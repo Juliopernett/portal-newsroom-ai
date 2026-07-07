@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./database:/app/database
+    restart: unless-stopped
+
+  # Cuando el proyecto migre de SQLite a PostgreSQL (ver docs/ROADMAP.md),
+  # se agregará aquí un servicio "db" (postgres:16) y DATABASE_URL en .env
+  # apuntará a él. No se agrega todavía para no introducir infraestructura
+  # que la fase actual no necesita.

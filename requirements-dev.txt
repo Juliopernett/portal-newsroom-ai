@@ -1,0 +1,13 @@
+# Dependencias de DESARROLLO.
+# Incluye producción (requirements.txt) más testing, linting y tipado.
+# Uso: pip install -r requirements-dev.txt
+# Esto NUNCA se instala en la imagen Docker de producción.
+-r requirements.txt
+
+# --- Testing ---
+pytest>=8.2,<9
+pytest-cov>=5.0,<6
+
+# --- Calidad de código ---
+ruff>=0.4,<1
+mypy>=1.10,<2
