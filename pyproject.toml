@@ -1,6 +1,6 @@
 [project]
 name = "portal-newsroom-ai"
-version = "0.2.0"
+version = "0.3.0"
 description = "Plataforma interna de Portal Vallenato para asistir al equipo editorial con IA."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -56,3 +56,11 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    # `Protocol` method bodies (`core/ports/`) are never executed directly —
+    # only concrete adapters that implement them run.
+    "^\\s*\\.\\.\\.$",
+    "^\\s*raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]

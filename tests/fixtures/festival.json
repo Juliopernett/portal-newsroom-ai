@@ -1,0 +1,38 @@
+[
+  {
+    "title": "Abren inscripciones para el Festival de la Leyenda Vallenata 2027",
+    "url": "https://festivalvallenato.example.com/noticias/inscripciones-2027",
+    "summary": "La Fundación Festival de la Leyenda Vallenata anunció el calendario oficial y la apertura de inscripciones para las categorías Rey Vallenato, Rey Aficionado y Piloneras.",
+    "image_url": "https://festivalvallenato.example.com/img/inscripciones-2027.jpg",
+    "published_at": "2026-07-02T07:00:00+00:00",
+    "category": "Festival",
+    "confidence": 0.95
+  },
+  {
+    "title": "El Festival Vallenato confirma primeras fechas del Reinado Infantil",
+    "url": "https://festivalvallenato.example.com/noticias/reinado-infantil-fechas",
+    "summary": "La organización reveló las primeras fechas de las eliminatorias del Reinado Infantil Vallenato en varios municipios del Cesar.",
+    "image_url": "https://festivalvallenato.example.com/img/reinado-infantil.jpg",
+    "published_at": "2026-07-05T16:20:00+00:00",
+    "category": "Festival",
+    "confidence": 0.8
+  },
+  {
+    "title": "Piloneras alistan coreografías para la edición 2027 del Festival",
+    "url": "https://festivalvallenato.example.com/noticias/piloneras-2027",
+    "summary": "Los grupos de danza tradicional ya ensayan las coreografías que representarán a sus municipios en el desfile de Piloneras.",
+    "image_url": "https://festivalvallenato.example.com/img/piloneras-2027.jpg",
+    "published_at": "2026-07-06T10:10:00+00:00",
+    "category": "Festival",
+    "confidence": 0.7
+  },
+  {
+    "title": "Festival de la Leyenda Vallenata 2027: así puedes inscribirte",
+    "url": "https://festivalvallenato.example.com/noticias/inscripciones-2027",
+    "summary": "Nota destacada nuevamente en la portada del sitio oficial recordando el proceso de inscripción para el Festival 2027.",
+    "image_url": "https://festivalvallenato.example.com/img/inscripciones-2027-destacado.jpg",
+    "published_at": "2026-07-02T07:00:00+00:00",
+    "category": "Festival",
+    "confidence": 0.95
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "title": "El 'churo' del acordeón: la ornamentación que distingue a los grandes maestros",
+    "url": "https://elpiloncultural.example.com/notas/el-churo-del-acordeon",
+    "summary": "Acordeoneros veteranos explican qué es el churo, el adorno melódico que separa a un intérprete correcto de uno excepcional.",
+    "image_url": "https://elpiloncultural.example.com/img/churo-acordeon.jpg",
+    "published_at": "2026-06-28T11:00:00+00:00",
+    "category": "Técnica Vallenata",
+    "confidence": 0.85
+  },
+  {
+    "title": "Taller gratuito enseñará a niños a hacer su primer churo en el acordeón",
+    "url": "https://elpiloncultural.example.com/notas/taller-churo-ninos",
+    "summary": "La Casa de la Cultura de Valledupar abrió inscripciones para un taller infantil enfocado en técnica de acordeón.",
+    "image_url": "https://elpiloncultural.example.com/img/taller-ninos.jpg",
+    "published_at": "2026-07-04T08:30:00+00:00",
+    "category": "Educación Musical",
+    "confidence": 0.6
+  }
+]

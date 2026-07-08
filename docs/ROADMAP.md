@@ -22,14 +22,25 @@ separación de dependencias de producción (`requirements.txt`) y desarrollo
 (`requirements-dev.txt`), y una guardarraíl explícita contra módulos
 `utils.py` genéricos (ver docs/CODING_STANDARDS.md).
 
-## Fase 1 — Radar & Extractor
+## Fase 1 — Radar & Extractor (en progreso)
 
-- Agente **Radar**: detección de noticias nuevas en las fuentes configuradas.
-- Agente **Extractor**: extracción estructurada del contenido (título,
-  cuerpo, imágenes, metadatos) usando Playwright/BeautifulSoup/Requests.
-- Primeras entidades de dominio (`core/entities/`) y modelos ORM
-  (`database/models/`) para representar una noticia detectada.
-- Deduplicación: nada se procesa dos veces.
+- ✅ **Discovery Engine** (Sprint 2, `feature/discovery-engine`): entidades
+  de dominio `NewsCandidate`, `Source`, `Article`, `EditorialTask`
+  (`core/entities/`); servicio `core.services.discovery_engine.DiscoveryEngine`
+  que agrega, deduplica por hash y ordena candidatos de varias fuentes;
+  evento `NewsFound` con payload real; `ContentSource` evolucionado para
+  devolver `NewsCandidate`; `FakeContentSource` + fixtures JSON para
+  probar todo sin red. Ver docs/ARCHITECTURE.md, sección "Discovery
+  Engine".
+- ⬜ Agente **Radar**: conectar `DiscoveryEngine` con un `ContentSource`
+  real (RSS, crawler, ...) y con `Repository` para descartar contra el
+  historial editorial persistido (hoy el `DiscoveryEngine` solo deduplica
+  dentro de una misma pasada, no contra ejecuciones anteriores).
+- ⬜ Agente **Extractor**: extracción estructurada del contenido completo
+  (cuerpo, imágenes adicionales) a partir de un `NewsCandidate`, usando
+  Playwright/BeautifulSoup/Requests.
+- ⬜ Modelos ORM (`database/models/`) para persistir `NewsCandidate` /
+  `Article` y sostener la deduplicación entre pasadas.
 
 ## Fase 2 — Writer & SEO
 
