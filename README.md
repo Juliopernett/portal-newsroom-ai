@@ -19,6 +19,24 @@ aprobación humana. Ver [PROJECT_RULES.md](docs/PROJECT_RULES.md).
 Para el contexto de negocio completo, ver [VISION.md](docs/VISION.md).
 Para el diseño técnico, ver [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Editorial Principles
+
+El principio raíz de todo el diseño editorial es **Human in the Loop**:
+la IA asiste, el editor decide. De ahí se derivan tres señales que
+priorizan (nunca deciden) qué le llega primero a un editor y con cuánta
+urgencia:
+
+- **Editorial Score** — qué tan importante sería la noticia, si es cierta.
+- **Confidence** — qué tan seguros estamos de que es cierta y está bien
+  capturada (ya existe en código: `NewsCandidate.confidence`).
+- **Freshness** — qué tan reciente y sensible al tiempo es.
+
+Ninguna de las tres, ni combinadas, aprueba o publica nada — solo
+ordenan lo que un humano revisa. Ver
+[docs/editorial/HUMAN_IN_THE_LOOP.md](docs/editorial/HUMAN_IN_THE_LOOP.md)
+y [docs/editorial/CONFIDENCE_MODEL.md](docs/editorial/CONFIDENCE_MODEL.md)
+(que compara los tres ejes en detalle) para la especificación completa.
+
 ## Stack tecnológico
 
 - Python 3.13
@@ -91,6 +109,20 @@ docker compose up --build
 | [CODING_STANDARDS.md](docs/CODING_STANDARDS.md) | Convenciones de código |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Cómo contribuir |
 | [CHANGELOG.md](CHANGELOG.md) | Historial de cambios |
+
+**Especificación editorial** (ver [docs/editorial/](docs/editorial/)):
+
+| Documento | Contenido |
+|---|---|
+| [editorial/HUMAN_IN_THE_LOOP.md](docs/editorial/HUMAN_IN_THE_LOOP.md) | El principio raíz: qué puede y qué nunca puede hacer la IA |
+| [editorial/EDITORIAL_POLICIES.md](docs/editorial/EDITORIAL_POLICIES.md) | Políticas obligatorias numeradas (EP-01 a EP-10), con flujo de decisión |
+| [editorial/EDITORIAL_SCORE.md](docs/editorial/EDITORIAL_SCORE.md) | Qué mide el Editorial Score y qué lo aumenta o penaliza |
+| [editorial/CONFIDENCE_MODEL.md](docs/editorial/CONFIDENCE_MODEL.md) | Qué es Confidence y cómo se compara con Score y Freshness |
+| [editorial/FRESHNESS_MODEL.md](docs/editorial/FRESHNESS_MODEL.md) | Cómo se calcula la vigencia temporal de una noticia |
+| [editorial/EDITORIAL_DECISION_TREE.md](docs/editorial/EDITORIAL_DECISION_TREE.md) | El flujo editorial completo, de la detección a la publicación |
+| [editorial/NEWS_LIFECYCLE.md](docs/editorial/NEWS_LIFECYCLE.md) | Los estados de una noticia, de detectada a archivada |
+| [editorial/KPIS.md](docs/editorial/KPIS.md) | Las métricas que definen si la plataforma cumple su propósito |
+| [editorial/EDITOR_PERSONAS.md](docs/editorial/EDITOR_PERSONAS.md) | Roles editoriales y sus responsabilidades |
 
 ## Para desarrolladores nuevos
 
