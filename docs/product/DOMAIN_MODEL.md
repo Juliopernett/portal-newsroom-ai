@@ -52,23 +52,77 @@ Contenido detectado por una `Source`, antes de ser extraído por completo.
 **Ya existe en código** (`core.entities.news_candidate.NewsCandidate`,
 Sprint 2). Ver [docs/architecture/discovery-engine.md](../architecture/discovery-engine.md).
 
+### EditorialAssessment (Value Object)
+
+*Refinado en Sprint 2.3.1 — ver
+[docs/adr/ADR-002-editorial-assessment.md](../adr/ADR-002-editorial-assessment.md)
+para la decisión completa.*
+
+La evaluación editorial de un `NewsCandidate`, calculada en un momento
+dado: `score` ([Editorial Score](../editorial/EDITORIAL_SCORE.md)),
+`confidence` ([Confidence](../editorial/CONFIDENCE_MODEL.md)),
+`freshness` ([Freshness](../editorial/FRESHNESS_MODEL.md)), `priority`
+(la prioridad combinada resultante, la que realmente ordena la bandeja
+de un editor), `reasoning` (explicación legible de por qué se llegó a
+estos valores) y `calculated_at` (cuándo se calculó).
+
+Es un **Value Object**, no una entidad: no tiene identidad propia ni se
+actualiza — cada vez que se recalcula (por ejemplo, cuando un rumor se
+confirma y su Confidence cambia), se produce una `EditorialAssessment`
+**nueva**, no se modifica la anterior. Un mismo `NewsCandidate` puede
+tener varias `EditorialAssessment` a lo largo de su vida, formando un
+historial de cómo cambió el juicio de la plataforma sobre él. Esto no es
+un patrón nuevo en el proyecto: es la misma filosofía que ya usan las
+entidades en código (`core/entities/*.py`, Sprint 2, todas
+`frozen=True`) aplicada a un concepto que además necesita poder repetirse
+en el tiempo.
+
+Se separa deliberadamente de `NewsCandidate` y de `Article` — ver
+[docs/editorial/EDITORIAL_SCORE.md](../editorial/EDITORIAL_SCORE.md) y el
+ADR-002 para el razonamiento completo.
+
 ### Article
 
 Un artículo en el pipeline editorial, desde que se extrae hasta que se
-publica o se rechaza. **Ya existe en código**
+aprueba o se rechaza. **Ya existe en código**
 (`core.entities.article.Article`, Sprint 2), con su ciclo de estados
 (`ArticleStatus`).
 
+`ArticleStatus` se mantiene deliberadamente simple (`DRAFT`,
+`PENDING_REVIEW`, `APPROVED`, `REJECTED`, `PUBLISHED`) — describe
+únicamente el estado **editorial** del contenido, nunca su estado de
+**distribución** por canal. Esa complejidad vive en `Publication` y
+`PublicationStatus`, no aquí — ver ADR-002.
+
 ### Publication
 
-El registro de que un `Article` fue efectivamente publicado por un
-humano en un canal concreto — cuándo, dónde, por quién. Distinto del
-estado `PUBLISHED` de un `Article`: el estado dice "esto ya se publicó
-en algún lado"; `Publication` es el hecho auditable de una publicación
-específica, en un `MediaOutlet` que en el futuro podría publicar el mismo
-artículo en más de un canal. No existe en código todavía — no hace falta
-mientras un `Article` solo pueda terminar en un único sitio WordPress por
-cliente.
+El registro de que un `Article` fue distribuido — o se intentó
+distribuir — en un canal concreto: WordPress, Facebook, Instagram,
+Telegram (como canal público, distinto del `NotificationChannel` interno
+que usa el equipo editorial), X, TikTok, o cualquier canal futuro. Un
+mismo `Article` puede generar **muchas** `Publication`, una por canal, y
+cada una avanza con su propio `PublicationStatus`, independiente de las
+demás y de `ArticleStatus`.
+
+No existe en código todavía. En el MVP (un solo canal: WordPress),
+`ArticleStatus.PUBLISHED` y una única `Publication` en estado
+`Published` son, en la práctica, equivalentes — la separación se vuelve
+indispensable a partir del sprint "Social" (v1.0), cuando aparece un
+segundo canal de distribución.
+
+#### PublicationStatus
+
+| Estado | Qué significa |
+|---|---|
+| `Pending` | La `Publication` existe (por ejemplo, un borrador listo para ese canal) pero todavía no se envió |
+| `Scheduled` | Un editor la programó para un momento futuro |
+| `Published` | Está publicada y visible en ese canal |
+| `Failed` | Se intentó publicar y falló (error técnico del canal) — requiere reintento manual |
+| `Archived` | Se retiró deliberadamente de ese canal después de haber estado publicada |
+| `Cancelled` | Un editor decidió no distribuir en ese canal, después de todo |
+
+Ver el diagrama de estados completo en
+[docs/editorial/NEWS_LIFECYCLE.md](../editorial/NEWS_LIFECYCLE.md).
 
 ### SocialAccount
 
@@ -111,12 +165,19 @@ erDiagram
     MediaOutlet ||--o{ SocialAccount : administra
 
     Source ||--o{ NewsCandidate : produce
+    NewsCandidate ||--o{ EditorialAssessment : "se evalúa mediante"
     NewsCandidate |o--o| Article : "se convierte en"
     Article ||--o{ EditorialTask : genera
     Editor ||--o{ EditorialTask : resuelve
-    Article ||--o{ Publication : "se publica como"
+    Article ||--o{ Publication : "se distribuye como"
     EditorialRule }o--o{ Article : restringe
 ```
+
+`NewsCandidate ||--o{ EditorialAssessment` es intencionalmente "uno a
+muchos": cada recálculo agrega una `EditorialAssessment` nueva, nunca
+reemplaza la anterior (ver la sección de arriba). `Article ||--o{
+Publication` refleja que un artículo puede distribuirse en varios canales
+a la vez, cada uno con su propio ciclo de vida.
 
 ## Frontera entre lo conceptual y lo implementado
 
@@ -129,7 +190,8 @@ erDiagram
 | `MediaOutlet` | ⬜ Conceptual, no implementada | — |
 | `Editor` | ⬜ Conceptual, no implementada | — |
 | `EditorialRule` | ⬜ Conceptual, no implementada | — |
-| `Publication` | ⬜ Conceptual, no implementada | — |
+| `EditorialAssessment` (Value Object) | ⬜ Conceptual, no implementada — ver ADR-002 | — |
+| `Publication` / `PublicationStatus` | ⬜ Conceptual, no implementada | — |
 | `SocialAccount` | ⬜ Conceptual, no implementada | — |
 | `AIProvider` (entidad de negocio) | ⬜ Conceptual — existe el `Protocol` técnico homónimo en `core/ports/ai_provider.py`, no la entidad de negocio | — |
 | `NotificationChannel` (entidad de negocio) | ⬜ Conceptual — existe el `Protocol` técnico `core.ports.notifier.Notifier`, no la entidad de negocio | — |
