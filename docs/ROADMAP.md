@@ -73,8 +73,68 @@ separación de dependencias de producción (`requirements.txt`) y desarrollo
   anteriores, con capacidad de decidir dinámicamente el flujo según el tipo
   de contenido detectado.
 
-## Futuro (sin fecha)
+## Futuro — evolución hacia SaaS
 
-- Migración de SQLite a PostgreSQL.
-- Soporte multi-fuente y multi-sección editorial.
-- Panel de control interno (evaluar si amerita introducir una API/FastAPI).
+A partir de Sprint 2.2, Portal Vallenato se trata como el **cliente
+piloto** de una plataforma pensada para servir a más de un medio digital
+independiente — ver [docs/product/PRODUCT_VISION.md](product/PRODUCT_VISION.md).
+El MVP (fases 0 a 8 de este documento) no cambia: sigue construyéndose
+para un único cliente. Lo que sigue es lo que viene después de v1.0,
+detallado en [docs/product/SAAS_EVOLUTION.md](product/SAAS_EVOLUTION.md)
+y [docs/product/MVP_SCOPE.md](product/MVP_SCOPE.md).
+
+```mermaid
+flowchart LR
+    V1["v1.0\nMVP de Portal Vallenato"] --> V11["v1.1\nMulti-media support"]
+    V11 --> V12["v1.2\nCustomer configuration"]
+    V12 --> V13["v1.3\nAI scoring engine"]
+    V13 --> V14["v1.4\nAnalytics"]
+    V14 --> V20(["v2.0\nTrue SaaS"])
+
+    style V1 fill:#d1e7dd,stroke:#0f5132
+    style V20 fill:#cfe2ff,stroke:#084298
+```
+
+### v1.1 — Multi-media support
+
+Primer paso hacia multi-tenencia: la plataforma puede desplegarse una
+vez por cliente adicional (Etapa "Multi Customer" —
+[docs/product/SAAS_EVOLUTION.md](product/SAAS_EVOLUTION.md)), sin
+necesidad todavía de que un único despliegue sirva a varios clientes a
+la vez.
+
+### v1.2 — Customer configuration
+
+La entidad `MediaOutlet` se vuelve real, y la configuración por cliente
+(ver [docs/product/CUSTOMER_CONFIGURATION.md](product/CUSTOMER_CONFIGURATION.md))
+empieza a moverse de `.env` a datos.
+
+### v1.3 — AI scoring engine
+
+`DiscoveryEngine` gana una señal de relevancia/calidad sobre cada
+`NewsCandidate` (más allá del orden actual por prioridad de fuente y
+`confidence` — ver
+[docs/architecture/discovery-engine.md](architecture/discovery-engine.md)),
+para ayudar a un editor a priorizar qué revisar primero cuando hay
+volumen alto.
+
+### v1.4 — Analytics
+
+Métricas por cliente: tiempo ahorrado, tasa de aprobación, fuentes más
+productivas — la versión multi-cliente del agente Analytics ya previsto
+en la Fase 7.
+
+### v2.0 — True SaaS
+
+Un despliegue compartido sirve a todos los clientes. Incluye lo que hoy
+está explícitamente fuera de alcance: autenticación, autorización,
+facturación y, probablemente, una API pública — ver
+[docs/product/SAAS_EVOLUTION.md](product/SAAS_EVOLUTION.md), etapa
+"True SaaS".
+
+## Otros temas técnicos futuros (sin fecha)
+
+- Migración de SQLite a PostgreSQL — se vuelve más urgente, no opcional,
+  en cuanto exista más de un cliente concurrente (v1.1 en adelante).
+- Panel de control interno (evaluar si amerita introducir una
+  API/FastAPI) — ver v1.2 y v2.0.

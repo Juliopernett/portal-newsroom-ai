@@ -19,6 +19,19 @@ aprobación humana. Ver [PROJECT_RULES.md](docs/PROJECT_RULES.md).
 Para el contexto de negocio completo, ver [VISION.md](docs/VISION.md).
 Para el diseño técnico, ver [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Product Vision
+
+Portal Vallenato es el **cliente piloto**, no el producto final. Portal
+Newsroom AI se diseña como una plataforma de inteligencia editorial
+pensada para servir, a futuro, a múltiples medios digitales
+independientes con necesidades editoriales comparables — sin que eso
+retrase ni cambie el alcance del MVP que se está construyendo hoy para
+Portal Vallenato.
+
+Ver [docs/product/PRODUCT_VISION.md](docs/product/PRODUCT_VISION.md) para
+la visión completa, y [docs/product/](docs/product/) para el modelo de
+dominio, el alcance del MVP y la estrategia de evolución hacia SaaS.
+
 ## Stack tecnológico
 
 - Python 3.13
@@ -97,6 +110,17 @@ todavía.
 | [CODING_STANDARDS.md](docs/CODING_STANDARDS.md) | Convenciones de código |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Cómo contribuir |
 | [CHANGELOG.md](CHANGELOG.md) | Historial de cambios |
+
+**Visión de producto y evolución a SaaS** (ver [docs/product/](docs/product/)):
+
+| Documento | Contenido |
+|---|---|
+| [product/PRODUCT_VISION.md](docs/product/PRODUCT_VISION.md) | Misión, visión, clientes objetivo, por qué no es un scraper ni un plugin de WordPress |
+| [product/DOMAIN_MODEL.md](docs/product/DOMAIN_MODEL.md) | Entidades de negocio (incluye `MediaOutlet`) y sus relaciones |
+| [product/MVP_SCOPE.md](docs/product/MVP_SCOPE.md) | Qué está dentro y fuera del MVP de Portal Vallenato |
+| [product/SAAS_EVOLUTION.md](docs/product/SAAS_EVOLUTION.md) | Cómo se evoluciona de un cliente a una plataforma multi-cliente sin reescribir el sistema |
+| [product/CUSTOMER_CONFIGURATION.md](docs/product/CUSTOMER_CONFIGURATION.md) | Todo lo que debería ser configurable por cliente a futuro |
+| [product/COMPETITIVE_ADVANTAGES.md](docs/product/COMPETITIVE_ADVANTAGES.md) | En qué se diferencia de RSS readers, plugins de WordPress, Zapier y asistentes de IA simples |
 
 **ADR — decisiones de arquitectura:**
 
