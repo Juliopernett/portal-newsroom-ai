@@ -80,7 +80,13 @@ python -m app.main
 docker compose up --build
 ```
 
-## Documentación
+## Project Documentation
+
+Documentación completa del proyecto ("Engineering Handbook"), organizada
+por tema. Si algo no está aquí, probablemente no está documentado
+todavía.
+
+**Base (Sprint 1 / 1.1):**
 
 | Documento | Contenido |
 |---|---|
@@ -92,15 +98,69 @@ docker compose up --build
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Cómo contribuir |
 | [CHANGELOG.md](CHANGELOG.md) | Historial de cambios |
 
+**ADR — decisiones de arquitectura:**
+
+| Documento | Contenido |
+|---|---|
+| [adr/ADR-001-project-vision.md](docs/adr/ADR-001-project-vision.md) | Por qué existe el proyecto, por qué no es un scraper, por qué agentes + Ports & Adapters |
+
+**Architecture — diseño técnico con diagramas:**
+
+| Documento | Contenido |
+|---|---|
+| [architecture/system-overview.md](docs/architecture/system-overview.md) | Visión general, flujo del sistema, agentes y responsabilidades (con diagramas Mermaid) |
+| [architecture/discovery-engine.md](docs/architecture/discovery-engine.md) | Qué hace, qué no hace y cómo evolucionará el Discovery Engine |
+
+**Business — el negocio detrás del código:**
+
+| Documento | Contenido |
+|---|---|
+| [business/editorial-workflow.md](docs/business/editorial-workflow.md) | El flujo editorial completo, de la noticia a WordPress |
+
+**Development — cómo se trabaja en este repo:**
+
+| Documento | Contenido |
+|---|---|
+| [development/branch-strategy.md](docs/development/branch-strategy.md) | Git Flow: `feature/` → `develop` → `main` |
+| [development/code-review.md](docs/development/code-review.md) | Qué se revisa antes de integrar un cambio |
+
+**Deployment — hacia dónde va la infraestructura:**
+
+| Documento | Contenido |
+|---|---|
+| [deployment/aws.md](docs/deployment/aws.md) | Estrategia de despliegue futura en AWS (propuesta, no implementada) |
+
+**Editorial — principios que rigen el contenido:**
+
+| Documento | Contenido |
+|---|---|
+| [editorial/style-guide.md](docs/editorial/style-guide.md) | Principios editoriales: sin inventar hechos, sin clickbait, SEO responsable, respeto por las fuentes |
+| [editorial/ai-writing-rules.md](docs/editorial/ai-writing-rules.md) | Cómo debe escribir la IA: tono, longitud, fuentes, estilo |
+
+**Operations — cómo se opera en producción:**
+
+| Documento | Contenido |
+|---|---|
+| [operations/logging.md](docs/operations/logging.md) | Estrategia de logging actual y futura |
+
+**Roadmap — el plan sprint a sprint:**
+
+| Documento | Contenido |
+|---|---|
+| [roadmap/v1-roadmap.md](docs/roadmap/v1-roadmap.md) | Todos los sprints planeados hasta v1.0 (con diagrama) |
+
 ## Para desarrolladores nuevos
 
-Para entender el proyecto en menos de 30 minutos, lee en este orden:
+Para entender el proyecto en menos de una hora, lee en este orden:
 
 1. [VISION.md](docs/VISION.md) — qué problema resuelve y qué NO es.
-2. [ARCHITECTURE.md](docs/ARCHITECTURE.md) — cómo está organizado y por qué.
-3. [PROJECT_RULES.md](docs/PROJECT_RULES.md) — lo que nunca se debe romper.
-4. [CODING_STANDARDS.md](docs/CODING_STANDARDS.md) — cómo se escribe el código aquí.
-5. [ROADMAP.md](docs/ROADMAP.md) — en qué fase está el proyecto ahora mismo.
+2. [adr/ADR-001-project-vision.md](docs/adr/ADR-001-project-vision.md) — por qué se tomaron las decisiones de arquitectura fundacionales.
+3. [architecture/system-overview.md](docs/architecture/system-overview.md) — cómo está organizado, con diagramas.
+4. [ARCHITECTURE.md](docs/ARCHITECTURE.md) — el mismo diseño, en detalle completo.
+5. [PROJECT_RULES.md](docs/PROJECT_RULES.md) — lo que nunca se debe romper.
+6. [CODING_STANDARDS.md](docs/CODING_STANDARDS.md) — cómo se escribe el código aquí.
+7. [business/editorial-workflow.md](docs/business/editorial-workflow.md) — el mismo sistema, visto desde el negocio.
+8. [roadmap/v1-roadmap.md](docs/roadmap/v1-roadmap.md) — en qué sprint está el proyecto ahora mismo.
 
 Luego, para saber dónde poner código nuevo, usa esta guía rápida:
 

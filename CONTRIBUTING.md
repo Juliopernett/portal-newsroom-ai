@@ -12,7 +12,9 @@ pytest
 
 ## Flujo de trabajo
 
-1. Crea una rama descriptiva a partir de `main`:
+1. Crea una rama descriptiva a partir de `develop` (ver
+   [docs/development/branch-strategy.md](docs/development/branch-strategy.md)
+   para el modelo completo de ramas):
    - `feature/<nombre-corto>` para funcionalidad nueva.
    - `fix/<nombre-corto>` para correcciones.
    - `docs/<nombre-corto>` para documentación.
