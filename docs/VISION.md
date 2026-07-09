@@ -1,5 +1,14 @@
 # Visión del proyecto
 
+> **Nota (Sprint 2.2):** este documento describe correctamente el
+> problema y los principios de diseño del MVP. La afirmación "no es un
+> producto genérico multi-cliente" en la sección "Qué NO es" describía la
+> intención original del proyecto y ya no es exacta: Portal Vallenato
+> pasó a ser el **cliente piloto** de una plataforma pensada para servir
+> a más de un medio a futuro, sin que eso cambie el alcance del MVP. Ver
+> [docs/product/PRODUCT_VISION.md](product/PRODUCT_VISION.md) para la
+> visión de producto vigente.
+
 ## Problema
 
 El equipo editorial de Portal Vallenato dedica una parte significativa de su
@@ -36,8 +45,12 @@ Portal Newsroom AI:
   [PROJECT_RULES.md](PROJECT_RULES.md).
 - No reemplaza el criterio editorial humano: reescribe y sugiere, no decide
   qué es noticia ni qué se publica.
-- No es un producto genérico multi-cliente. Es una herramienta interna,
-  construida a medida del flujo de trabajo de Portal Vallenato.
+- ~~No es un producto genérico multi-cliente. Es una herramienta interna,
+  construida a medida del flujo de trabajo de Portal Vallenato.~~
+  **Actualizado en Sprint 2.2:** el MVP sigue construyéndose a medida del
+  flujo de trabajo de Portal Vallenato, pero como cliente piloto de una
+  plataforma pensada para servir a más de un medio — ver
+  [docs/product/PRODUCT_VISION.md](product/PRODUCT_VISION.md).
 
 ## A quién sirve
 
