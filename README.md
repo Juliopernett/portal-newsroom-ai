@@ -3,8 +3,9 @@
 Plataforma interna de **Portal Vallenato** para asistir al equipo editorial en la
 detección, redacción y publicación asistida de noticias.
 
-> **Estado:** Fase 0 — Foundation. Todavía no hay agentes implementados.
-> Ver [ROADMAP.md](docs/ROADMAP.md).
+> **Estado:** Fase 1 — Radar & Extractor (en progreso). Discovery Engine
+> (Sprint 2) ya implementado en `core/`; los agentes Radar/Extractor
+> todavía no. Ver [ROADMAP.md](docs/ROADMAP.md).
 
 ## ¿Qué es esto?
 
