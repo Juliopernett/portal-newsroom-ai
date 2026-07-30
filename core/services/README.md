@@ -1,16 +1,19 @@
 # core/services
 
-Vacío intencionalmente durante este sprint (Foundation Hardening).
-
 ## Qué vive aquí
 
 Servicios de dominio: lógica de negocio pura que no pertenece naturalmente
 a una única entidad y por lo tanto no encaja como método de un modelo de
-`core/entities/`. Ejemplos de lo que llegará aquí a partir de Sprint 2+:
+`core/entities/`.
 
-- Reglas de deduplicación que combinan más de una fuente de información
-  (por ejemplo, decidir si dos referencias distintas son "la misma
-  noticia").
+- `deduplication.py`: `generate_candidate_hash`, la huella de contenido
+  que decide si dos candidatos son "la misma noticia" (Sprint 2).
+- `discovery_engine.py`: `DiscoveryEngine`, el motor que agrega, deduplica
+  y ordena candidatos provenientes de varias fuentes (Sprint 2). Ver
+  docs/ARCHITECTURE.md, sección "Discovery Engine".
+
+Ejemplos de lo que llegará aquí en sprints futuros:
+
 - Reglas de aprobación editorial que dependan de más de una entidad.
 
 ## Qué NO vive aquí

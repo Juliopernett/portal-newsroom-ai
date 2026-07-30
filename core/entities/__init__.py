@@ -1,7 +1,26 @@
 """Domain entities.
 
-Intentionally empty during the Foundation phase. Domain entities (e.g. an
-`Article` or a `Source`) will be introduced starting with the Radar/Extractor
-agents (see docs/ROADMAP.md), once the fields they need are driven by a real
-requirement instead of being guessed in advance.
+Plain, immutable dataclasses describing the shapes the domain works with
+as content moves through the editorial pipeline — no behavior beyond
+constructor validation, no infrastructure dependencies. Business logic
+that spans more than one entity belongs in `core/services/`, not here.
+
+Re-exported below so consumers can `from core.entities import
+NewsCandidate` instead of reaching into the submodule.
 """
+
+from __future__ import annotations
+
+from core.entities.article import Article, ArticleStatus
+from core.entities.editorial_task import EditorialTask, EditorialTaskStatus
+from core.entities.news_candidate import NewsCandidate
+from core.entities.source import Source
+
+__all__ = [
+    "Article",
+    "ArticleStatus",
+    "EditorialTask",
+    "EditorialTaskStatus",
+    "NewsCandidate",
+    "Source",
+]

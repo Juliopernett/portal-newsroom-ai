@@ -69,18 +69,27 @@ dependencias.
 
 ### `core/` — Dominio
 
-- `core/entities/`: modelos de dominio (se poblará a partir de la Fase 1,
-  cuando exista un agente que realmente los necesite).
+- `core/entities/`: modelos de dominio. Desde Sprint 2: `NewsCandidate`,
+  `Source`, `Article`, `EditorialTask` — dataclasses inmutables
+  (`frozen=True, slots=True, kw_only=True`), sin Pydantic ni ninguna otra
+  dependencia externa, consistente con que `core/` no tiene dependencias
+  de infraestructura.
 - `core/ports/`: contratos (`typing.Protocol`) que describen lo que cada
   agente necesita de una fuente de contenido, un extractor, un proveedor de
   IA, un proveedor de imágenes, un publicador de CMS, un notificador y un
-  repositorio de persistencia/historial.
-- `core/events/`: eventos de dominio — hechos de negocio ya ocurridos
-  (`NewsFound`, `ArticleRewritten`, `DraftCreated`,
-  `NotificationRequested`). Hoy son clases vacías; tendrán payload real a
-  partir de Sprint 2. Ver "Eventos de dominio" más abajo.
+  repositorio de persistencia/historial. Desde Sprint 2, `ContentSource`
+  devuelve `list[NewsCandidate]` (antes `list[str]`, antes de que la
+  entidad existiera) y expone la `Source` que representa.
+- `core/events/`: eventos de dominio — hechos de negocio ya ocurridos.
+  Desde Sprint 2, `NewsFound` tiene payload real (`candidates`,
+  `occurred_at`), emitido por `DiscoveryEngine`. `ArticleRewritten`,
+  `DraftCreated` y `NotificationRequested` siguen siendo clases vacías,
+  pendientes del sprint del agente que las necesite. Ver "Eventos de
+  dominio" más abajo.
 - `core/services/`: servicios de dominio — lógica de negocio pura que no
-  pertenece a una única entidad (ver `core/services/README.md`).
+  pertenece a una única entidad (ver `core/services/README.md`). Desde
+  Sprint 2: `generate_candidate_hash` (deduplicación) y `DiscoveryEngine`.
+  Ver "Discovery Engine" más abajo.
 - `core/exceptions.py`: jerarquía de errores de negocio
   (`DomainError` y subclases).
 
@@ -91,7 +100,7 @@ Un paquete por responsabilidad. Cada agente depende únicamente de los
 
 | Agente | Responsabilidad | Port principal |
 |---|---|---|
-| `radar` | Detectar noticias nuevas | `ContentSource`, `Repository` |
+| `radar` | Detectar noticias nuevas | `ContentSource`, `Repository`, `core.services.DiscoveryEngine` |
 | `extractor` | Extraer contenido estructurado | `ContentExtractor` |
 | `writer` | Reescribir con estilo editorial | `AIProvider` |
 | `seo` | Generar metadatos SEO | `AIProvider` |
@@ -186,7 +195,34 @@ Fuente externa
  Aprobación humana ──▶ [Repository] registra la decisión (historial editorial)
 ```
 
-## Eventos de dominio (preparado, no implementado)
+## Discovery Engine (Sprint 2)
+
+`core.services.discovery_engine.DiscoveryEngine` es el motor detrás del
+futuro agente Radar — no es el agente en sí. Recibe una colección de
+adaptadores `ContentSource`, y por cada uno **habilitado**:
+
+1. Pide sus candidatos (`fetch_candidates() -> list[NewsCandidate]`).
+2. Deduplica por `hash` (huella calculada por el adaptador vía
+   `core.services.deduplication.generate_candidate_hash`), quedándose con
+   la primera aparición.
+3. Ordena el resultado por prioridad de la fuente, luego por `confidence`,
+   luego por título.
+4. Devuelve un evento `NewsFound` con el resultado.
+
+No hace scraping, no llama IA, no persiste nada — cualquiera de esas cosas
+es responsabilidad de un adaptador `ContentSource` concreto (que todavía
+no existe) o de quien consuma el `NewsFound` que devuelve. Para probarlo
+sin red existe `tests/fakes/FakeContentSource`, que lee JSON de
+`tests/fixtures/` en lugar de una fuente real — nunca se importa desde
+código de producción.
+
+Lo que falta para que `agents/radar/` exista de verdad (fases futuras):
+un `ContentSource` real por fuente (RSS, crawler, ...), un
+`core.ports.repository.Repository` que descarte contra el historial
+editorial persistido (hoy la deduplicación es solo dentro de una misma
+pasada), y un `workflow` que llame a todo esto con una cadencia.
+
+## Eventos de dominio (preparado, parcialmente implementado)
 
 `core/events/` reserva el espacio donde vivirán los hechos de negocio que
 la aplicación necesita comunicar entre agentes sin acoplarlos directamente
@@ -195,12 +231,15 @@ querer enterarse sin que `agents/wordpress/` conozca la existencia de
 `agents/analytics/`).
 
 Hoy **no existe** ningún mecanismo de publicación/suscripción (event bus).
-Los eventos son solo clases vacías, documentadas, sin comportamiento. Esto
-es intencional: se introducirá un `core.ports.event_bus.EventBus` (contrato,
-igual que los demás ports) más adelante en el roadmap, cuando exista un
-primer caso real de un agente reaccionando al evento de otro — no antes.
+`NewsFound` tiene payload real desde Sprint 2, pero "dispararlo" hoy
+significa simplemente devolverlo como resultado de
+`DiscoveryEngine.run()` — quien lo reciba decide qué hacer. Los otros tres
+eventos siguen siendo clases vacías. Se introducirá un
+`core.ports.event_bus.EventBus` (contrato, igual que los demás ports) más
+adelante en el roadmap, cuando exista un primer caso real de un agente
+reaccionando al evento de otro — no antes.
 
-Hasta entonces, `workflows/` sigue siendo el único mecanismo de
+Hasta entonces, `workflows/` sigue siendo el mecanismo previsto de
 coordinación entre agentes (llamadas directas, secuenciales).
 
 ## Principios técnicos aplicados
