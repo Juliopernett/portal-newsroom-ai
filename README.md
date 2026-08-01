@@ -5,7 +5,11 @@ detección, redacción y publicación asistida de noticias.
 
 > **Estado:** Fase 1 — Radar & Extractor (en progreso). Discovery Engine
 > (Sprint 2) ya implementado en `core/`; los agentes Radar/Extractor
-> todavía no. Ver [ROADMAP.md](docs/ROADMAP.md).
+> todavía no. Sprint 3A definió el reposicionamiento comercial —
+> **Publication Inbox** y **Commercial Manager** (diseñados, no
+> implementados) — ver [ROADMAP.md](docs/ROADMAP.md) y
+> [ADR-003](docs/adr/ADR-003-publication-inbox.md) /
+> [ADR-004](docs/adr/ADR-004-commercial-manager.md).
 
 ## ¿Qué es esto?
 
@@ -147,6 +151,8 @@ todavía.
 |---|---|
 | [adr/ADR-001-project-vision.md](docs/adr/ADR-001-project-vision.md) | Por qué existe el proyecto, por qué no es un scraper, por qué agentes + Ports & Adapters |
 | [adr/ADR-002-editorial-assessment.md](docs/adr/ADR-002-editorial-assessment.md) | Por qué Editorial Score/Confidence/Freshness viven en `EditorialAssessment`, y por qué `Publication` se separa de `Article` |
+| [adr/ADR-003-publication-inbox.md](docs/adr/ADR-003-publication-inbox.md) | Por qué `PublicationRequest` converge todos los canales de entrada (WhatsApp, Radar, manual, Email futuro) sin tocar `NewsCandidate` |
+| [adr/ADR-004-commercial-manager.md](docs/adr/ADR-004-commercial-manager.md) | Por qué Commercial Manager es un bounded context independiente, `Client` no es `MediaOutlet`, y `Campaign` es la unidad operativa |
 
 **Architecture — diseño técnico con diagramas:**
 
@@ -154,12 +160,15 @@ todavía.
 |---|---|
 | [architecture/system-overview.md](docs/architecture/system-overview.md) | Visión general, flujo del sistema, agentes y responsabilidades (con diagramas Mermaid) |
 | [architecture/discovery-engine.md](docs/architecture/discovery-engine.md) | Qué hace, qué no hace y cómo evolucionará el Discovery Engine |
+| [architecture/publication-inbox.md](docs/architecture/publication-inbox.md) | Cómo convergen WhatsApp, Radar, entrada manual y Email (futuro) en `PublicationRequest` |
+| [architecture/commercial-manager.md](docs/architecture/commercial-manager.md) | `Client`, `Contract`, `Plan`, `Campaign` y cómo se calcula la cuota comercial |
 
 **Business — el negocio detrás del código:**
 
 | Documento | Contenido |
 |---|---|
 | [business/editorial-workflow.md](docs/business/editorial-workflow.md) | El flujo editorial completo, de la noticia a WordPress |
+| [business/commercial-workflow.md](docs/business/commercial-workflow.md) | El flujo comercial, de un mensaje de WhatsApp a una campaña con cuota vigilada |
 
 **Development — cómo se trabaja en este repo:**
 
@@ -195,6 +204,12 @@ todavía.
 | Documento | Contenido |
 |---|---|
 | [operations/logging.md](docs/operations/logging.md) | Estrategia de logging actual y futura |
+
+**UX — revisión de la interfaz interna:**
+
+| Documento | Contenido |
+|---|---|
+| [ux/sprint-3d5-ux-review.md](docs/ux/sprint-3d5-ux-review.md) | Revisión de la interfaz reemplaza-Excel (Sprint 3D-UI) desde el uso diario real: wireframes y mejoras priorizadas, ninguna implementada todavía |
 
 **Roadmap — el plan sprint a sprint:**
 

@@ -11,6 +11,13 @@ a una única entidad y por lo tanto no encaja como método de un modelo de
 - `discovery_engine.py`: `DiscoveryEngine`, el motor que agrega, deduplica
   y ordena candidatos provenientes de varias fuentes (Sprint 2). Ver
   docs/ARCHITECTURE.md, sección "Discovery Engine".
+- `pauta_service.py`: `PautaService`, calcula cupo consumido/restante y
+  vigencia/vencimiento de una `Pauta` (Sprint 3B — Commercial Core MVP).
+  Todo calculado a partir de `Pauta` y su historial de
+  `PublicationRequest`; nunca un contador almacenado.
+- `publication_request_service.py`: `mark_as_published`, la única
+  transición de estado de `PublicationRequest` que este sprint necesita
+  (Sprint 3B).
 
 Ejemplos de lo que llegará aquí en sprints futuros:
 

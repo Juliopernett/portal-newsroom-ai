@@ -25,6 +25,17 @@ como cliente único, con configuración global vía `.env`:
 - Flujo de aprobación/rechazo humano, registrado en el historial.
 - Propuestas básicas de contenido para redes sociales — planeado, sprint
   "Social".
+- **Commercial Manager** (`Client`, `CommercialContact`, `Contract`,
+  `Plan`, `Campaign`, `PublicationRegistryEntry`, `Alert`) — agregado en
+  Sprint 3A, planeado Sprint 3B (núcleo) y 3C (dashboard). No es
+  multi-tenencia: todo `Client` vive dentro del único `MediaOutlet`
+  implícito del MVP (Portal Vallenato) — ver
+  [ADR-004](../adr/ADR-004-commercial-manager.md), Decisión 1, y
+  [docs/architecture/commercial-manager.md](../architecture/commercial-manager.md).
+- **Publication Inbox** (`PublicationRequest`, `MediaAsset`) — agregado en
+  Sprint 3A, planeado Sprint 3D. Reemplaza a `NewsCandidate` como punto de
+  entrada al pipeline editorial para todo canal (WhatsApp, Radar, manual)
+  — ver [ADR-003](../adr/ADR-003-publication-inbox.md).
 
 ## Fuera del MVP
 

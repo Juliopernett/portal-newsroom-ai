@@ -12,15 +12,23 @@ NewsCandidate` instead of reaching into the submodule.
 from __future__ import annotations
 
 from core.entities.article import Article, ArticleStatus
+from core.entities.client import Client, ClientType
 from core.entities.editorial_task import EditorialTask, EditorialTaskStatus
 from core.entities.news_candidate import NewsCandidate
+from core.entities.pauta import Pauta
+from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.entities.source import Source
 
 __all__ = [
     "Article",
     "ArticleStatus",
+    "Client",
+    "ClientType",
     "EditorialTask",
     "EditorialTaskStatus",
     "NewsCandidate",
+    "Pauta",
+    "PublicationRequest",
+    "PublicationRequestStatus",
     "Source",
 ]

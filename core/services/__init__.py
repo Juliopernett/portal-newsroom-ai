@@ -11,8 +11,12 @@ from __future__ import annotations
 
 from core.services.deduplication import generate_candidate_hash
 from core.services.discovery_engine import DiscoveryEngine
+from core.services.pauta_service import PautaService
+from core.services.publication_request_service import mark_as_published
 
 __all__ = [
     "DiscoveryEngine",
+    "PautaService",
     "generate_candidate_hash",
+    "mark_as_published",
 ]

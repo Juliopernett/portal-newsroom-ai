@@ -33,6 +33,37 @@ separación de dependencias de producción (`requirements.txt`) y desarrollo
   probar todo sin red. Ver docs/ARCHITECTURE.md, sección "Discovery
   Engine".
 - ⬜ Agente **Radar**: conectar `DiscoveryEngine` con un `ContentSource`
+  real y con `core.ports.repository.Repository` para deduplicar contra el
+  historial persistido, entregando el resultado a Publication Inbox (ver
+  Fase 1.5) en lugar de directamente al Extractor.
+
+## Fase 1.5 — Publication Inbox & Commercial Manager (Sprint 3, diseño en 3A)
+
+*Agregada en Sprint 3A — reposicionamiento de producto: la mayoría de las
+publicaciones del cliente piloto no vienen de Discovery, llegan por
+WhatsApp desde managers, artistas y empresas. Ver
+[ADR-003](adr/ADR-003-publication-inbox.md) y
+[ADR-004](adr/ADR-004-commercial-manager.md).*
+
+Dos bounded contexts nuevos, construidos en este orden deliberado —
+primero el valor de negocio (administrar clientes/campañas), después las
+integraciones de canal:
+
+- ⬜ **Commercial Manager, núcleo** (Sprint 3B): entidades `Client`,
+  `CommercialContact`, `Contract`, `Plan`, `Campaign` — ver
+  [docs/architecture/commercial-manager.md](architecture/commercial-manager.md).
+- ⬜ **Commercial Manager, dashboard** (Sprint 3C): primera vista de
+  clientes, contratos, campañas activas y cuota restante.
+- ⬜ **Publication Inbox, núcleo** (Sprint 3D): entidad `PublicationRequest`,
+  puerto `PublicationInboxChannel`, adaptador `ManualPublicationInboxChannel`
+  — ver [docs/architecture/publication-inbox.md](architecture/publication-inbox.md).
+- ⬜ **Radar → Publication Inbox** (Sprint 3E): adaptador que mapea
+  `NewsCandidate` a `PublicationRequest`, sin modificar `DiscoveryEngine`.
+- ⬜ **Agente WhatsApp** (Sprint 3F): adaptador real contra WhatsApp
+  Business API.
+- ⬜ **Registro e integración comercial** (Sprint 3G): `PublicationRegistryEntry`
+  automático vía `workflows/` cuando un `Article` comercial se publica,
+  más `Alert` de cuota superada/contrato por vencer.
   real (RSS, crawler, ...) y con `Repository` para descartar contra el
   historial editorial persistido (hoy el `DiscoveryEngine` solo deduplica
   dentro de una misma pasada, no contra ejecuciones anteriores).

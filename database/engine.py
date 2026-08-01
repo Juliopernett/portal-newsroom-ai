@@ -3,27 +3,64 @@
 This module owns the single SQLAlchemy engine used by the application. No
 other module should call `create_engine` directly — go through
 `get_engine()` / `get_session_factory()` so connection settings stay
-centralized and swapping SQLite for PostgreSQL later (docs/ROADMAP.md) is a
-one-line change in `config/settings.py`.
+centralized. Swapping SQLite for PostgreSQL (Sprint 3C, Railway) is a
+one-line change in `.env` (`DATABASE_URL`), not code — see
+`docs/product/SAAS_EVOLUTION.md` and `docs/product/MVP_SCOPE.md`.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from config.settings import get_settings
+
+
+def normalize_database_url(database_url: str) -> str:
+    """Rewrite a legacy `postgres://` URL to the `postgresql+psycopg://` scheme.
+
+    Railway (and Heroku before it) hand out `DATABASE_URL` values starting
+    with `postgres://` — a scheme SQLAlchemy 2.0 no longer accepts, and
+    without an explicit driver it would fall back to psycopg2, which this
+    project does not install (see `requirements.txt`, `psycopg[binary]`).
+    """
+    if database_url.startswith("postgres://"):
+        return "postgresql+psycopg://" + database_url.removeprefix("postgres://")
+    return database_url
+
+
+def enable_sqlite_foreign_keys(engine: Engine) -> None:
+    """Turn on SQLite foreign key enforcement — off by default, unlike PostgreSQL.
+
+    Without this, an invalid `client_id`/`pauta_id` reference would silently
+    succeed against the SQLite databases used locally and in tests, while
+    correctly failing against the PostgreSQL/Railway database used in
+    production — a behavior gap that would hide real bugs until deploy.
+    No-op for every other dialect.
+    """
+    if engine.dialect.name != "sqlite":
+        return
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection: Any, _connection_record: Any) -> None:
+        # `Any`: the raw DBAPI connection type varies per driver and SQLAlchemy's
+        # own "connect" event does not type it more precisely than this.
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
 
 
 @lru_cache
 def get_engine() -> Engine:
     """Return a cached SQLAlchemy engine built from the application settings."""
     settings = get_settings()
-    is_sqlite = settings.database_url.startswith("sqlite")
+    database_url = normalize_database_url(settings.database_url)
+    is_sqlite = database_url.startswith("sqlite")
     connect_args = {"check_same_thread": False} if is_sqlite else {}
-    return create_engine(settings.database_url, connect_args=connect_args)
+    engine = create_engine(database_url, connect_args=connect_args)
+    enable_sqlite_foreign_keys(engine)
+    return engine
 
 
 @lru_cache

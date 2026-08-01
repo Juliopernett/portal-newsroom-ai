@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal Vallenato — Pautas</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>Portal Vallenato</h1>
+  <nav>
+    <button type="button" class="tab-btn" data-tab="solicitudes">Cola de Solicitudes</button>
+    <button type="button" class="tab-btn" data-tab="clientes">Clientes y Pautas</button>
+  </nav>
+</header>
+
+<div id="resumen" class="resumen" aria-live="polite"></div>
+
+<div id="status" class="status" hidden></div>
+
+<main>
+
+  <section id="tab-solicitudes" class="tab-panel">
+    <div class="grid-2">
+      <div>
+        <h2>Registrar solicitud</h2>
+        <form id="form-solicitud">
+          <label>Pauta
+            <select id="solicitud-pauta">
+              <option value="">(sin pauta todavía — se vincula después)</option>
+            </select>
+          </label>
+          <label>Texto
+            <textarea id="solicitud-texto" required rows="3"></textarea>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="solicitud-prioridad">
+            Prioridad manual (adelanta la fila)
+          </label>
+          <button type="submit">Registrar solicitud</button>
+        </form>
+      </div>
+
+      <div>
+        <div class="section-header">
+          <h2>Pendientes de publicar</h2>
+          <button type="button" id="refrescar-solicitudes" class="secondary">Actualizar</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Recibida</th>
+              <th>Cliente</th>
+              <th>Texto</th>
+              <th>Prioridad</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tabla-solicitudes"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-clientes" class="tab-panel">
+    <div class="grid-2">
+      <div>
+        <details class="collapsible">
+          <summary>Nuevo cliente</summary>
+          <form id="form-cliente">
+            <label>Nombre
+              <input type="text" id="cliente-nombre" required>
+            </label>
+            <label>Tipo
+              <select id="cliente-tipo" required>
+                <option value="artista">Artista</option>
+                <option value="manager">Manager</option>
+                <option value="promotor">Promotor</option>
+                <option value="empresario">Empresario</option>
+              </select>
+            </label>
+            <label>Teléfono
+              <input type="text" id="cliente-telefono" required>
+            </label>
+            <label>Instagram (opcional)
+              <input type="text" id="cliente-instagram">
+            </label>
+            <button type="submit">Crear cliente</button>
+          </form>
+        </details>
+
+        <details class="collapsible">
+          <summary>Nueva pauta</summary>
+          <form id="form-pauta">
+            <label>Cliente
+              <select id="pauta-cliente" required></select>
+            </label>
+            <label>Fecha de inicio
+              <input type="date" id="pauta-fecha-inicio" required>
+            </label>
+            <label>Fecha de fin
+              <input type="date" id="pauta-fecha-fin" required>
+            </label>
+            <label>Publicaciones contratadas
+              <input type="number" id="pauta-cantidad" min="1" step="1" required>
+            </label>
+            <label>Valor pagado
+              <input type="number" id="pauta-valor" min="0" step="0.01" required>
+            </label>
+            <label>Fecha de pago
+              <input type="date" id="pauta-fecha-pago" required>
+            </label>
+            <label>Observaciones (opcional)
+              <input type="text" id="pauta-observaciones">
+            </label>
+            <button type="submit">Crear pauta</button>
+          </form>
+        </details>
+      </div>
+
+      <div>
+        <div class="section-header">
+          <h2>Clientes y sus pautas</h2>
+          <button type="button" id="refrescar-clientes" class="secondary">Actualizar</button>
+        </div>
+        <div id="lista-clientes"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

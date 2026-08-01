@@ -153,6 +153,88 @@ Una unidad de trabajo asignada a un `Editor` sobre un `Article` concreto
 (revisar, aprobar, corregir). **Ya existe en código**
 (`core.entities.editorial_task.EditorialTask`, Sprint 2).
 
+### PublicationRequest
+
+*Diseñada en Sprint 3A — ver
+[docs/adr/ADR-003-publication-inbox.md](../adr/ADR-003-publication-inbox.md)
+para la decisión completa.*
+
+La entidad de convergencia de cualquier canal de entrada de contenido:
+WhatsApp, Radar, entrada manual, y a futuro Email. Reemplaza a
+`NewsCandidate` como el punto de entrada al pipeline editorial (`Extractor`
+en adelante) — `NewsCandidate` sigue existiendo, pero como concepto interno
+de Discovery, mapeado a un `PublicationRequest` por un adaptador, nunca
+consumido directamente por el resto del pipeline.
+
+Incluye contexto comercial desde su diseño (`is_commercial`, `client_id`,
+`campaign_id`, `commercial_contact_id`, `priority`,
+`requested_publish_at`) aunque no exista todavía en código — ver
+[docs/architecture/publication-inbox.md](../architecture/publication-inbox.md)
+para la tabla completa de atributos.
+
+### MediaAsset (Value Object)
+
+Un adjunto de un `PublicationRequest` (imagen, video, documento) — un
+mensaje de WhatsApp suele traer varios. `type`, `url_or_path`,
+`mime_type`, `caption`.
+
+### Client
+
+*Diseñada en Sprint 3A — ver
+[docs/adr/ADR-004-commercial-manager.md](../adr/ADR-004-commercial-manager.md).*
+
+El cliente comercial de Commercial Manager: un manager, artista o empresa
+que paga (o tiene un acuerdo) por espacio editorial/promocional.
+
+> **No confundir con `MediaOutlet`.** `MediaOutlet` es el *tenant* de la
+> plataforma (hoy hay exactamente uno: Portal Vallenato). `Client` es un
+> cliente comercial *de* ese `MediaOutlet` — vive enteramente dentro de él,
+> no es un paso hacia multi-tenencia. Ver
+> [ADR-004](../adr/ADR-004-commercial-manager.md), Decisión 1.
+
+### CommercialContact
+
+*Diseñada en Sprint 3A.* La persona que físicamente envía contenido por
+WhatsApp (un manager, un asistente de prensa) — separada de `Client`
+porque no siempre coinciden, y porque un contacto puede escribir antes de
+que alguien lo vincule a un `Client` conocido. Ver
+[ADR-004](../adr/ADR-004-commercial-manager.md), Decisión 2.
+
+### Contract
+
+*Diseñada en Sprint 3A.* El acuerdo comercial de un `Client`: a qué `Plan`
+está suscrito, vigencia, estado. Responde "¿qué se acordó?" — distinto de
+`Campaign`, que responde "¿qué se está ejecutando?". Ver
+[ADR-004](../adr/ADR-004-commercial-manager.md), Decisión 3.
+
+### Plan
+
+*Diseñada en Sprint 3A.* La oferta comercial que un `Contract` referencia:
+cuota mensual incluida, precio, canales incluidos.
+
+### Campaign
+
+*Diseñada en Sprint 3A.* La unidad operativa central de Commercial
+Manager — el trabajo real que se ejecuta para un `Client` (ej.
+"lanzamiento de disco X"), con o sin `Contract` asociado. Una campaña sin
+contrato es un estado de negocio válido (cortesía, prueba); simplemente no
+tiene cuota que vigilar. `PublicationRequest` y `PublicationRegistryEntry`
+se atan primariamente a `Campaign`, no a `Contract`. Ver
+[ADR-004](../adr/ADR-004-commercial-manager.md), Decisión 3.
+
+### PublicationRegistryEntry
+
+*Diseñada en Sprint 3A.* El registro de que un `Article` de una `Campaign`
+llegó a `ArticleStatus.PUBLISHED`. Es la fuente de verdad para calcular
+cuota consumida — la cuota se **deriva** contando estos registros, nunca
+se guarda como contador mutable. Ver
+[ADR-004](../adr/ADR-004-commercial-manager.md), Decisión 4.
+
+### Alert
+
+*Diseñada en Sprint 3A.* Cuota superada, contrato por vencer, u otra
+condición de Commercial Manager que requiere atención humana.
+
 ## Relaciones
 
 ```mermaid
@@ -166,11 +248,21 @@ erDiagram
 
     Source ||--o{ NewsCandidate : produce
     NewsCandidate ||--o{ EditorialAssessment : "se evalúa mediante"
-    NewsCandidate |o--o| Article : "se convierte en"
+    NewsCandidate ||--o| PublicationRequest : "se mapea a (origin=RADAR)"
+    PublicationRequest |o--o| Article : "se acepta como"
     Article ||--o{ EditorialTask : genera
     Editor ||--o{ EditorialTask : resuelve
     Article ||--o{ Publication : "se distribuye como"
     EditorialRule }o--o{ Article : restringe
+
+    Client ||--o{ CommercialContact : tiene
+    Client ||--o{ Contract : firma
+    Client ||--o{ Campaign : ejecuta
+    Contract ||--o| Plan : usa
+    Campaign }o--o| Contract : "se factura bajo (opcional)"
+    CommercialContact ||--o{ PublicationRequest : envía
+    Campaign ||--o{ PublicationRequest : origina
+    Campaign ||--o{ PublicationRegistryEntry : acumula
 ```
 
 `NewsCandidate ||--o{ EditorialAssessment` es intencionalmente "uno a
@@ -178,6 +270,17 @@ muchos": cada recálculo agrega una `EditorialAssessment` nueva, nunca
 reemplaza la anterior (ver la sección de arriba). `Article ||--o{
 Publication` refleja que un artículo puede distribuirse en varios canales
 a la vez, cada uno con su propio ciclo de vida.
+
+Desde Sprint 3A, `Article` ya no nace directamente de `NewsCandidate`:
+nace de `PublicationRequest`, el punto de convergencia de cualquier canal
+(WhatsApp, Radar, manual, Email futuro) — ver
+[docs/adr/ADR-003-publication-inbox.md](../adr/ADR-003-publication-inbox.md).
+Para contenido de Radar, `NewsCandidate` sigue existiendo como paso
+intermedio interno de Discovery, mapeado 1 a 1 a un `PublicationRequest`.
+El bloque `Client`/`Contract`/`Plan`/`Campaign` (Commercial Manager) se
+conecta con `PublicationRequest` solo por referencias de ID, nunca por
+import directo entre bounded contexts — ver
+[docs/adr/ADR-004-commercial-manager.md](../adr/ADR-004-commercial-manager.md).
 
 ## Frontera entre lo conceptual y lo implementado
 
@@ -195,6 +298,9 @@ a la vez, cada uno con su propio ciclo de vida.
 | `SocialAccount` | ⬜ Conceptual, no implementada | — |
 | `AIProvider` (entidad de negocio) | ⬜ Conceptual — existe el `Protocol` técnico homónimo en `core/ports/ai_provider.py`, no la entidad de negocio | — |
 | `NotificationChannel` (entidad de negocio) | ⬜ Conceptual — existe el `Protocol` técnico `core.ports.notifier.Notifier`, no la entidad de negocio | — |
+| `PublicationRequest` / `MediaAsset` | ⬜ Diseñada (Sprint 3A) — ver [ADR-003](../adr/ADR-003-publication-inbox.md) — implementación planeada Sprint 3D | — |
+| `Client` / `CommercialContact` / `Contract` / `Plan` / `Campaign` | ⬜ Diseñadas (Sprint 3A) — ver [ADR-004](../adr/ADR-004-commercial-manager.md) — implementación planeada Sprint 3B | — |
+| `PublicationRegistryEntry` / `Alert` | ⬜ Diseñadas (Sprint 3A) — implementación planeada Sprint 3G | — |
 
 Esta tabla es, en la práctica, el mapa de qué habría que construir para
 pasar de "un cliente implícito" a "clientes explícitos y configurables" —

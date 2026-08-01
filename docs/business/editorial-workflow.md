@@ -4,6 +4,13 @@
 > los agentes existan (ver [docs/roadmap/v1-roadmap.md](../roadmap/v1-roadmap.md)
 > para qué existe hoy). Para la vista técnica del mismo flujo, ver
 > [docs/architecture/system-overview.md](../architecture/system-overview.md).
+>
+> **Nota (Sprint 3A):** desde `Extractor` en adelante, este diagrama es
+> válido sin importar si el contenido llegó por Radar, WhatsApp o entrada
+> manual — todos convergen antes en un `PublicationRequest` (ver
+> [docs/business/commercial-workflow.md](commercial-workflow.md) y
+> [ADR-003](../adr/ADR-003-publication-inbox.md)). El nodo "Radar la
+> detecta" de abajo describe solo el canal orgánico.
 
 ## De la aparición de una noticia a WordPress
 

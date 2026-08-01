@@ -24,5 +24,12 @@ con `Repository` para descartar contra el historial editorial persistido
 
 ## Produce
 
-Un evento `NewsFound` con los candidatos nuevos, que se entrega al agente
-Extractor.
+Un evento `NewsFound` con los candidatos nuevos. Desde Sprint 3A, esto no
+va directo al Extractor: un `RadarPublicationInboxAdapter` (ver
+[docs/architecture/publication-inbox.md](../../docs/architecture/publication-inbox.md))
+mapea cada `NewsCandidate` a un `PublicationRequest` (`origin=RADAR`,
+`is_commercial=False`), que converge con los demás canales de entrada
+(WhatsApp, entrada manual) antes de llegar al Extractor. `DiscoveryEngine`
+en sí no cambia — Radar sigue siendo uno de varios canales de **Publication
+Inbox**, no el único punto de entrada del sistema. Ver
+[ADR-003](../../docs/adr/ADR-003-publication-inbox.md).

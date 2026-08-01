@@ -8,6 +8,20 @@
 > a más de un medio a futuro, sin que eso cambie el alcance del MVP. Ver
 > [docs/product/PRODUCT_VISION.md](product/PRODUCT_VISION.md) para la
 > visión de producto vigente.
+>
+> **Nota (Sprint 3A):** la sección "Qué es Portal Newsroom AI" describe el
+> flujo orgánico (Radar → Extractor → ... ) como si fuera la única fuente
+> de contenido. En la práctica, para el cliente piloto, la mayoría de las
+> publicaciones **no** se originan ahí: llegan directamente por WhatsApp
+> desde managers, artistas y empresas — contenido comercial, no
+> descubierto. El problema de negocio que resuelve el proyecto no cambió
+> (ahorrar tiempo mecánico, nunca reemplazar criterio editorial), pero su
+> alcance se amplió para incluir la gestión de esas solicitudes
+> comerciales. Ver
+> [docs/product/PRODUCT_VISION.md](product/PRODUCT_VISION.md), sección
+> "Repositioning comercial", y
+> [ADR-003](adr/ADR-003-publication-inbox.md) /
+> [ADR-004](adr/ADR-004-commercial-manager.md) para el diseño completo.
 
 ## Problema
 
@@ -27,6 +41,9 @@ corregir y aprobar.
 
 Portal Newsroom AI:
 
+- Recibe contenido por varios canales — WhatsApp de managers/artistas/
+  empresas, detección automática (Radar), entrada manual — y lo convierte
+  en una solicitud de publicación única (ver Nota Sprint 3A abajo).
 - Detecta noticias nuevas de las fuentes configuradas.
 - Extrae su contenido de forma estructurada.
 - Reescribe el artículo con el estilo editorial de Portal Vallenato.

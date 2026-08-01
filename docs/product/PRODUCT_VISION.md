@@ -112,6 +112,35 @@ de "automatización":
   [docs/product/DOMAIN_MODEL.md](DOMAIN_MODEL.md)) están pensados desde
   ahora para servir a más de un cliente — aunque hoy solo sirvan a uno.
 
+## Repositioning comercial (Sprint 3A)
+
+El reposicionamiento de Sprint 2.2 (cliente piloto de una plataforma
+multi-cliente) describía **quién** usa la plataforma. El de Sprint 3A
+describe **de dónde viene el contenido que la plataforma procesa**: para
+Portal Vallenato, la mayoría no llega por Discovery — llega directamente
+por WhatsApp de managers, artistas y empresas, generalmente con un interés
+comercial detrás (promoción de un lanzamiento, cobertura de un evento).
+
+Esto no convierte a Portal Newsroom AI en una herramienta de gestión
+comercial genérica. Sigue siendo una plataforma de inteligencia editorial
+— la diferencia es que ahora administra explícitamente **dos pilares**,
+no uno:
+
+1. **Editorial** (como antes): detectar, extraer, reescribir, aprobar,
+   publicar contenido con criterio humano — nunca automáticamente.
+2. **Comercial** (nuevo, Sprint 3A): administrar quién pide publicar qué,
+   bajo qué acuerdo, y si ese pedido respeta lo pactado — sin que esto
+   relaje ninguna regla editorial existente. Un pedido comercial pasa por
+   el mismo pipeline, la misma aprobación humana, las mismas reglas que
+   cualquier otro contenido.
+
+Ver [ADR-003](../adr/ADR-003-publication-inbox.md) (cómo converge
+cualquier canal en una entidad única) y
+[ADR-004](../adr/ADR-004-commercial-manager.md) (cómo se administra la
+relación comercial sin acoplarse al dominio editorial) para el diseño
+completo, y [docs/product/MVP_SCOPE.md](MVP_SCOPE.md) para por qué esto
+entra al alcance del MVP sin introducir multi-tenencia.
+
 ## Qué no cambia con este reposicionamiento
 
 - El MVP se sigue construyendo para Portal Vallenato, sin desviarse a
@@ -119,6 +148,9 @@ de "automatización":
   [docs/product/MVP_SCOPE.md](MVP_SCOPE.md).
 - Ninguna regla de negocio existente se relaja —
   [docs/PROJECT_RULES.md](../PROJECT_RULES.md) sigue vigente sin cambios.
+  Un pedido comercial recibido por WhatsApp no se publica automáticamente
+  con más razón que uno detectado por Radar — la regla 1 no distingue por
+  origen del contenido.
 - La arquitectura Ports & Adapters ya construida (Sprint 1) es exactamente
   lo que hace posible este reposicionamiento sin reescribir nada — ver
   [docs/product/SAAS_EVOLUTION.md](SAAS_EVOLUTION.md).

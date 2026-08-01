@@ -100,7 +100,8 @@ Un paquete por responsabilidad. Cada agente depende únicamente de los
 
 | Agente | Responsabilidad | Port principal |
 |---|---|---|
-| `radar` | Detectar noticias nuevas | `ContentSource`, `Repository`, `core.services.DiscoveryEngine` |
+| `radar` | Detectar noticias nuevas (un canal de Publication Inbox) | `ContentSource`, `Repository`, `core.services.DiscoveryEngine` |
+| `whatsapp` | Recibir solicitudes comerciales por WhatsApp (otro canal de Publication Inbox) | `PublicationInboxChannel` |
 | `extractor` | Extraer contenido estructurado | `ContentExtractor` |
 | `writer` | Reescribir con estilo editorial | `AIProvider` |
 | `seo` | Generar metadatos SEO | `AIProvider` |
@@ -114,6 +115,11 @@ Un paquete por responsabilidad. Cada agente depende únicamente de los
 
 Hoy cada paquete es un placeholder documentado (`README.md`); la
 implementación llega en fases futuras del roadmap.
+
+**Commercial Manager no es un agente** — es un bounded context propio, con
+sus propias entidades y reglas de negocio (ver "Publication Inbox y
+Commercial Manager" más abajo), no una automatización de una tarea
+mecánica del pipeline.
 
 ### `workflows/`
 
@@ -221,6 +227,36 @@ un `ContentSource` real por fuente (RSS, crawler, ...), un
 `core.ports.repository.Repository` que descarte contra el historial
 editorial persistido (hoy la deduplicación es solo dentro de una misma
 pasada), y un `workflow` que llame a todo esto con una cadencia.
+
+## Publication Inbox y Commercial Manager (Sprint 3A — diseño, no implementado)
+
+Sprint 3A reposicionó el proyecto: para el cliente piloto, la mayoría de
+las publicaciones no llegan por Discovery, llegan por WhatsApp desde
+managers, artistas y empresas. Se diseñaron dos bounded contexts nuevos —
+ver [ADR-003](adr/ADR-003-publication-inbox.md) y
+[ADR-004](adr/ADR-004-commercial-manager.md):
+
+- **Publication Inbox** (`docs/architecture/publication-inbox.md`):
+  converge cualquier canal de entrada (WhatsApp, Radar, entrada manual,
+  Email futuro) en una entidad única, `PublicationRequest`, antes de
+  entrar al pipeline editorial existente (`Extractor` en adelante, sin
+  cambios). Radar sigue usando `DiscoveryEngine` exactamente igual — un
+  adaptador nuevo lo envuelve, no lo modifica.
+- **Commercial Manager** (`docs/architecture/commercial-manager.md`):
+  administra `Client`, `CommercialContact`, `Contract`, `Plan`,
+  `Campaign`, `PublicationRegistryEntry` y `Alert` — la relación comercial
+  detrás de ese contenido. Se conecta con Publication Inbox y con
+  Editorial **solo por referencias de ID**, nunca importando entidades de
+  un contexto en el otro; la coordinación cuando hace falta ocurre en
+  `workflows/`, el mismo mecanismo que ya usa el proyecto para
+  WordPress → Telegram.
+
+Ninguno de los dos existe en código todavía. El roadmap
+(`docs/ROADMAP.md`, `docs/roadmap/v1-roadmap.md`) construye primero el
+núcleo de Commercial Manager y su dashboard (Sprint 3B-3C), y recién
+después las integraciones de canal — Publication Inbox, Radar, WhatsApp
+(Sprint 3D-3G) — porque el valor de negocio de administrar clientes y
+campañas no depende de que ningún canal esté conectado todavía.
 
 ## Eventos de dominio (preparado, parcialmente implementado)
 
