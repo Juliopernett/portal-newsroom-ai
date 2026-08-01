@@ -38,6 +38,7 @@ def test_create_pauta_returns_computed_quota_fields(client: TestClient) -> None:
     assert body["publicaciones_consumidas"] == 0
     assert body["publicaciones_restantes"] == 10
     assert body["cuota_agotada"] is False
+    assert body["peso_comercial"] == "50000.00"
 
 
 def test_create_pauta_rejects_end_date_not_after_start_date(client: TestClient) -> None:
@@ -99,3 +100,4 @@ def test_list_pautas_includes_computed_quota_fields(client: TestClient) -> None:
     body = response.json()
     assert len(body) == 1
     assert body[0]["publicaciones_restantes"] == 10
+    assert body[0]["peso_comercial"] == "50000.00"

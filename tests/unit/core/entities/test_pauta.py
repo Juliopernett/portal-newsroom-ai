@@ -74,3 +74,23 @@ def test_pauta_is_immutable() -> None:
 
     with pytest.raises(AttributeError):
         pauta.publicaciones_contratadas = 20  # type: ignore[misc]
+
+
+def test_peso_comercial_divides_valor_pagado_by_publicaciones_contratadas() -> None:
+    pauta = _build(valor_pagado=Decimal("500000"), publicaciones_contratadas=10)
+
+    assert pauta.peso_comercial == Decimal("50000.00")
+
+
+def test_peso_comercial_rounds_to_two_decimals_half_up() -> None:
+    # 1 / 8 = 0.125 exactamente — ROUND_HALF_EVEN daría 0.12 (2 es par),
+    # ROUND_HALF_UP (el que usa peso_comercial) da 0.13.
+    pauta = _build(valor_pagado=Decimal("1"), publicaciones_contratadas=8)
+
+    assert pauta.peso_comercial == Decimal("0.13")
+
+
+def test_peso_comercial_is_zero_when_valor_pagado_is_zero() -> None:
+    pauta = _build(valor_pagado=Decimal("0"), publicaciones_contratadas=10)
+
+    assert pauta.peso_comercial == Decimal("0.00")

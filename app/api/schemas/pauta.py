@@ -27,7 +27,12 @@ class PautaCreate(BaseModel):
 
 
 class PautaOut(BaseModel):
-    """Response body for a `Pauta`, including its computed quota status."""
+    """Response body for a `Pauta`, including its computed quota status.
+
+    `peso_comercial` is read straight from the entity (`core.entities.pauta.Pauta.peso_comercial`)
+    rather than computed here — see that property's docstring for why it
+    lives on the entity instead of `PautaService`.
+    """
 
     id: str
     client_id: str
@@ -42,3 +47,4 @@ class PautaOut(BaseModel):
     vigente: bool
     vencida: bool
     cuota_agotada: bool
+    peso_comercial: Decimal

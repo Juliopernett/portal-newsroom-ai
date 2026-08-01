@@ -9,6 +9,28 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **`Pauta.peso_comercial` (Sprint 3G)**: propiedad nueva —
+  `valor_pagado / publicaciones_contratadas`, redondeado a 2 decimales
+  con `ROUND_HALF_UP` explícito (no el `ROUND_HALF_EVEN` por defecto de
+  `Decimal.quantize()`). Expuesta en `PautaOut`
+  (`GET /pautas`, `GET /pautas/{id}`) sin persistirse — se recalcula en
+  cada respuesta, igual que el resto de los campos derivados de `Pauta`.
+  No se usa todavía para ordenar la cola de solicitudes; eso queda para
+  cuando se defina la estrategia de priorización completa.
+  - **Decisión arquitectónica deliberada:** a diferencia de todo lo demás
+    calculado sobre `Pauta` (que vive en
+    `core.services.pauta_service.PautaService`), `peso_comercial` es un
+    método de la propia entidad. Justificación completa en el docstring
+    de la propiedad (`core/entities/pauta.py`): no necesita reloj ni el
+    historial de `PublicationRequest` de otro agregado — es una función
+    pura de los propios campos de `Pauta`, ya protegidos por su propio
+    invariante (`publicaciones_contratadas > 0`). Es una excepción
+    puntual y documentada al estilo "entidades sin comportamiento" del
+    proyecto, no todavía una regla general — se posterga
+    deliberadamente un ADR formal hasta validar el criterio en más
+    sprints; si aparecen más propiedades derivadas de este tipo, se
+    documentará el principio general entonces, no este caso aislado.
+
 - **Mejoras UX P0 (Sprint 3F)**: los 5 hallazgos P0 de
   `docs/ux/sprint-3d5-ux-review.md`, implementados solo en
   `app/api/static/` (HTML/CSS/JS) — cero cambios de backend, dominio o
