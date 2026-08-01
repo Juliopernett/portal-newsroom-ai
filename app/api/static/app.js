@@ -32,6 +32,14 @@ let pendientesCount = 0;
 
 async function apiFetch(path, options) {
   const response = await fetch(path, options);
+  if (response.status === 401) {
+    // Sesión ausente o vencida — vale tanto al cargar la app por primera
+    // vez como a mitad de uso (sesión vencida mientras la pestaña seguía
+    // abierta). showLogin() está declarada más abajo; el "hoisting" de
+    // funciones normales de JS hace que esto funcione sin importar el
+    // orden de las declaraciones en el archivo.
+    showLogin();
+  }
   if (!response.ok) {
     let detail = response.statusText;
     try {
@@ -70,6 +78,57 @@ function diasParaVencer(pauta) {
 
 function horasEnEspera(fechaRecepcionIso) {
   return (Date.now() - new Date(fechaRecepcionIso).getTime()) / 3_600_000;
+}
+
+// ---------- autenticación ----------
+
+function showLogin() {
+  document.getElementById("login-screen").hidden = false;
+  document.getElementById("nav-tabs").hidden = true;
+  document.getElementById("btn-logout").hidden = true;
+  document.querySelector("main").hidden = true;
+  document.getElementById("resumen").innerHTML = "";
+}
+
+function showApp() {
+  document.getElementById("login-screen").hidden = true;
+  document.getElementById("nav-tabs").hidden = false;
+  document.getElementById("btn-logout").hidden = false;
+  document.querySelector("main").hidden = false;
+}
+
+function setupFormLogin() {
+  document.getElementById("form-login").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+      email: document.getElementById("login-email").value,
+      password: document.getElementById("login-password").value,
+    };
+    try {
+      await apiFetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      event.target.reset();
+      showApp();
+      await loadClientesYPautas();
+      await loadSolicitudes();
+    } catch (error) {
+      showStatus(error.message, true);
+    }
+  });
+}
+
+function setupLogout() {
+  document.getElementById("btn-logout").addEventListener("click", async () => {
+    try {
+      await apiFetch("/auth/logout", { method: "POST" });
+    } catch {
+      // aunque falle la llamada, igual mostramos el login localmente
+    }
+    showLogin();
+  });
 }
 
 // ---------- pestañas ----------
@@ -417,9 +476,19 @@ async function init() {
   setupFormSolicitud();
   setupFormCliente();
   setupFormPauta();
+  setupFormLogin();
+  setupLogout();
   document.getElementById("refrescar-solicitudes").addEventListener("click", loadSolicitudes);
   document.getElementById("refrescar-clientes").addEventListener("click", loadClientesYPautas);
 
+  try {
+    await apiFetch("/auth/me");
+  } catch {
+    // apiFetch ya llamó a showLogin() en el 401 — nada más que hacer.
+    return;
+  }
+
+  showApp();
   try {
     await loadClientesYPautas();
     await loadSolicitudes();

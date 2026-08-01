@@ -18,7 +18,10 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 # FastAPI's dependency injection requires `Depends(...)` as an argument
 # default — the documented pattern, not the mutable-default-argument bug
 # B008 exists to catch. See https://fastapi.tiangolo.com/tutorial/dependencies/
+# dependencies.py itself chains Depends() the same way (get_current_user
+# depends on get_current_session depends on get_unit_of_work).
 "app/api/routers/*.py" = ["B008"]
+"app/api/dependencies.py" = ["B008"]
 
 [tool.ruff.lint.isort]
 known-first-party = [

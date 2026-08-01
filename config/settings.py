@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # --- Database ---
     database_url: str = f"sqlite:///{BASE_DIR / 'database' / 'newsroom.db'}"
 
+    # --- Auth (login MVP — see docs/adr/ADR-005-authentication.md) ---
+    session_ttl_hours: int = 24 * 7
+
     # --- WordPress (used by the future WordPress agent) ---
     wordpress_site_url: str | None = None
     wordpress_username: str | None = None

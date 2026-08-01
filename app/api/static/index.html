@@ -10,17 +10,31 @@
 
 <header>
   <h1>Portal Vallenato</h1>
-  <nav>
+  <nav id="nav-tabs" hidden>
     <button type="button" class="tab-btn" data-tab="solicitudes">Cola de Solicitudes</button>
     <button type="button" class="tab-btn" data-tab="clientes">Clientes y Pautas</button>
   </nav>
+  <button type="button" id="btn-logout" class="secondary" hidden>Cerrar sesión</button>
 </header>
 
 <div id="resumen" class="resumen" aria-live="polite"></div>
 
 <div id="status" class="status" hidden></div>
 
-<main>
+<section id="login-screen">
+  <form id="form-login">
+    <h2>Iniciar sesión</h2>
+    <label>Email
+      <input type="email" id="login-email" required autocomplete="username">
+    </label>
+    <label>Contraseña
+      <input type="password" id="login-password" required autocomplete="current-password">
+    </label>
+    <button type="submit">Entrar</button>
+  </form>
+</section>
+
+<main hidden>
 
   <section id="tab-solicitudes" class="tab-panel">
     <div class="grid-2">

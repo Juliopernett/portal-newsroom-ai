@@ -3,13 +3,17 @@
 Plataforma interna de **Portal Vallenato** para asistir al equipo editorial en la
 detección, redacción y publicación asistida de noticias.
 
-> **Estado:** Fase 1 — Radar & Extractor (en progreso). Discovery Engine
-> (Sprint 2) ya implementado en `core/`; los agentes Radar/Extractor
-> todavía no. Sprint 3A definió el reposicionamiento comercial —
-> **Publication Inbox** y **Commercial Manager** (diseñados, no
-> implementados) — ver [ROADMAP.md](docs/ROADMAP.md) y
+> **Estado:** dos frentes en paralelo. **Discovery Engine** (Sprint 2)
+> tiene el motor listo pero sin agente Radar real conectado todavía. El
+> **Commercial Core** (`Client`/`Pauta`/`PublicationRequest`, Sprints
+> 3B–3G) está construido, con login (ver
+> [ADR-005](docs/adr/ADR-005-authentication.md)) y desplegado en
+> `master` — Portal Vallenato lo usa a diario para reemplazar el Excel de
+> pautas. Ver [ROADMAP.md](docs/ROADMAP.md),
 > [ADR-003](docs/adr/ADR-003-publication-inbox.md) /
-> [ADR-004](docs/adr/ADR-004-commercial-manager.md).
+> [ADR-004](docs/adr/ADR-004-commercial-manager.md) para el diseño (no
+> implementado) de Publication Inbox/Commercial Manager como bounded
+> contexts formales.
 
 ## ¿Qué es esto?
 
@@ -108,6 +112,14 @@ pytest
 
 # 5. Ejecutar la aplicación (foundation smoke test)
 python -m app.main
+
+# 6. Migrar la base de datos y levantar la API/UI (Commercial Core)
+python -m alembic upgrade head
+python -m uvicorn app.api.main:app --reload   # http://127.0.0.1:8000/
+
+# 7. Crear el primer usuario para poder iniciar sesión (con el servidor
+#    del paso 6 corriendo en otra terminal, o antes de levantarlo)
+python -m scripts.create_user --email tucorreo@portalvallenato.com --nombre "Tu Nombre"
 ```
 
 ## Con Docker
@@ -153,6 +165,7 @@ todavía.
 | [adr/ADR-002-editorial-assessment.md](docs/adr/ADR-002-editorial-assessment.md) | Por qué Editorial Score/Confidence/Freshness viven en `EditorialAssessment`, y por qué `Publication` se separa de `Article` |
 | [adr/ADR-003-publication-inbox.md](docs/adr/ADR-003-publication-inbox.md) | Por qué `PublicationRequest` converge todos los canales de entrada (WhatsApp, Radar, manual, Email futuro) sin tocar `NewsCandidate` |
 | [adr/ADR-004-commercial-manager.md](docs/adr/ADR-004-commercial-manager.md) | Por qué Commercial Manager es un bounded context independiente, `Client` no es `MediaOutlet`, y `Campaign` es la unidad operativa |
+| [adr/ADR-005-authentication.md](docs/adr/ADR-005-authentication.md) | Por qué sesiones server-side (no JWT), Argon2id detrás de un puerto, y qué queda explícitamente fuera del login MVP |
 
 **Architecture — diseño técnico con diagramas:**
 

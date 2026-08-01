@@ -5,12 +5,13 @@ services:
       dockerfile: docker/Dockerfile
     env_file:
       - .env
+    ports:
+      - "8000:8000"
     volumes:
       - ./logs:/app/logs
       - ./database:/app/database
     restart: unless-stopped
 
-  # Cuando el proyecto migre de SQLite a PostgreSQL (ver docs/ROADMAP.md),
-  # se agregará aquí un servicio "db" (postgres:16) y DATABASE_URL en .env
-  # apuntará a él. No se agrega todavía para no introducir infraestructura
-  # que la fase actual no necesita.
+  # No hay un servicio "db" local: DATABASE_URL en .env ya decide SQLite
+  # (default) o PostgreSQL (Sprint 3C, ver database/engine.py) sin cambiar
+  # código. En producción, Postgres vive en Railway, no en este compose.

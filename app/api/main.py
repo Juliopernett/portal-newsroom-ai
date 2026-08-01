@@ -19,7 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.errors import register_exception_handlers
-from app.api.routers import clients, pautas, publication_requests
+from app.api.routers import auth, clients, pautas, publication_requests
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -27,6 +27,7 @@ app = FastAPI(title="Portal Newsroom AI — Commercial Core API")
 
 register_exception_handlers(app)
 
+app.include_router(auth.router)
 app.include_router(clients.router)
 app.include_router(pautas.router)
 app.include_router(publication_requests.router)

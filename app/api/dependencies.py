@@ -1,19 +1,29 @@
 """FastAPI dependency injection for the internal API.
 
 The only place in `app/api/` that touches `database.engine`/
-`database.unit_of_work` directly — every route handler depends on
-`core.ports.unit_of_work.UnitOfWork` (the abstraction), never on
-`SqlAlchemyUnitOfWork` (the adapter), so tests can override this one
-function to point at a throwaway database instead.
+`database.unit_of_work`/`security.password_hasher` directly — every route
+handler depends on the `core.ports` abstractions, never the concrete
+adapters, so tests can override these to point at a throwaway database
+instead.
 """
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Iterator
+from datetime import UTC, datetime
 
+from fastapi import Cookie, Depends, HTTPException, status
+
+from core.entities.session import Session as SessionEntity
+from core.entities.user import User
+from core.ports.password_hasher import PasswordHasher
 from core.ports.unit_of_work import UnitOfWork
 from database.engine import get_session_factory
 from database.unit_of_work import SqlAlchemyUnitOfWork
+from security.password_hasher import Argon2IdPasswordHasher
+
+SESSION_COOKIE_NAME = "session_token"
 
 
 def get_unit_of_work() -> Iterator[UnitOfWork]:
@@ -26,3 +36,49 @@ def get_unit_of_work() -> Iterator[UnitOfWork]:
     """
     with SqlAlchemyUnitOfWork(get_session_factory()) as uow:
         yield uow
+
+
+def get_password_hasher() -> PasswordHasher:
+    """Return the password hasher used to check credentials at login."""
+    return Argon2IdPasswordHasher()
+
+
+def hash_session_token(token: str) -> str:
+    """Return the SHA-256 hex digest of a raw session token.
+
+    Session tokens are already high-entropy random values
+    (`secrets.token_urlsafe`), unlike passwords — a fast hash is enough
+    here; Argon2's deliberate slowness would only cost CPU, not add real
+    protection, for a value nobody is trying to brute-force guess.
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def get_current_session(
+    session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> SessionEntity:
+    """Resolve the current request's `Session` from its cookie, or reject it."""
+    if session_token is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
+    session = uow.sessions.get_by_token_hash(hash_session_token(session_token))
+    if session is None or session.expires_at < datetime.now(UTC):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
+    return session
+
+
+def get_current_user(
+    session: SessionEntity = Depends(get_current_session),
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> User:
+    """Resolve the current request's authenticated `User`.
+
+    The dependency every protected route declares — even where the route
+    itself never reads the returned `User`, requiring this dependency is
+    what rejects unauthenticated requests with a 401 before the route body
+    runs at all.
+    """
+    user = uow.users.get_by_id(session.user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
+    return user
