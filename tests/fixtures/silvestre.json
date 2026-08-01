@@ -1,0 +1,20 @@
+[
+  {
+    "title": "El vallenato silvestre resurge en los pueblos del Cesar",
+    "url": "https://vallenatohoy.example.com/noticias/vallenato-silvestre-resurge",
+    "summary": "Festivales veredales rescatan el estilo silvestre, la forma más antigua de interpretar el vallenato, lejos de los arreglos comerciales.",
+    "image_url": "https://vallenatohoy.example.com/img/silvestre-resurge.jpg",
+    "published_at": "2026-07-01T09:15:00+00:00",
+    "category": "Vallenato Silvestre",
+    "confidence": 0.9
+  },
+  {
+    "title": "Nueva generación de acordeoneros apuesta por el estilo silvestre",
+    "url": "https://vallenatohoy.example.com/noticias/nueva-generacion-silvestre",
+    "summary": "Jóvenes intérpretes del Cesar y La Guajira estudian con los viejos maestros para no perder la esencia del vallenato silvestre.",
+    "image_url": "https://vallenatohoy.example.com/img/nueva-generacion.jpg",
+    "published_at": "2026-07-03T14:40:00+00:00",
+    "category": "Vallenato Silvestre",
+    "confidence": 0.75
+  }
+]

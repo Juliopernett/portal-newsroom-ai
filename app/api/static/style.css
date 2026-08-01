@@ -1,0 +1,354 @@
+/* Prioriza velocidad de operación sobre estética — sin framework, sin CDN. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 15px;
+  color: #1a1a1a;
+  background: #f5f5f4;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.25rem;
+  background: #1f2937;
+  color: #fff;
+}
+
+header h1 {
+  font-size: 1.1rem;
+  margin: 0;
+  white-space: nowrap;
+}
+
+nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tab-btn {
+  background: transparent;
+  border: 1px solid #4b5563;
+  color: #d1d5db;
+  padding: 0.4rem 0.9rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.tab-btn.active {
+  background: #fff;
+  color: #1f2937;
+  font-weight: 600;
+  border-color: #fff;
+}
+
+/* Barra de resumen — visible en ambas pestañas, apenas se abre la app. */
+.resumen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.6rem 1.25rem;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.resumen:empty {
+  display: none;
+}
+
+.resumen-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.resumen-item.is-alert {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.resumen-item.is-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+main {
+  padding: 1.25rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: minmax(260px, 380px) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+h2:first-child {
+  margin-top: 0;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.25rem;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.9rem;
+}
+
+/* Formularios de baja frecuencia (crear cliente/pauta): colapsados por
+   defecto para que la cola de trabajo sea lo primero que se ve. */
+details.collapsible {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+
+details.collapsible + details.collapsible {
+  margin-top: 0;
+}
+
+details.collapsible > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+details.collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.collapsible > summary::before {
+  content: "+ ";
+  color: #6b7280;
+}
+
+details.collapsible[open] > summary::before {
+  content: "– ";
+}
+
+details.collapsible[open] > summary {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+details.collapsible form {
+  border: none;
+  border-radius: 0;
+  margin: 0;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+input,
+select,
+textarea {
+  font-size: 0.95rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
+  background: #1f2937;
+  color: #fff;
+}
+
+button.secondary {
+  background: #fff;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.88rem;
+  vertical-align: top;
+}
+
+th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.link-pauta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 220px;
+}
+
+.link-pauta select {
+  font-size: 0.82rem;
+  padding: 0.25rem 0.35rem;
+}
+
+table.compact th,
+table.compact td {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.82rem;
+}
+
+.client-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.client-card h3 {
+  margin: 0 0 0.15rem;
+  font-size: 0.95rem;
+}
+
+.muted {
+  color: #6b7280;
+  font-weight: normal;
+  font-size: 0.85em;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.badge-ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-expiring {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.badge-lowquota {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+/* Solicitud con mucho tiempo esperando en la cola — solo resalta,
+   nunca bloquea ni cambia el flujo. */
+.row-urgent {
+  background: #fff7ed;
+  box-shadow: inset 3px 0 0 #ea580c;
+}
+
+.status {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.status-ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-error {
+  background: #fee2e2;
+  color: #991b1b;
+}

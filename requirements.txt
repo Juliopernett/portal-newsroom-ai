@@ -1,0 +1,26 @@
+# Dependencias de PRODUCCIÓN.
+# Esto es lo único que se instala en la imagen Docker de la aplicación
+# (ver docker/Dockerfile). Para desarrollo local usa requirements-dev.txt,
+# que incluye estas más las herramientas de testing/lint/tipado.
+
+# --- Configuración y validación de datos ---
+pydantic>=2.7,<3
+pydantic-settings>=2.2,<3
+python-dotenv>=1.0,<2
+
+# --- Persistencia ---
+SQLAlchemy>=2.0,<3
+alembic>=1.13,<2
+psycopg[binary]>=3.1,<4
+
+# --- API interna (Sprint 3D) ---
+fastapi>=0.111,<1
+uvicorn[standard]>=0.29,<1
+
+# --- Extracción de contenido (usadas a partir del agente Extractor) ---
+playwright>=1.44,<2
+beautifulsoup4>=4.12,<5
+requests>=2.32,<3
+
+# --- Integraciones (usadas a partir de los agentes WordPress / Telegram) ---
+python-telegram-bot>=21.0,<22
