@@ -9,6 +9,85 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **Login MVP**: autenticación con sesiones server-side, reincorporada
+  al alcance del MVP tras el deploy a Railway con datos sensibles de
+  clientes en una URL pública — ver
+  [ADR-005](docs/adr/ADR-005-authentication.md) para el razonamiento
+  completo y qué queda explícitamente fuera (invitaciones, reset de
+  contraseña, 2FA, bloqueo por intentos fallidos, SMTP, gestión avanzada
+  de usuarios).
+  - `core.entities.user.User`, `core.entities.session.Session` — la
+    sesión es server-side (Postgres), no JWT: revocar una sesión
+    específica es un `DELETE` inmediato.
+  - `core.ports.password_hasher.PasswordHasher` (`Protocol`) +
+    `security/password_hasher.py` (paquete nuevo, par de `database/`):
+    `Argon2IdPasswordHasher` sobre `argon2-cffi` — Argon2id nunca entra a
+    `core/`, misma disciplina que ya aplica a SQLAlchemy.
+  - `core.ports.user_repository.UserRepository`,
+    `core.ports.session_repository.SessionRepository` +
+    implementaciones SQLAlchemy; `UnitOfWork` gana `users`/`sessions`.
+    Migración nueva (`users`, `sessions` con FK a `users.id`).
+  - `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
+    (`app/api/routers/auth.py`). El login corre una verificación Argon2
+    contra un hash señuelo real cuando el email no existe, para que el
+    tiempo de respuesta no delate qué emails tienen cuenta.
+  - Todos los endpoints existentes (`/clients`, `/pautas`,
+    `/publication-requests`) protegidos vía
+    `APIRouter(dependencies=[Depends(get_current_user)])` — a nivel de
+    router, no por función, para que cualquier endpoint agregado después
+    quede protegido automáticamente.
+  - `scripts/create_user.py`: única forma de crear una cuenta (sin
+    invitaciones ni endpoint de gestión) — idempotente, contraseña
+    siempre por prompt interactivo, nunca por argumento de línea de
+    comandos.
+  - UI (`app/api/static/`): pantalla de login, botón de cerrar sesión;
+    `apiFetch` redirige a la pantalla de login automáticamente ante
+    cualquier 401 (sesión ausente o vencida en cualquier momento del uso,
+    no solo al cargar la app).
+  - `tests/integration/api/conftest.py`: el fixture `client` ahora se
+    autentica automáticamente (usuario de prueba real + login real vía
+    `POST /auth/login`) — **ningún test de sprints anteriores necesitó
+    cambiar su código**, solo heredó el nuevo comportamiento del fixture.
+    `unauthenticated_client` queda disponible para los tests que
+    verifican específicamente el rechazo sin sesión.
+  - Hallazgo real durante las pruebas de persistencia: sin
+    `relationship()` a nivel ORM entre `UserModel`/`SessionModel`
+    (mapeados como columnas FK simples, igual que el resto de
+    `database/models/`), SQLAlchemy no puede ordenar automáticamente sus
+    inserts dentro de un mismo `flush()` — y el orden alfabético de las
+    tablas (`sessions` antes que `users`) resulta ser el incorrecto. El
+    mismo patrón en `Client`→`Pauta`→`PublicationRequest` funcionaba por
+    coincidencia alfabética, no porque el problema no existiera.
+    Documentado y resuelto con un `flush()` explícito en los fixtures de
+    test — no afecta código de producción, que nunca crea dos entidades
+    nuevas relacionadas antes de un mismo `commit()`.
+  - `argon2-cffi` agregado a `requirements.txt`.
+  - `docs/product/MVP_SCOPE.md` actualizado: autenticación pasa de
+    "fuera del MVP" a "dentro, alcance mínimo".
+
+### Fixed
+
+- **`docker/Dockerfile` no levantaba la aplicación real.** Desde que
+  existe `app/api/` (Sprint 3D), el `CMD` seguía apuntando a
+  `python -m app.main` — el smoke test de configuración/logging de la
+  Fase 0, que no sirve ni la API ni la UI. Encontrado al preparar el
+  deploy a Railway. Ahora el contenedor aplica las migraciones de
+  Alembic y arranca uvicorn contra `app.api.main:app`, escuchando en
+  `$PORT` (Railway lo inyecta; local usa 8000 por default). Se usa
+  `python -m alembic` / `python -m uvicorn`, no los scripts de consola
+  `alembic`/`uvicorn` directos — su presencia en el `PATH` depende de
+  cómo los instale `pip`, `python -m` no. Verificado ejecutando la
+  cadena exacta del `CMD` fuera de Docker (no disponible en este
+  entorno) contra una base SQLite descartable: migra y responde `200`
+  en `/ui/`.
+  - `docker-compose.yml`: agrega el mapeo de puerto `8000:8000` (antes
+    ausente — ni con el `Dockerfile` corregido hubiera sido alcanzable
+    desde `localhost`) y corrige el comentario sobre PostgreSQL, que
+    ya no requiere un servicio `db` local (`DATABASE_URL` decide SQLite
+    vs. Postgres sin cambiar código, ver Sprint 3C).
+
+### Added
+
 - **`Pauta.peso_comercial` (Sprint 3G)**: propiedad nueva —
   `valor_pagado / publicaciones_contratadas`, redondeado a 2 decimales
   con `ROUND_HALF_UP` explícito (no el `ROUND_HALF_EVEN` por defecto de

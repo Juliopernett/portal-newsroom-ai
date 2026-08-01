@@ -4,19 +4,23 @@
 restantes" (Sprint 3D) actually is — it reuses
 `core.services.pauta_service.PautaService`, already built and tested in
 Sprint 3B, without any new domain logic.
+
+Every route requires an authenticated session — `dependencies=` at the
+`APIRouter` level, not per-function, so a route added here later is
+protected automatically instead of by remembering to add it.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.dependencies import get_unit_of_work
+from app.api.dependencies import get_current_user, get_unit_of_work
 from app.api.schemas.pauta import PautaCreate, PautaOut
 from core.entities.pauta import Pauta
 from core.ports.unit_of_work import UnitOfWork
 from core.services.pauta_service import PautaService
 
-router = APIRouter(prefix="/pautas", tags=["pautas"])
+router = APIRouter(prefix="/pautas", tags=["pautas"], dependencies=[Depends(get_current_user)])
 
 
 def _to_out(pauta: Pauta, uow: UnitOfWork) -> PautaOut:

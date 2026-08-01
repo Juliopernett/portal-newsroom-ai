@@ -1,15 +1,20 @@
-"""Routes for Client."""
+"""Routes for Client.
+
+Every route requires an authenticated session — `dependencies=` at the
+`APIRouter` level, not per-function, so a route added here later is
+protected automatically instead of by remembering to add it.
+"""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from app.api.dependencies import get_unit_of_work
+from app.api.dependencies import get_current_user, get_unit_of_work
 from app.api.schemas.client import ClientCreate, ClientOut
 from core.entities.client import Client
 from core.ports.unit_of_work import UnitOfWork
 
-router = APIRouter(prefix="/clients", tags=["clients"])
+router = APIRouter(prefix="/clients", tags=["clients"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("", response_model=ClientOut, status_code=201)

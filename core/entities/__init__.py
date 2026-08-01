@@ -17,7 +17,9 @@ from core.entities.editorial_task import EditorialTask, EditorialTaskStatus
 from core.entities.news_candidate import NewsCandidate
 from core.entities.pauta import Pauta
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
+from core.entities.session import Session
 from core.entities.source import Source
+from core.entities.user import User
 
 __all__ = [
     "Article",
@@ -30,5 +32,7 @@ __all__ = [
     "Pauta",
     "PublicationRequest",
     "PublicationRequestStatus",
+    "Session",
     "Source",
+    "User",
 ]

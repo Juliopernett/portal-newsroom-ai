@@ -90,6 +90,21 @@ main {
   margin: 0 auto;
 }
 
+#login-screen {
+  display: flex;
+  justify-content: center;
+  padding: 3rem 1.25rem;
+}
+
+#login-screen form {
+  width: 100%;
+  max-width: 320px;
+}
+
+#login-screen h2 {
+  margin-top: 0;
+}
+
 .tab-panel {
   display: none;
 }

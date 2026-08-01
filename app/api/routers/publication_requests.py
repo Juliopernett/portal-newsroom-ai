@@ -7,13 +7,17 @@
 request received without a Pauta had no way to be completed from the
 interface — it exposes `link_pauta`, itself just `dataclasses.replace`
 on an existing field, no new domain rule.
+
+Every route requires an authenticated session — `dependencies=` at the
+`APIRouter` level, not per-function, so a route added here later is
+protected automatically instead of by remembering to add it.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.dependencies import get_unit_of_work
+from app.api.dependencies import get_current_user, get_unit_of_work
 from app.api.schemas.publication_request import (
     PublicationRequestCreate,
     PublicationRequestLinkPauta,
@@ -23,7 +27,11 @@ from core.entities.publication_request import PublicationRequest, PublicationReq
 from core.ports.unit_of_work import UnitOfWork
 from core.services.publication_request_service import link_pauta, mark_as_published
 
-router = APIRouter(prefix="/publication-requests", tags=["publication-requests"])
+router = APIRouter(
+    prefix="/publication-requests",
+    tags=["publication-requests"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.post("", response_model=PublicationRequestOut, status_code=201)

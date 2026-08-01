@@ -15,6 +15,8 @@ from types import TracebackType
 from core.ports.client_repository import ClientRepository
 from core.ports.pauta_repository import PautaRepository
 from core.ports.publication_request_repository import PublicationRequestRepository
+from core.ports.session_repository import SessionRepository
+from core.ports.user_repository import UserRepository
 
 
 class UnitOfWork(ABC):
@@ -22,15 +24,18 @@ class UnitOfWork(ABC):
 
     Concrete adapters (`database.unit_of_work.SqlAlchemyUnitOfWork`) open a
     transaction on `__enter__` and expose `clients`/`pautas`/
-    `publication_requests` bound to it. Exiting the `with` block always
-    rolls back unless `commit()` was called explicitly first — the same
-    discipline regardless of what happened inside the block, so callers
-    never have to remember to clean up after an exception.
+    `publication_requests`/`users`/`sessions` bound to it. Exiting the
+    `with` block always rolls back unless `commit()` was called explicitly
+    first — the same discipline regardless of what happened inside the
+    block, so callers never have to remember to clean up after an
+    exception.
     """
 
     clients: ClientRepository
     pautas: PautaRepository
     publication_requests: PublicationRequestRepository
+    users: UserRepository
+    sessions: SessionRepository
 
     @abstractmethod
     def __enter__(self) -> UnitOfWork:

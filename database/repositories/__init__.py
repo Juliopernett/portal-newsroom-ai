@@ -13,9 +13,13 @@ from database.repositories.pauta_repository import SqlAlchemyPautaRepository
 from database.repositories.publication_request_repository import (
     SqlAlchemyPublicationRequestRepository,
 )
+from database.repositories.session_repository import SqlAlchemySessionRepository
+from database.repositories.user_repository import SqlAlchemyUserRepository
 
 __all__ = [
     "SqlAlchemyClientRepository",
     "SqlAlchemyPautaRepository",
     "SqlAlchemyPublicationRequestRepository",
+    "SqlAlchemySessionRepository",
+    "SqlAlchemyUserRepository",
 ]

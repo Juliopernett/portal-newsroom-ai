@@ -36,6 +36,14 @@ como cliente único, con configuración global vía `.env`:
   Sprint 3A, planeado Sprint 3D. Reemplaza a `NewsCandidate` como punto de
   entrada al pipeline editorial para todo canal (WhatsApp, Radar, manual)
   — ver [ADR-003](../adr/ADR-003-publication-inbox.md).
+- **Autenticación, alcance mínimo** (`User`, `Session`) — agregado tras el
+  deploy a Railway: la URL pública con datos sensibles de clientes
+  (teléfonos, montos pagados) invalidó el supuesto de "solo corre en
+  local" que justificaba dejar esto fuera. Login/logout/sesión con
+  Argon2id, todos los endpoints protegidos, sin invitaciones, reset de
+  contraseña, 2FA ni gestión de usuarios — ver
+  [ADR-005](../adr/ADR-005-authentication.md) para el detalle completo y
+  qué queda explícitamente para después.
 
 ## Fuera del MVP
 
@@ -50,8 +58,10 @@ no necesita multi-tenencia):
   [docs/product/CUSTOMER_CONFIGURATION.md](CUSTOMER_CONFIGURATION.md)).
 - Más de un sitio WordPress, más de un canal de Telegram, más de un
   proveedor de IA seleccionable en tiempo de ejecución.
-- Autenticación y cuentas de usuario — hoy no hay "usuarios del sistema",
-  solo el equipo editorial de un único cliente.
+- ~~Autenticación y cuentas de usuario~~ — **reincorporado al MVP tras el
+  deploy a Railway**, alcance mínimo, ver ADR-005 arriba. Lo que sigue
+  fuera: invitaciones, reset de contraseña, 2FA, bloqueo por intentos
+  fallidos, roles/gestión avanzada de usuarios.
 - Facturación / suscripción.
 - Cualquier API pública o panel de control — ver
   [docs/PROJECT_RULES.md](../PROJECT_RULES.md) y
@@ -77,7 +87,8 @@ Resumen de a dónde apunta cada elemento diferido:
 | Selección de proveedor de IA por cliente | v1.2 / v1.3 |
 | Puntaje de relevancia de candidatos | v1.3 — AI scoring engine |
 | Métricas por cliente | v1.4 — Analytics |
-| Autenticación, facturación, API pública | v2.0 — True SaaS |
+| Facturación, API pública | v2.0 — True SaaS |
+| Roles, invitaciones, 2FA (autenticación *avanzada* — el login básico ya es MVP) | v1.2+ / según necesidad real |
 
 ## Deuda técnica reconocida
 
