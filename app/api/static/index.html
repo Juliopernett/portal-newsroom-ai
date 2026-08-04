@@ -9,22 +9,242 @@
 </head>
 <body>
 
-<header id="app-header" hidden>
-  <div class="app-brand">
-    <img src="img/icono-pv.png" alt="" class="app-brand-icon">
-    <h1>Portal Vallenato</h1>
+<!-- Sprite de iconos: un solo set de linea, minimal, reutilizado con <use> en
+     toda la app en vez de una libreria/CDN de iconos. -->
+<svg xmlns="http://www.w3.org/2000/svg" class="icon-sprite" aria-hidden="true">
+  <symbol id="icon-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="9" rx="1.5"></rect>
+    <rect x="14" y="3" width="7" height="5" rx="1.5"></rect>
+    <rect x="14" y="12" width="7" height="9" rx="1.5"></rect>
+    <rect x="3" y="16" width="7" height="5" rx="1.5"></rect>
+  </symbol>
+  <symbol id="icon-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 12h4l2 3h6l2-3h4"></path>
+    <path d="M5 12 3.5 5.5A2 2 0 0 1 5.5 3h13a2 2 0 0 1 2 2.5L19 12"></path>
+    <path d="M3 12v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6"></path>
+  </symbol>
+  <symbol id="icon-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="9" cy="8" r="3.25"></circle>
+    <path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path>
+    <path d="M16 4.5a3.25 3.25 0 0 1 0 6.4"></path>
+    <path d="M17.5 14a6.5 6.5 0 0 1 4 6"></path>
+  </symbol>
+  <symbol id="icon-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M3 6h18"></path><path d="M3 12h18"></path><path d="M3 18h18"></path>
+  </symbol>
+  <symbol id="icon-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+    <path d="M16 17l5-5-5-5"></path>
+    <path d="M21 12H9"></path>
+  </symbol>
+  <symbol id="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 12a9 9 0 0 1 15.4-6.36L21 8"></path><path d="M21 3v5h-5"></path>
+    <path d="M21 12a9 9 0 0 1-15.4 6.36L3 16"></path><path d="M3 21v-5h5"></path>
+  </symbol>
+  <symbol id="icon-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 6l6 6-6 6"></path>
+  </symbol>
+  <symbol id="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>
+  </symbol>
+  <symbol id="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M6 6l12 12"></path><path d="M18 6 6 18"></path>
+  </symbol>
+  <symbol id="icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M12 5v14"></path><path d="M5 12h14"></path>
+  </symbol>
+  <symbol id="icon-money" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"></circle>
+    <path d="M12 7v10"></path><path d="M15 9.5c0-1.4-1.4-2.5-3-2.5s-3 1.1-3 2.5 1.4 2 3 2.5 3 1.1 3 2.5-1.4 2.5-3 2.5-3-1.1-3-2.5"></path>
+  </symbol>
+  <symbol id="icon-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path>
+  </symbol>
+  <symbol id="icon-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10.3 3.86 1.8 18a1.5 1.5 0 0 0 1.3 2.25h17.8A1.5 1.5 0 0 0 22.2 18L13.7 3.86a1.5 1.5 0 0 0-2.6 0z"></path>
+    <path d="M12 9v4"></path><path d="M12 16.5v.1"></path>
+  </symbol>
+  <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"></circle><path d="m8.5 12.5 2.5 2.5 4.5-5.5"></path>
+  </symbol>
+  <symbol id="icon-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="4.5"></circle><circle cx="12" cy="12" r=".5"></circle>
+  </symbol>
+  <symbol id="icon-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6.6 10.8a15.6 15.6 0 0 0 6.6 6.6l2.2-2.2a1.3 1.3 0 0 1 1.33-.31c1.06.35 2.2.54 3.37.54a1.3 1.3 0 0 1 1.3 1.3V20.6a1.3 1.3 0 0 1-1.3 1.3C10.8 21.9 2.1 13.2 2.1 3.3A1.3 1.3 0 0 1 3.4 2h3.3a1.3 1.3 0 0 1 1.3 1.3c0 1.18.19 2.31.54 3.37a1.3 1.3 0 0 1-.32 1.33z"></path>
+  </symbol>
+</svg>
+
+<div id="app-shell" hidden>
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-brand">
+      <img src="img/icono-pv.png" alt="" class="sidebar-brand-icon">
+      <span class="sidebar-brand-name">Portal Vallenato</span>
+    </div>
+    <nav id="nav-tabs" class="sidebar-nav">
+      <button type="button" class="nav-item active" data-tab="dashboard">
+        <svg class="nav-item-icon"><use href="#icon-dashboard"></use></svg>
+        <span>Dashboard</span>
+      </button>
+      <button type="button" class="nav-item" data-tab="solicitudes">
+        <svg class="nav-item-icon"><use href="#icon-inbox"></use></svg>
+        <span>Solicitudes</span>
+      </button>
+      <button type="button" class="nav-item" data-tab="clientes">
+        <svg class="nav-item-icon"><use href="#icon-users"></use></svg>
+        <span>Clientes</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <button type="button" id="btn-logout" class="nav-item">
+        <svg class="nav-item-icon"><use href="#icon-logout"></use></svg>
+        <span>Cerrar sesión</span>
+      </button>
+    </div>
+  </aside>
+
+  <div id="nav-overlay" class="nav-overlay" hidden></div>
+
+  <div class="app-main">
+    <header class="topbar">
+      <button type="button" id="btn-menu" class="icon-btn" aria-label="Abrir menú">
+        <svg class="icon"><use href="#icon-menu"></use></svg>
+      </button>
+      <span id="topbar-title" class="topbar-title">Dashboard</span>
+    </header>
+
+    <div id="status" class="status" hidden></div>
+
+    <main>
+      <section id="tab-dashboard" class="tab-panel active">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle">Resumen comercial de Portal Vallenato</p>
+          </div>
+          <button type="button" id="refrescar-dashboard" class="btn btn-secondary">
+            <svg class="icon"><use href="#icon-refresh"></use></svg>
+            Actualizar
+          </button>
+        </div>
+
+        <div id="dashboard-money" class="stat-row stat-row-money"></div>
+
+        <div class="section-block">
+          <h2 class="section-title">Requiere atención</h2>
+          <div id="dashboard-alertas" class="alert-grid"></div>
+        </div>
+
+        <div class="section-block">
+          <h2 class="section-title">Oportunidades comerciales</h2>
+          <div id="dashboard-oportunidades" class="alert-grid"></div>
+        </div>
+
+        <div class="section-block">
+          <h2 class="section-title">Actividad</h2>
+          <div id="dashboard-actividad" class="stat-row stat-row-compact"></div>
+        </div>
+
+        <div class="section-block">
+          <div class="section-header-flex">
+            <h2 class="section-title">Ranking comercial</h2>
+          </div>
+          <div id="ranking-comercial" class="ranking-list"></div>
+        </div>
+      </section>
+
+      <section id="tab-solicitudes" class="tab-panel">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Solicitudes</h1>
+            <p class="page-subtitle">Cola de publicaciones del día</p>
+          </div>
+          <button type="button" id="refrescar-solicitudes" class="btn btn-secondary">
+            <svg class="icon"><use href="#icon-refresh"></use></svg>
+            Actualizar
+          </button>
+        </div>
+
+        <form id="form-solicitud" class="quick-form">
+          <div class="quick-form-row">
+            <div class="quick-form-field quick-form-field-pauta">
+              <input
+                type="text"
+                id="solicitud-pauta-buscar"
+                class="pauta-buscador"
+                placeholder="Buscar cliente para vincular pauta…"
+                autocomplete="off"
+              >
+              <select id="solicitud-pauta">
+                <option value="">(sin pauta todavía — se vincula después)</option>
+              </select>
+            </div>
+            <label class="checkbox quick-form-checkbox">
+              <input type="checkbox" id="solicitud-prioridad">
+              Prioridad
+            </label>
+          </div>
+          <div class="quick-form-row">
+            <textarea id="solicitud-texto" required rows="2" placeholder="Texto de la publicación…" class="quick-form-textarea"></textarea>
+            <button type="submit" class="btn btn-primary">
+              <svg class="icon"><use href="#icon-plus"></use></svg>
+              Registrar
+            </button>
+          </div>
+        </form>
+
+        <div class="kanban">
+          <div class="kanban-column">
+            <div class="kanban-column-header">
+              <span>Pendientes</span>
+              <span id="kanban-count-pendientes" class="kanban-count">0</span>
+            </div>
+            <div id="kanban-pendientes" class="kanban-cards"></div>
+          </div>
+          <div class="kanban-column">
+            <div class="kanban-column-header">
+              <span>Publicadas</span>
+              <span id="kanban-count-publicadas" class="kanban-count">0</span>
+            </div>
+            <div id="kanban-publicadas" class="kanban-cards"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-clientes" class="tab-panel">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Clientes</h1>
+            <p class="page-subtitle">Fichas comerciales de cada cliente</p>
+          </div>
+          <div class="page-header-actions">
+            <button type="button" class="btn btn-secondary" data-open-drawer="drawer-cliente">
+              <svg class="icon"><use href="#icon-plus"></use></svg>
+              Nuevo cliente
+            </button>
+            <button type="button" class="btn btn-secondary" data-open-drawer="drawer-pauta">
+              <svg class="icon"><use href="#icon-plus"></use></svg>
+              Nueva pauta
+            </button>
+            <button type="button" id="refrescar-clientes" class="icon-btn" aria-label="Actualizar">
+              <svg class="icon"><use href="#icon-refresh"></use></svg>
+            </button>
+          </div>
+        </div>
+
+        <input
+          type="text"
+          id="clientes-buscar"
+          class="clientes-buscador"
+          placeholder="Buscar cliente por nombre…"
+          autocomplete="off"
+        >
+
+        <div id="lista-clientes" class="client-grid"></div>
+      </section>
+    </main>
   </div>
-  <nav id="nav-tabs" hidden>
-    <button type="button" class="tab-btn" data-tab="solicitudes">Cola de Solicitudes</button>
-    <button type="button" class="tab-btn" data-tab="clientes">Clientes y Pautas</button>
-    <button type="button" class="tab-btn" data-tab="dashboard">Dashboard</button>
-  </nav>
-  <button type="button" id="btn-logout" class="secondary" hidden>Cerrar sesión</button>
-</header>
-
-<div id="resumen" class="resumen" aria-live="polite"></div>
-
-<div id="status" class="status" hidden></div>
+</div>
 
 <section id="login-screen">
   <div class="login-card">
@@ -44,167 +264,69 @@
   </div>
 </section>
 
-<main hidden>
+<div id="drawer-overlay" class="drawer-overlay" hidden></div>
 
-  <section id="tab-solicitudes" class="tab-panel">
-    <div class="grid-2">
-      <div>
-        <h2>Registrar solicitud</h2>
-        <form id="form-solicitud">
-          <label>Pauta
-            <input
-              type="text"
-              id="solicitud-pauta-buscar"
-              class="pauta-buscador"
-              placeholder="Buscar por nombre de cliente…"
-              autocomplete="off"
-            >
-            <select id="solicitud-pauta">
-              <option value="">(sin pauta todavía — se vincula después)</option>
-            </select>
-          </label>
-          <label>Texto
-            <textarea id="solicitud-texto" required rows="3"></textarea>
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" id="solicitud-prioridad">
-            Prioridad manual (adelanta la fila)
-          </label>
-          <button type="submit">Registrar solicitud</button>
-        </form>
-      </div>
+<aside id="drawer-cliente" class="drawer" hidden aria-hidden="true">
+  <div class="drawer-header">
+    <h2>Nuevo cliente</h2>
+    <button type="button" class="icon-btn" data-close-drawer aria-label="Cerrar">
+      <svg class="icon"><use href="#icon-close"></use></svg>
+    </button>
+  </div>
+  <form id="form-cliente" class="drawer-form">
+    <label>Nombre
+      <input type="text" id="cliente-nombre" required>
+    </label>
+    <label>Tipo
+      <select id="cliente-tipo" required>
+        <option value="artista">Artista</option>
+        <option value="manager">Manager</option>
+        <option value="promotor">Promotor</option>
+        <option value="empresario">Empresario</option>
+      </select>
+    </label>
+    <label>Teléfono
+      <input type="text" id="cliente-telefono" required>
+    </label>
+    <label>Instagram (opcional)
+      <input type="text" id="cliente-instagram">
+    </label>
+    <button type="submit" class="btn btn-primary">Crear cliente</button>
+  </form>
+</aside>
 
-      <div>
-        <div class="section-header">
-          <h2>Pendientes de publicar</h2>
-          <button type="button" id="refrescar-solicitudes" class="secondary">Actualizar</button>
-        </div>
-        <table class="responsive-stack">
-          <thead>
-            <tr>
-              <th>Recibida</th>
-              <th>Cliente</th>
-              <th>Texto</th>
-              <th>Prioridad</th>
-              <th>Acción</th>
-            </tr>
-          </thead>
-          <tbody id="tabla-solicitudes"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section id="tab-clientes" class="tab-panel">
-    <div class="grid-2">
-      <div>
-        <details class="collapsible">
-          <summary>Nuevo cliente</summary>
-          <form id="form-cliente">
-            <label>Nombre
-              <input type="text" id="cliente-nombre" required>
-            </label>
-            <label>Tipo
-              <select id="cliente-tipo" required>
-                <option value="artista">Artista</option>
-                <option value="manager">Manager</option>
-                <option value="promotor">Promotor</option>
-                <option value="empresario">Empresario</option>
-              </select>
-            </label>
-            <label>Teléfono
-              <input type="text" id="cliente-telefono" required>
-            </label>
-            <label>Instagram (opcional)
-              <input type="text" id="cliente-instagram">
-            </label>
-            <button type="submit">Crear cliente</button>
-          </form>
-        </details>
-
-        <details class="collapsible">
-          <summary>Nueva pauta</summary>
-          <form id="form-pauta">
-            <label>Cliente
-              <select id="pauta-cliente" required></select>
-            </label>
-            <label>Fecha de inicio
-              <input type="date" id="pauta-fecha-inicio" required>
-            </label>
-            <label>Fecha de fin
-              <input type="date" id="pauta-fecha-fin" required>
-            </label>
-            <label>Publicaciones contratadas
-              <input type="number" id="pauta-cantidad" min="1" step="1" required>
-            </label>
-            <label>Valor pagado
-              <input type="number" id="pauta-valor" min="0" step="0.01" required>
-            </label>
-            <label>Fecha de pago
-              <input type="date" id="pauta-fecha-pago" required>
-            </label>
-            <label>Observaciones (opcional)
-              <input type="text" id="pauta-observaciones">
-            </label>
-            <button type="submit">Crear pauta</button>
-          </form>
-        </details>
-      </div>
-
-      <div>
-        <div class="section-header">
-          <h2>Clientes y sus pautas</h2>
-          <button type="button" id="refrescar-clientes" class="secondary">Actualizar</button>
-        </div>
-        <div id="lista-clientes"></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="tab-dashboard" class="tab-panel">
-    <div class="section-header">
-      <h2>Resumen general</h2>
-      <button type="button" id="refrescar-dashboard" class="secondary">Actualizar</button>
-    </div>
-    <div id="dashboard-resumen" class="dashboard-cards"></div>
-
-    <h2>Alertas</h2>
-    <div id="dashboard-alertas" class="dashboard-alertas">
-      <div class="alerta-grupo">
-        <h3>Clientes con cupo agotado</h3>
-        <ul id="alerta-cupo-agotado" class="alerta-lista"></ul>
-      </div>
-      <div class="alerta-grupo">
-        <h3>Clientes por vencer (≤ 7 días)</h3>
-        <ul id="alerta-por-vencer" class="alerta-lista"></ul>
-      </div>
-      <div class="alerta-grupo">
-        <h3>Clientes con menos de 3 publicaciones restantes</h3>
-        <ul id="alerta-cupo-bajo" class="alerta-lista"></ul>
-      </div>
-      <div class="alerta-grupo">
-        <h3>Solicitudes esperando hace más de 4 horas</h3>
-        <ul id="alerta-solicitudes-antiguas" class="alerta-lista"></ul>
-      </div>
-    </div>
-
-    <h2>Ranking comercial</h2>
-    <table class="responsive-stack">
-      <thead>
-        <tr>
-          <th>Cliente</th>
-          <th>Valor contratado</th>
-          <th>Peso comercial</th>
-          <th>Publicaciones restantes</th>
-          <th>Fecha de vencimiento</th>
-          <th>Estado</th>
-        </tr>
-      </thead>
-      <tbody id="tabla-ranking"></tbody>
-    </table>
-  </section>
-
-</main>
+<aside id="drawer-pauta" class="drawer" hidden aria-hidden="true">
+  <div class="drawer-header">
+    <h2>Nueva pauta</h2>
+    <button type="button" class="icon-btn" data-close-drawer aria-label="Cerrar">
+      <svg class="icon"><use href="#icon-close"></use></svg>
+    </button>
+  </div>
+  <form id="form-pauta" class="drawer-form">
+    <label>Cliente
+      <select id="pauta-cliente" required></select>
+    </label>
+    <label>Fecha de inicio
+      <input type="date" id="pauta-fecha-inicio" required>
+    </label>
+    <label>Fecha de fin
+      <input type="date" id="pauta-fecha-fin" required>
+    </label>
+    <label>Publicaciones contratadas
+      <input type="number" id="pauta-cantidad" min="1" step="1" required>
+    </label>
+    <label>Valor pagado
+      <input type="number" id="pauta-valor" min="0" step="0.01" required>
+    </label>
+    <label>Fecha de pago
+      <input type="date" id="pauta-fecha-pago" required>
+    </label>
+    <label>Observaciones (opcional)
+      <input type="text" id="pauta-observaciones">
+    </label>
+    <button type="submit" class="btn btn-primary">Crear pauta</button>
+  </form>
+</aside>
 
 <script src="app.js"></script>
 </body>
