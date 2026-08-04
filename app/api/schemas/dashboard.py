@@ -31,7 +31,6 @@ class DashboardResumenOut(BaseModel):
     ingreso_historico: Decimal
     peso_comercial_promedio: Decimal
     valor_promedio_por_cliente: Decimal
-    clientes_premium: int
 
 
 class DashboardAlertasOut(BaseModel):
@@ -42,10 +41,14 @@ class DashboardAlertasOut(BaseModel):
     then a stale-request backlog) — not a re-sort of any list's contents,
     which stay in the order `AnalyticsService` already returns them.
 
-    `clientes_publicaciones_sin_usar` is deliberately not in that
-    priority ordering — it's a historical/sales report ("who left money
-    on the table"), not an operational alert (see
-    `AnalyticsService.clientes_con_publicaciones_sin_usar`), listed last.
+    `clientes_publicaciones_sin_usar` and `clientes_premium` are
+    deliberately not in that priority ordering — neither is an
+    operational alert. The first is a historical/sales report ("who left
+    money on the table", see
+    `AnalyticsService.clientes_con_publicaciones_sin_usar`); the second is
+    a relationship/account-management segment (see
+    `AnalyticsService.clientes_premium`), not something anyone needs to
+    act on. Both listed last.
     """
 
     clientes_cupo_agotado: list[ClientOut]
@@ -55,6 +58,7 @@ class DashboardAlertasOut(BaseModel):
     clientes_contrato_por_renovar: list[ClientOut]
     solicitudes_antiguas: list[PublicationRequestOut]
     clientes_publicaciones_sin_usar: list[ClientOut]
+    clientes_premium: list[ClientOut]
 
 
 class RankingComercialOut(BaseModel):

@@ -75,7 +75,6 @@ def test_resumen_is_all_zero_with_no_data(client: TestClient) -> None:
     assert body["ingreso_historico"] == "0"
     assert body["peso_comercial_promedio"] == "0"
     assert body["valor_promedio_por_cliente"] == "0"
-    assert body["clientes_premium"] == 0
 
 
 def test_resumen_reflects_a_vigente_pauta(client: TestClient) -> None:
@@ -157,6 +156,17 @@ def test_alertas_lists_a_client_who_left_publications_unused_on_an_expired_pauta
     # No es una alerta operativa -- una pauta vencida no cuenta para estas.
     assert body["clientes_cupo_agotado"] == []
     assert body["clientes_menos_de_3_restantes"] == []
+
+
+def test_alertas_lists_a_client_with_a_premium_package(client: TestClient) -> None:
+    client_id = _create_client(client)
+    # 2026-07-01 a 2027-01-01 -> 184 dias -> semestral (premium).
+    _create_pauta(client, client_id, fecha_inicio="2026-07-01", fecha_fin="2027-01-01")
+
+    response = client.get("/dashboard/alertas")
+
+    assert response.status_code == 200
+    assert [c["id"] for c in response.json()["clientes_premium"]] == [client_id]
 
 
 def test_alertas_lists_an_old_pending_solicitud(client: TestClient) -> None:

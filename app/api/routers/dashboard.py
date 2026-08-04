@@ -45,7 +45,6 @@ def get_resumen(uow: UnitOfWork = Depends(get_unit_of_work)) -> DashboardResumen
         ingreso_historico=analytics.ingresos_historicos(),
         peso_comercial_promedio=analytics.peso_comercial_promedio(),
         valor_promedio_por_cliente=analytics.valor_promedio_por_cliente(),
-        clientes_premium=len(analytics.clientes_premium()),
     )
 
 
@@ -78,6 +77,7 @@ def get_alertas(uow: UnitOfWork = Depends(get_unit_of_work)) -> DashboardAlertas
         clientes_publicaciones_sin_usar=[
             ClientOut.model_validate(c) for c in analytics.clientes_con_publicaciones_sin_usar()
         ],
+        clientes_premium=[ClientOut.model_validate(c) for c in analytics.clientes_premium()],
     )
 
 
