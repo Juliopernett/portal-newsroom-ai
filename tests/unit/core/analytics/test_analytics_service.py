@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from core.analytics.analytics_service import AnalyticsService
+from core.analytics.view_models import EstadoComercial
 from core.entities.client import Client, ClientType
 from core.entities.pauta import Pauta
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
@@ -231,6 +232,27 @@ def test_clientes_con_cupo_agotado_returns_clients_with_an_exhausted_pauta() -> 
     assert [c.id for c in resultado] == ["agotado"]
 
 
+def test_clientes_con_cupo_agotado_excludes_an_agotada_but_vencida_pauta() -> None:
+    # Sprint 4C: una pauta agotada que ya vencio no es tarea operativa.
+    cliente = _client(id="c1")
+    pauta_vencida = _pauta(
+        id="p1",
+        client_id="c1",
+        fecha_inicio=date(2026, 1, 1),
+        fecha_fin=date(2026, 2, 1),
+        publicaciones_contratadas=2,
+    )
+    solicitudes = [
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(2)
+    ]
+
+    resultado = _service(
+        clients=[cliente], pautas=[pauta_vencida], solicitudes=solicitudes
+    ).clientes_con_cupo_agotado()
+
+    assert resultado == []
+
+
 def test_clientes_con_cupo_bajo_uses_percentage_not_absolute_count() -> None:
     # 10 contratadas, 9 consumidas -> 1 restante -> 10% -> bajo cupo.
     bajo = _client(id="bajo")
@@ -256,6 +278,27 @@ def test_clientes_con_cupo_bajo_excludes_exactly_20_percent_remaining() -> None:
 
     resultado = _service(
         clients=[cliente], pautas=pautas, solicitudes=solicitudes
+    ).clientes_con_cupo_bajo()
+
+    assert resultado == []
+
+
+def test_clientes_con_cupo_bajo_excludes_a_low_quota_but_vencida_pauta() -> None:
+    # Sprint 4C: mismo principio, para el 20%.
+    cliente = _client(id="c1")
+    pauta_vencida = _pauta(
+        id="p1",
+        client_id="c1",
+        fecha_inicio=date(2026, 1, 1),
+        fecha_fin=date(2026, 2, 1),
+        publicaciones_contratadas=10,
+    )
+    solicitudes = [
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(9)
+    ]
+
+    resultado = _service(
+        clients=[cliente], pautas=[pauta_vencida], solicitudes=solicitudes
     ).clientes_con_cupo_bajo()
 
     assert resultado == []
@@ -395,6 +438,175 @@ def test_clientes_con_menos_de_n_publicaciones_restantes_excludes_exactly_the_mi
     assert resultado == []
 
 
+def test_clientes_con_menos_de_n_publicaciones_restantes_excludes_a_vencida_pauta() -> None:
+    # Sprint 4C: la razon del cambio -- ya no mezcla vigentes y vencidas.
+    cliente = _client(id="c1")
+    pauta_vencida = _pauta(
+        id="p1",
+        client_id="c1",
+        fecha_inicio=date(2026, 1, 1),
+        fecha_fin=date(2026, 2, 1),
+        publicaciones_contratadas=10,
+    )
+    solicitudes = [
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(9)
+    ]
+
+    resultado = _service(
+        clients=[cliente], pautas=[pauta_vencida], solicitudes=solicitudes
+    ).clientes_con_menos_de_n_publicaciones_restantes(minimo=3)
+
+    assert resultado == []
+
+
+def test_clientes_con_publicaciones_individuales_pendientes_filters_by_tipo_y_saldo() -> None:
+    individual_con_saldo = _client(id="individual")
+    individual_agotado = _client(id="agotado")
+    paquete = _client(id="paquete")
+    pautas = [
+        _pauta(
+            id="p1",
+            client_id="individual",
+            fecha_inicio=date(2026, 8, 1),
+            fecha_fin=date(2026, 8, 2),
+            publicaciones_contratadas=3,
+        ),
+        _pauta(
+            id="p2",
+            client_id="agotado",
+            fecha_inicio=date(2026, 8, 1),
+            fecha_fin=date(2026, 8, 2),
+            publicaciones_contratadas=1,
+        ),
+        _pauta(
+            id="p3",
+            client_id="paquete",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 8, 30),
+            publicaciones_contratadas=8,
+        ),
+    ]
+    solicitudes = [_solicitud(pauta_id="p2", estado=PublicationRequestStatus.PUBLICADA)]
+
+    resultado = _service(
+        clients=[individual_con_saldo, individual_agotado, paquete],
+        pautas=pautas,
+        solicitudes=solicitudes,
+    ).clientes_con_publicaciones_individuales_pendientes()
+
+    assert [c.id for c in resultado] == ["individual"]
+
+
+def test_clientes_con_contrato_por_renovar_excludes_individual_pautas() -> None:
+    paquete_por_vencer = _client(id="paquete")
+    individual_por_vencer = _client(id="individual")
+    pautas = [
+        _pauta(
+            id="p1",
+            client_id="paquete",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 8, 5),
+            publicaciones_contratadas=8,
+        ),
+        _pauta(
+            id="p2",
+            client_id="individual",
+            fecha_inicio=date(2026, 7, 30),
+            fecha_fin=date(2026, 8, 5),
+            publicaciones_contratadas=2,
+        ),
+    ]
+
+    resultado = _service(
+        clients=[paquete_por_vencer, individual_por_vencer], pautas=pautas
+    ).clientes_con_contrato_por_renovar(dias=7)
+
+    assert [c.id for c in resultado] == ["paquete"]
+
+
+def test_clientes_con_publicaciones_sin_usar_returns_only_vencidas_con_saldo() -> None:
+    dejo_saldo = _client(id="dejo-saldo")
+    vencida_sin_saldo = _client(id="sin-saldo")
+    vigente = _client(id="vigente")
+    pautas = [
+        _pauta(
+            id="p1",
+            client_id="dejo-saldo",
+            fecha_inicio=date(2026, 1, 1),
+            fecha_fin=date(2026, 2, 1),
+            publicaciones_contratadas=8,
+        ),
+        _pauta(
+            id="p2",
+            client_id="sin-saldo",
+            fecha_inicio=date(2026, 1, 1),
+            fecha_fin=date(2026, 2, 1),
+            publicaciones_contratadas=1,
+        ),
+        _pauta(
+            id="p3",
+            client_id="vigente",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 8, 30),
+            publicaciones_contratadas=8,
+        ),
+    ]
+    solicitudes = [_solicitud(pauta_id="p2", estado=PublicationRequestStatus.PUBLICADA)]
+
+    resultado = _service(
+        clients=[dejo_saldo, vencida_sin_saldo, vigente], pautas=pautas, solicitudes=solicitudes
+    ).clientes_con_publicaciones_sin_usar()
+
+    assert [c.id for c in resultado] == ["dejo-saldo"]
+
+
+def test_valor_promedio_por_cliente_divides_ingresos_by_client_count() -> None:
+    pautas = [
+        _pauta(client_id="c1", valor_pagado=Decimal("100")),
+        _pauta(client_id="c2", valor_pagado=Decimal("300")),
+    ]
+
+    service = _service(clients=[_client(id="c1"), _client(id="c2")], pautas=pautas)
+
+    assert service.valor_promedio_por_cliente() == Decimal("200.00")
+
+
+def test_valor_promedio_por_cliente_is_zero_with_no_clients() -> None:
+    assert _service().valor_promedio_por_cliente() == Decimal("0")
+
+
+def test_clientes_premium_returns_only_semestral_and_anual() -> None:
+    mensual = _client(id="mensual")
+    semestral = _client(id="semestral")
+    anual = _client(id="anual")
+    pautas = [
+        _pauta(
+            id="p1",
+            client_id="mensual",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 7, 31),
+        ),
+        _pauta(
+            id="p2",
+            client_id="semestral",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2027, 1, 1),
+        ),
+        _pauta(
+            id="p3",
+            client_id="anual",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2027, 7, 10),
+        ),
+    ]
+
+    resultado = _service(
+        clients=[mensual, semestral, anual], pautas=pautas
+    ).clientes_premium()
+
+    assert {c.id for c in resultado} == {"semestral", "anual"}
+
+
 def test_ranking_comercial_aggregates_across_a_clients_multiple_pautas() -> None:
     cliente = _client(id="c1")
     pautas = [
@@ -432,6 +644,10 @@ def test_ranking_comercial_aggregates_across_a_clients_multiple_pautas() -> None
     assert item.fecha_vencimiento == date(2026, 2, 1)
     # p1 es vigente hoy (2026-07-01 a 2026-08-30, "hoy" = 2026-08-01)
     assert item.vigente is True
+    # estado_comercial usa SOLO p1 (la vigente): 9 restantes, vence en 29
+    # dias -> saludable, aunque publicaciones_restantes (14) sume tambien
+    # los 5 de la p2 ya vencida.
+    assert item.estado_comercial == EstadoComercial.SALUDABLE
 
 
 def test_ranking_comercial_excludes_clients_without_pautas() -> None:
@@ -451,3 +667,125 @@ def test_ranking_comercial_is_sorted_by_peso_comercial_descending() -> None:
     ).ranking_comercial()
 
     assert [item.cliente.id for item in ranking] == ["alto", "bajo"]
+
+
+# ---------- estado_comercial (Sprint 4C) ----------
+
+
+def test_estado_comercial_is_vencido_when_no_pauta_is_vigente() -> None:
+    pautas = [
+        _pauta(
+            client_id="c1",
+            fecha_inicio=date(2026, 1, 1),
+            fecha_fin=date(2026, 2, 1),
+            publicaciones_contratadas=8,
+        )
+    ]
+
+    ranking = _service(clients=[_client(id="c1")], pautas=pautas).ranking_comercial()
+
+    assert ranking[0].estado_comercial == EstadoComercial.VENCIDO
+
+
+def test_estado_comercial_is_renovacion_when_quota_is_exhausted() -> None:
+    pautas = [
+        _pauta(
+            id="p1",
+            client_id="c1",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 12, 1),
+            publicaciones_contratadas=2,
+        )
+    ]
+    solicitudes = [
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(2)
+    ]
+
+    ranking = _service(
+        clients=[_client(id="c1")], pautas=pautas, solicitudes=solicitudes
+    ).ranking_comercial()
+
+    assert ranking[0].estado_comercial == EstadoComercial.RENOVACION
+
+
+def test_estado_comercial_is_renovacion_when_expiring_within_7_days() -> None:
+    pautas = [
+        _pauta(
+            client_id="c1",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 8, 5),  # 4 dias despues de "hoy" (2026-08-01)
+            publicaciones_contratadas=50,
+        )
+    ]
+
+    ranking = _service(clients=[_client(id="c1")], pautas=pautas).ranking_comercial()
+
+    assert ranking[0].estado_comercial == EstadoComercial.RENOVACION
+
+
+def test_estado_comercial_is_atencion_when_restantes_is_low_but_not_urgent() -> None:
+    pautas = [
+        _pauta(
+            id="p1",
+            client_id="c1",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 12, 1),
+            publicaciones_contratadas=10,
+        )
+    ]
+    solicitudes = [
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(7)
+    ]  # 3 restantes
+
+    ranking = _service(
+        clients=[_client(id="c1")], pautas=pautas, solicitudes=solicitudes
+    ).ranking_comercial()
+
+    assert ranking[0].estado_comercial == EstadoComercial.ATENCION
+
+
+def test_estado_comercial_is_saludable_with_plenty_of_time_and_quota() -> None:
+    pautas = [
+        _pauta(
+            client_id="c1",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 12, 1),
+            publicaciones_contratadas=10,
+        )
+    ]
+
+    ranking = _service(clients=[_client(id="c1")], pautas=pautas).ranking_comercial()
+
+    assert ranking[0].estado_comercial == EstadoComercial.SALUDABLE
+
+
+def test_estado_comercial_ignores_leftover_quota_from_a_vencida_pauta() -> None:
+    # Una pauta vieja y ya vencida con mucho saldo sin usar no debe "tapar"
+    # que la pauta vigente actual esta casi agotada.
+    vencida_con_saldo = _pauta(
+        id="p1",
+        client_id="c1",
+        fecha_inicio=date(2026, 1, 1),
+        fecha_fin=date(2026, 2, 1),
+        publicaciones_contratadas=20,
+    )
+    vigente_casi_agotada = _pauta(
+        id="p2",
+        client_id="c1",
+        fecha_inicio=date(2026, 7, 1),
+        fecha_fin=date(2026, 12, 1),
+        publicaciones_contratadas=2,
+    )
+    solicitudes = [_solicitud(pauta_id="p2", estado=PublicationRequestStatus.PUBLICADA)]
+
+    ranking = _service(
+        clients=[_client(id="c1")],
+        pautas=[vencida_con_saldo, vigente_casi_agotada],
+        solicitudes=solicitudes,
+    ).ranking_comercial()
+
+    item = ranking[0]
+    # publicaciones_restantes (suma de TODAS las pautas) se ve saludable...
+    assert item.publicaciones_restantes == 21
+    # ...pero estado_comercial mira solo la vigente (1 restante) y marca atencion.
+    assert item.estado_comercial == EstadoComercial.ATENCION

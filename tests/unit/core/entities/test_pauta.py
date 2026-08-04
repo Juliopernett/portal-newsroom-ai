@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
 
-from core.entities.pauta import Pauta
+from core.entities.pauta import Pauta, PautaTipo
 
 
 def _build(**overrides: object) -> Pauta:
@@ -94,3 +94,30 @@ def test_peso_comercial_is_zero_when_valor_pagado_is_zero() -> None:
     pauta = _build(valor_pagado=Decimal("0"), publicaciones_contratadas=10)
 
     assert pauta.peso_comercial == Decimal("0.00")
+
+
+def _con_duracion(dias: int) -> Pauta:
+    inicio = date(2026, 1, 1)
+    return _build(fecha_inicio=inicio, fecha_fin=inicio + timedelta(days=dias))
+
+
+@pytest.mark.parametrize(
+    "dias,esperado",
+    [
+        (1, PautaTipo.INDIVIDUAL),
+        (14, PautaTipo.INDIVIDUAL),
+        (15, PautaTipo.MENSUAL),
+        (31, PautaTipo.MENSUAL),
+        (45, PautaTipo.MENSUAL),
+        (46, PautaTipo.TRIMESTRAL),
+        (90, PautaTipo.TRIMESTRAL),
+        (135, PautaTipo.TRIMESTRAL),
+        (136, PautaTipo.SEMESTRAL),
+        (181, PautaTipo.SEMESTRAL),
+        (270, PautaTipo.SEMESTRAL),
+        (271, PautaTipo.ANUAL),
+        (365, PautaTipo.ANUAL),
+    ],
+)
+def test_tipo_infers_the_commercial_product_from_duration(dias: int, esperado: PautaTipo) -> None:
+    assert _con_duracion(dias).tipo == esperado

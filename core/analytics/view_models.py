@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from enum import StrEnum
 
 from core.entities.client import Client
 
@@ -37,6 +38,24 @@ class ClientePesoComercial:
 
     cliente: Client
     peso_comercial: Decimal
+
+
+class EstadoComercial(StrEnum):
+    """A one-glance read on how urgently a `Client` needs sales/account attention.
+
+    Evaluated in priority order (see `AnalyticsService.ranking_comercial`):
+    a `Client` with no vigente `Pauta` at all is `VENCIDO` regardless of
+    anything else; among clients with a vigente `Pauta`, an exhausted quota
+    or an imminent end date is `RENOVACION` (act now) before a merely-low
+    quota is `ATENCION` (keep an eye on it); everyone else is `SALUDABLE`.
+    Deliberately collapses two numbers (days left, publications left) most
+    operators would otherwise have to compare by hand into one glance.
+    """
+
+    SALUDABLE = "saludable"
+    ATENCION = "atencion"
+    RENOVACION = "renovacion"
+    VENCIDO = "vencido"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -66,3 +85,4 @@ class RankingComercialItem:
     publicaciones_restantes: int
     fecha_vencimiento: date
     vigente: bool
+    estado_comercial: EstadoComercial
