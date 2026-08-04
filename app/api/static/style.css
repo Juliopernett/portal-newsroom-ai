@@ -14,8 +14,10 @@ body {
 
 header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1.5rem;
+  justify-content: space-between;
+  gap: 0.6rem 1.5rem;
   padding: 0.75rem 1.25rem;
   background: #1f2937;
   color: #fff;
@@ -30,6 +32,8 @@ header h1 {
 nav {
   display: flex;
   gap: 0.5rem;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .tab-btn {
@@ -127,6 +131,122 @@ main {
 @media (max-width: 800px) {
   .grid-2 {
     grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+/* Celular: header apilado, tablas convertidas a tarjetas, controles a
+   tamaño de dedo. El operador de guardia usa esto parado con el
+   teléfono, no solo sentado frente a un monitor. */
+@media (max-width: 640px) {
+  header {
+    padding: 0.6rem 0.9rem;
+  }
+
+  header h1 {
+    font-size: 1rem;
+  }
+
+  #nav-tabs {
+    order: 3;
+    width: 100%;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 0.55rem 0.4rem;
+  }
+
+  #btn-logout {
+    order: 2;
+  }
+
+  .resumen {
+    padding: 0.5rem 0.9rem;
+  }
+
+  main {
+    padding: 0.9rem;
+  }
+
+  .status {
+    left: 0.75rem;
+    right: 0.75rem;
+    top: 0.6rem;
+  }
+
+  /* Tablas de 4+ columnas no caben en una pantalla angosta sin scroll
+     horizontal incómodo — se convierten en una lista de tarjetas, una
+     fila por tarjeta, con la etiqueta de columna a la izquierda (viene
+     de data-label en el <td>, puesto en app.js). */
+  table.responsive-stack thead {
+    display: none;
+  }
+
+  table.responsive-stack,
+  table.responsive-stack tbody,
+  table.responsive-stack tr,
+  table.responsive-stack td {
+    display: block;
+    width: 100%;
+  }
+
+  table.responsive-stack {
+    border: none;
+    background: transparent;
+  }
+
+  table.responsive-stack tr {
+    margin-bottom: 0.75rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  table.responsive-stack tr:last-child {
+    margin-bottom: 0;
+  }
+
+  table.responsive-stack td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid #f0f0f0;
+    text-align: right;
+  }
+
+  table.responsive-stack td:last-child {
+    border-bottom: none;
+  }
+
+  table.responsive-stack td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: #6b7280;
+    text-align: left;
+  }
+
+  /* La celda de acción (botón, o select + botón para vincular) no cabe
+     en el renglón label-izquierda/valor-derecha del resto — pasa a
+     columna completa, con la etiqueta arriba. */
+  #tabla-solicitudes td:last-child {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+  }
+
+  #tabla-solicitudes td:last-child::before {
+    margin-bottom: 0.35rem;
+  }
+
+  table.responsive-stack .link-pauta {
+    width: 100%;
+    min-width: 0;
   }
 }
 
@@ -222,8 +342,11 @@ label.checkbox {
 input,
 select,
 textarea {
-  font-size: 0.95rem;
-  padding: 0.4rem 0.5rem;
+  /* 16px, no 0.95rem (~15.2px): por debajo de 16px, iOS Safari hace zoom
+     automático al enfocar el campo — molesto en un formulario que se usa
+     parado, con el celular en la mano. */
+  font-size: 16px;
+  padding: 0.5rem;
   border: 1px solid #d1d5db;
   border-radius: 4px;
   font-family: inherit;
@@ -233,7 +356,8 @@ button {
   cursor: pointer;
   border: none;
   border-radius: 4px;
-  padding: 0.5rem 0.9rem;
+  padding: 0.55rem 0.9rem;
+  min-height: 2.5rem;
   font-size: 0.9rem;
   background: #1f2937;
   color: #fff;
@@ -266,6 +390,7 @@ td {
   border-bottom: 1px solid #f0f0f0;
   font-size: 0.88rem;
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 
 th {

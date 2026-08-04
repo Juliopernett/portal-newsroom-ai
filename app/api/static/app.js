@@ -264,9 +264,9 @@ function renderListaClientes(clientes, pautas) {
       .map(
         (p) => `
         <tr>
-          <td>${formatFecha(p.fecha_inicio)} – ${formatFecha(p.fecha_fin)}</td>
-          <td>${p.publicaciones_restantes}/${p.publicaciones_contratadas}</td>
-          <td>${estadoPautaBadges(p)}</td>
+          <td data-label="Período">${formatFecha(p.fecha_inicio)} – ${formatFecha(p.fecha_fin)}</td>
+          <td data-label="Restantes">${p.publicaciones_restantes}/${p.publicaciones_contratadas}</td>
+          <td data-label="Estado">${estadoPautaBadges(p)}</td>
         </tr>`
       )
       .join("");
@@ -276,7 +276,7 @@ function renderListaClientes(clientes, pautas) {
       <p class="muted">${client.telefono}${client.instagram ? " · " + client.instagram : ""}</p>
       ${
         pautasDelCliente.length
-          ? `<table class="compact">
+          ? `<table class="compact responsive-stack">
                <thead><tr><th>Período</th><th>Restantes</th><th>Estado</th></tr></thead>
                <tbody>${filas}</tbody>
              </table>`
@@ -328,11 +328,11 @@ async function loadSolicitudes() {
     const tr = document.createElement("tr");
     if (esperandoMucho) tr.className = "row-urgent";
     tr.innerHTML = `
-      <td>${esperandoMucho ? "⏱ " : ""}${solicitud.fecha_recepcion.slice(0, 16).replace("T", " ")}</td>
-      <td>${nombreCliente}</td>
-      <td>${solicitud.texto}</td>
-      <td>${solicitud.prioridad_manual ? "⚑" : ""}</td>
-      <td>${accionHtml}</td>
+      <td data-label="Recibida">${esperandoMucho ? "⏱ " : ""}${solicitud.fecha_recepcion.slice(0, 16).replace("T", " ")}</td>
+      <td data-label="Cliente">${nombreCliente}</td>
+      <td data-label="Texto">${solicitud.texto}</td>
+      <td data-label="Prioridad">${solicitud.prioridad_manual ? "⚑ Sí" : "—"}</td>
+      <td data-label="Acción">${accionHtml}</td>
     `;
     tbody.appendChild(tr);
   }
