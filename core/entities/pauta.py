@@ -18,10 +18,14 @@ from enum import StrEnum
 from uuid import uuid4
 
 # Bandas de duración (en días) para inferir `Pauta.tipo` — ver esa property.
+# Cada corte es el punto medio entre dos planes nominales del catálogo real
+# de Portal Vallenato (1/2/3/6/12 meses ~ 30/60/90/180/365 días), no un
+# número arbitrario.
 _DURACION_MAX_INDIVIDUAL = 14
-_DURACION_MAX_MENSUAL = 45
-_DURACION_MAX_TRIMESTRAL = 135
-_DURACION_MAX_SEMESTRAL = 270
+_DURACION_MAX_MENSUAL = 45  # punto medio entre 30 (1 mes) y 60 (2 meses)
+_DURACION_MAX_BIMESTRAL = 75  # punto medio entre 60 (2 meses) y 90 (3 meses)
+_DURACION_MAX_TRIMESTRAL = 135  # punto medio entre 90 (3 meses) y 180 (6 meses)
+_DURACION_MAX_SEMESTRAL = 272  # punto medio entre 180 (6 meses) y 365 (1 año)
 
 
 class PautaTipo(StrEnum):
@@ -29,12 +33,14 @@ class PautaTipo(StrEnum):
 
     Portal Vallenato vende dos cosas distintas bajo el mismo formulario
     ("Pauta"): publicaciones sueltas (paga por cantidad, la fecha casi no
-    importa) y paquetes por tiempo (paga por vigencia, mensual/trimestral/
-    semestral/anual). Ver `Pauta.tipo` para cómo se infiere cuál es cuál.
+    importa) y paquetes por tiempo — mensual/bimestral/trimestral/
+    semestral/anual, el catálogo real del negocio (1/2/3/6/12 meses). Ver
+    `Pauta.tipo` para cómo se infiere cuál es cuál.
     """
 
     INDIVIDUAL = "individual"
     MENSUAL = "mensual"
+    BIMESTRAL = "bimestral"
     TRIMESTRAL = "trimestral"
     SEMESTRAL = "semestral"
     ANUAL = "anual"
@@ -105,17 +111,22 @@ class Pauta:
         proposition IS its date range; publication count only follows
         from that (a negotiated custom deal could pair an unusual count
         with a standard duration, but the duration still correctly says
-        what kind of product was sold). Band edges are calendar months
-        with slack for real-world date variance, verified against every
-        historical Pauta migrated from the operator's spreadsheet:
-        <15 days: Individual, <=45: Mensual, <=135: Trimestral,
-        <=270: Semestral, otherwise: Anual.
+        what kind of product was sold). Band edges sit at the midpoint
+        between each pair of neighboring plans in the real catalog (1/2/3/6/12
+        meses), re-derived 2026-08-05 after the operator shared exact
+        pricing and it turned out a 2-month contract fell in the
+        Trimestral band, indistinguishable from a real 3-month one — not
+        just verified against historical data, cross-checked against the
+        actual price list: <15 days: Individual, <=45: Mensual,
+        <=75: Bimestral, <=135: Trimestral, <=272: Semestral, otherwise: Anual.
         """
         duracion_dias = (self.fecha_fin - self.fecha_inicio).days
         if duracion_dias <= _DURACION_MAX_INDIVIDUAL:
             return PautaTipo.INDIVIDUAL
         if duracion_dias <= _DURACION_MAX_MENSUAL:
             return PautaTipo.MENSUAL
+        if duracion_dias <= _DURACION_MAX_BIMESTRAL:
+            return PautaTipo.BIMESTRAL
         if duracion_dias <= _DURACION_MAX_TRIMESTRAL:
             return PautaTipo.TRIMESTRAL
         if duracion_dias <= _DURACION_MAX_SEMESTRAL:

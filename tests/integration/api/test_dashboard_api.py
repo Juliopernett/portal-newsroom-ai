@@ -191,8 +191,8 @@ def test_ranking_reflects_a_clients_pauta(client: TestClient) -> None:
     assert body[0]["cliente"]["id"] == client_id
     assert body[0]["valor_contratado"] == "200000.00"
     assert body[0]["peso_comercial"] == "20000.00"
-    # 2026-07-01 a 2026-08-30 -> 60 dias -> trimestral.
-    assert body[0]["tipo"] == "trimestral"
+    # 2026-07-01 a 2026-08-30 -> 60 dias -> bimestral.
+    assert body[0]["tipo"] == "bimestral"
     assert body[0]["publicaciones_contratadas"] == 10
     assert body[0]["publicaciones_restantes"] == 10
     assert body[0]["vigente"] is True
