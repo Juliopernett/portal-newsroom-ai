@@ -24,6 +24,14 @@ const ESTADO_COMERCIAL_LABELS = {
   vencido: "Vencido",
 };
 
+const PAUTA_TIPO_LABELS = {
+  individual: "Individual",
+  mensual: "Mensual",
+  trimestral: "Trimestral",
+  semestral: "Semestral",
+  anual: "Anual",
+};
+
 const STALE_REQUEST_HOURS = 4; // solicitud recibida hace más de N horas, sin atender (solo visual)
 
 let clientsById = new Map();
@@ -205,6 +213,12 @@ function closeAllDrawers() {
 // ejemplo el "+ Nueva pauta" de una ficha de cliente sin pauta.
 function setupGlobalClicks() {
   document.addEventListener("click", (event) => {
+    const historialBtn = event.target.closest("[data-show-historial]");
+    if (historialBtn) {
+      openHistorial(historialBtn.dataset.showHistorial);
+      openDrawer("drawer-historial");
+      return;
+    }
     const openBtn = event.target.closest("[data-open-drawer]");
     if (openBtn) {
       if (openBtn.dataset.editClient) {
@@ -343,6 +357,10 @@ function renderClientCard(cliente) {
       </div>`;
   }
 
+  // item.publicaciones_restantes/contratadas describen SOLO el contrato de
+  // referencia (la pauta vigente actual, o la mas reciente si ninguna lo
+  // es) -- nunca una suma entre contratos. Cada pauta es un contrato
+  // independiente: lo que no se usa antes de vencer no pasa al siguiente.
   const pct =
     item.publicaciones_contratadas > 0
       ? Math.round((item.publicaciones_restantes / item.publicaciones_contratadas) * 100)
@@ -357,21 +375,23 @@ function renderClientCard(cliente) {
           ${renderEditClienteButton(cliente.id)}
         </div>
       </div>
+      <p class="client-card-plan">Plan: ${PAUTA_TIPO_LABELS[item.tipo] ?? item.tipo}</p>
       <p class="client-card-meta">
-        <svg class="icon"><use href="#icon-clock"></use></svg>Hasta ${formatFecha(item.fecha_vencimiento)}
+        <svg class="icon"><use href="#icon-clock"></use></svg>Vence ${formatFecha(item.fecha_vencimiento)}
       </p>
       <div class="client-card-progress-track">
         <div class="client-card-progress-fill" style="width:${pct}%"></div>
       </div>
-      <div class="client-card-stats">
-        <div>
-          <span class="client-card-stat-value">${item.publicaciones_restantes}/${item.publicaciones_contratadas}</span>
-          <span class="client-card-stat-label">publicaciones</span>
-        </div>
-        <div>
-          <span class="client-card-stat-value">${formatMoneda(item.peso_comercial)}</span>
-          <span class="client-card-stat-label">peso comercial</span>
-        </div>
+      <p class="client-card-restantes">
+        <strong>${item.publicaciones_restantes}</strong> de ${item.publicaciones_contratadas} publicaciones disponibles
+      </p>
+      <div class="client-card-footer">
+        <button type="button" class="btn-link" data-show-historial="${cliente.id}">
+          <svg class="icon"><use href="#icon-clock"></use></svg>Historial
+        </button>
+        <button type="button" class="btn-link" data-open-drawer="drawer-pauta">
+          <svg class="icon"><use href="#icon-plus"></use></svg>Nueva pauta
+        </button>
       </div>
     </div>`;
 }
@@ -382,6 +402,39 @@ function renderListaClientes() {
   el.innerHTML = clientes.length
     ? clientes.map(renderClientCard).join("")
     : '<p class="muted">No se encontraron clientes.</p>';
+}
+
+// Cada Pauta de un cliente es un contrato independiente — el historial
+// muestra cada una con su propio saldo y estado, nunca sumados entre si.
+function renderHistorialItem(pauta) {
+  const estadoTexto = pauta.vigente ? "Vigente" : "Vencido";
+  const estadoClase = pauta.vigente ? "saludable" : "vencido";
+  return `
+    <div class="historial-item">
+      <div class="historial-item-fechas">
+        ${formatFecha(pauta.fecha_inicio)} – ${formatFecha(pauta.fecha_fin)}
+      </div>
+      <div class="historial-item-detalle">
+        <span>${PAUTA_TIPO_LABELS[pauta.tipo] ?? pauta.tipo}</span>
+        <span>${pauta.publicaciones_restantes}/${pauta.publicaciones_contratadas}</span>
+        <span class="badge badge-${estadoClase}">${estadoTexto}</span>
+      </div>
+    </div>`;
+}
+
+function openHistorial(clientId) {
+  const cliente = clientsById.get(clientId);
+  if (!cliente) return;
+  document.getElementById("drawer-historial-titulo").textContent = `Historial — ${cliente.nombre}`;
+
+  const pautasCliente = Array.from(pautasById.values())
+    .filter((p) => p.client_id === clientId)
+    .sort((a, b) => b.fecha_inicio.localeCompare(a.fecha_inicio));
+
+  const el = document.getElementById("historial-content");
+  el.innerHTML = pautasCliente.length
+    ? pautasCliente.map(renderHistorialItem).join("")
+    : '<p class="muted">Este cliente todavía no tiene pautas.</p>';
 }
 
 // ---------- Solicitudes: kanban ----------

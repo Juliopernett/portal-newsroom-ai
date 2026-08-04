@@ -14,6 +14,7 @@ from decimal import Decimal
 from enum import StrEnum
 
 from core.entities.client import Client
+from core.entities.pauta import PautaTipo
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -60,25 +61,32 @@ class EstadoComercial(StrEnum):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class RankingComercialItem:
-    """One row of the Ranking Comercial: a `Client` aggregated across all their `Pauta`s.
+    """One row of the Ranking Comercial: a `Client`'s current contract, plus lifetime totals.
 
-    A `Client` has no single "state" in the domain when they have more
-    than one `Pauta` — `fecha_vencimiento` and `vigente` are two
-    deliberate, documented ways to summarize that for reporting, decided
-    in Sprint 4B rather than left ambiguous:
+    Each `Pauta` is an independent contract in this business — quota
+    left unused when one expires never carries over to the next
+    (functional review, 2026-08-05: a client showing "6/32 publicaciones"
+    by summing a vigente Pauta's 6 remaining together with 26 already
+    dead from expired contracts implied a rolling balance that does not
+    exist, and actively misled whoever was about to publish). So:
 
-    - `fecha_vencimiento` is the earliest `fecha_fin` among the client's
-      Pautas — the soonest date that needs attention, whether it's still
-      upcoming or already past.
-    - `vigente` is true if at least one of the client's Pautas is vigente
-      today — a client counts as having something active if any one
-      contract does, not only if all of them do.
+    - `tipo`, `publicaciones_contratadas`, `publicaciones_restantes` and
+      `fecha_vencimiento` all describe exactly one Pauta — the client's
+      *contrato de referencia* (see
+      `AnalyticsService._contrato_de_referencia`): the vigente Pauta that
+      started most recently, or, if none is vigente, the most recently
+      started Pauta overall (so an expired client's card still has a
+      concrete "last contract" to show, clearly marked `vencido` via
+      `estado_comercial` rather than blank).
+    - `vigente` mirrors whether that one contrato de referencia is
+      vigente — equivalent to "does this client have any vigente Pauta
+      at all", since the reference contract is always picked from the
+      vigente ones when at least one exists.
 
-    `publicaciones_contratadas` and `publicaciones_restantes` are both
-    summed the same way (across every Pauta, vigente or not) so they
-    stay a matching numerator/denominator pair — a CRM card showing
-    "X restantes de Y contratadas" would be misleading if one side
-    counted vencida Pautas and the other didn't.
+    `valor_contratado` and `peso_comercial` are the one deliberate
+    exception that *do* stay lifetime sums across every Pauta — money
+    already paid does not expire the way unused publication quota does,
+    so aggregating revenue is still an accurate picture, unlike quota.
 
     Only built for clients with at least one Pauta (see
     `AnalyticsService.ranking_comercial`) — all fields are undefined
@@ -88,6 +96,7 @@ class RankingComercialItem:
     cliente: Client
     valor_contratado: Decimal
     peso_comercial: Decimal
+    tipo: PautaTipo
     publicaciones_contratadas: int
     publicaciones_restantes: int
     fecha_vencimiento: date

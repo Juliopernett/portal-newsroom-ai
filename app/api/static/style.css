@@ -909,6 +909,13 @@ button[type="submit"]:hover {
   background: var(--color-surface);
 }
 
+.client-card-plan {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
 .client-card-meta {
   margin: 0;
   font-size: 0.78rem;
@@ -938,28 +945,53 @@ button[type="submit"]:hover {
   transition: width var(--transition-base);
 }
 
-.client-card-stats {
-  display: flex;
-  gap: var(--space-4);
-  margin-top: var(--space-1);
-}
-
-.client-card-stat-value {
-  display: block;
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-
-.client-card-stat-label {
-  display: block;
-  font-size: 0.72rem;
+.client-card-restantes {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
   color: var(--color-text-secondary);
+}
+
+.client-card-restantes strong {
+  color: var(--color-text);
+  font-size: 0.95rem;
 }
 
 .client-card-footer {
   margin-top: var(--space-2);
   padding-top: var(--space-2);
   border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+/* ---------- historial de contratos ---------- */
+
+.historial-content {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.historial-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+.historial-item-fechas {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.historial-item-detalle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
 }
 
 /* ---------- login ---------- */

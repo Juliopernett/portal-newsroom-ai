@@ -607,7 +607,11 @@ def test_clientes_premium_returns_only_semestral_and_anual() -> None:
     assert {c.id for c in resultado} == {"semestral", "anual"}
 
 
-def test_ranking_comercial_aggregates_across_a_clients_multiple_pautas() -> None:
+def test_ranking_comercial_uses_only_the_current_contract_not_a_sum() -> None:
+    # Funcional review 2026-08-05: publicaciones_contratadas/restantes/
+    # fecha_vencimiento deben venir SOLO del contrato de referencia (la
+    # vigente), nunca de sumar una pauta vencida con la vigente actual
+    # -- eso implicaria un saldo de publicaciones que no existe.
     cliente = _client(id="c1")
     pautas = [
         _pauta(
@@ -635,20 +639,77 @@ def test_ranking_comercial_aggregates_across_a_clients_multiple_pautas() -> None
     assert len(ranking) == 1
     item = ranking[0]
     assert item.cliente.id == "c1"
+    # valor_contratado y peso_comercial SI son sumas de por vida -- el
+    # dinero ya pagado no "vence" como el cupo de publicaciones.
     assert item.valor_contratado == Decimal("150")
-    # (100+50) / (10+5) = 10.00
     assert item.peso_comercial == Decimal("10.00")
-    assert item.publicaciones_contratadas == 15
-    # restantes: (10-1) + (5-0) = 14
-    assert item.publicaciones_restantes == 14
-    # la fecha_fin mas temprana entre p1 (2026-08-30) y p2 (2026-02-01)
-    assert item.fecha_vencimiento == date(2026, 2, 1)
-    # p1 es vigente hoy (2026-07-01 a 2026-08-30, "hoy" = 2026-08-01)
+    # p1 es el contrato de referencia (la unica vigente): 10 contratadas,
+    # 9 restantes (10-1 publicada), vence 2026-08-30 -- nunca sumado con
+    # las 5 de p2, que ya vencio.
+    assert item.publicaciones_contratadas == 10
+    assert item.publicaciones_restantes == 9
+    assert item.fecha_vencimiento == date(2026, 8, 30)
     assert item.vigente is True
-    # estado_comercial usa SOLO p1 (la vigente): 9 restantes, vence en 29
-    # dias -> saludable, aunque publicaciones_restantes (14) sume tambien
-    # los 5 de la p2 ya vencida.
     assert item.estado_comercial == EstadoComercial.SALUDABLE
+
+
+def test_ranking_comercial_falls_back_to_the_most_recent_pauta_when_none_vigente() -> None:
+    cliente = _client(id="c1")
+    pautas = [
+        _pauta(
+            id="p1",
+            client_id="c1",
+            fecha_inicio=date(2026, 1, 1),
+            fecha_fin=date(2026, 2, 1),
+            publicaciones_contratadas=5,
+            valor_pagado=Decimal("50"),
+        ),
+        _pauta(
+            id="p2",
+            client_id="c1",
+            fecha_inicio=date(2026, 3, 1),
+            fecha_fin=date(2026, 4, 1),
+            publicaciones_contratadas=8,
+            valor_pagado=Decimal("80"),
+        ),
+    ]
+
+    item = _service(clients=[cliente], pautas=pautas).ranking_comercial()[0]
+
+    # Ninguna vigente -- usa la que empezo mas reciente (p2), no la mas
+    # antigua, para que el "ultimo contrato conocido" sea el mas util.
+    assert item.publicaciones_contratadas == 8
+    assert item.fecha_vencimiento == date(2026, 4, 1)
+    assert item.vigente is False
+    assert item.estado_comercial == EstadoComercial.VENCIDO
+
+
+def test_ranking_comercial_prefers_the_most_recently_started_vigente_pauta() -> None:
+    cliente = _client(id="c1")
+    pautas = [
+        _pauta(
+            id="p1",
+            client_id="c1",
+            fecha_inicio=date(2026, 6, 1),
+            fecha_fin=date(2026, 12, 1),
+            publicaciones_contratadas=5,
+            valor_pagado=Decimal("50"),
+        ),
+        _pauta(
+            id="p2",
+            client_id="c1",
+            fecha_inicio=date(2026, 7, 15),
+            fecha_fin=date(2026, 12, 15),
+            publicaciones_contratadas=8,
+            valor_pagado=Decimal("80"),
+        ),
+    ]
+
+    item = _service(clients=[cliente], pautas=pautas).ranking_comercial()[0]
+
+    # Ambas vigentes hoy -- gana la que empezo mas tarde (p2).
+    assert item.publicaciones_contratadas == 8
+    assert item.fecha_vencimiento == date(2026, 12, 15)
 
 
 def test_ranking_comercial_excludes_clients_without_pautas() -> None:
@@ -786,7 +847,7 @@ def test_estado_comercial_ignores_leftover_quota_from_a_vencida_pauta() -> None:
     ).ranking_comercial()
 
     item = ranking[0]
-    # publicaciones_restantes (suma de TODAS las pautas) se ve saludable...
-    assert item.publicaciones_restantes == 21
-    # ...pero estado_comercial mira solo la vigente (1 restante) y marca atencion.
+    # Tanto publicaciones_restantes como estado_comercial miran SOLO la
+    # vigente (1 restante) -- el saldo de la vencida (20) no la "tapa".
+    assert item.publicaciones_restantes == 1
     assert item.estado_comercial == EstadoComercial.ATENCION

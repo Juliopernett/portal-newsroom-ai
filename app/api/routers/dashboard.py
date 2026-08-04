@@ -90,6 +90,7 @@ def get_ranking(uow: UnitOfWork = Depends(get_unit_of_work)) -> list[RankingCome
             cliente=ClientOut.model_validate(item.cliente),
             valor_contratado=item.valor_contratado,
             peso_comercial=item.peso_comercial,
+            tipo=item.tipo,
             publicaciones_contratadas=item.publicaciones_contratadas,
             publicaciones_restantes=item.publicaciones_restantes,
             fecha_vencimiento=item.fecha_vencimiento,
