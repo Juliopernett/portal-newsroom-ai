@@ -476,7 +476,6 @@ const DASHBOARD_ACTIVIDAD = [
   ["solicitudes_pendientes", "Solicitudes pendientes", "icon-inbox", false],
   ["publicaciones_este_mes", "Publicaciones este mes", "icon-check", false],
   ["valor_promedio_por_cliente", "Valor promedio/cliente", "icon-money", true],
-  ["clientes_premium", "Clientes premium", "icon-target", false],
 ];
 
 // Categorías operativas — necesitan acción del equipo hoy.
@@ -534,6 +533,13 @@ const ALERTAS_OPORTUNIDAD = [
     icon: "icon-money",
     severity: "info",
     label: "dejaron publicaciones sin usar",
+  },
+  {
+    id: "premium",
+    campo: "clientes_premium",
+    icon: "icon-target",
+    severity: "success",
+    label: "clientes premium (semestral/anual)",
   },
 ];
 
