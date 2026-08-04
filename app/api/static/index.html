@@ -13,6 +13,7 @@
   <nav id="nav-tabs" hidden>
     <button type="button" class="tab-btn" data-tab="solicitudes">Cola de Solicitudes</button>
     <button type="button" class="tab-btn" data-tab="clientes">Clientes y Pautas</button>
+    <button type="button" class="tab-btn" data-tab="dashboard">Dashboard</button>
   </nav>
   <button type="button" id="btn-logout" class="secondary" hidden>Cerrar sesión</button>
 </header>
@@ -147,6 +148,49 @@
         <div id="lista-clientes"></div>
       </div>
     </div>
+  </section>
+
+  <section id="tab-dashboard" class="tab-panel">
+    <div class="section-header">
+      <h2>Resumen general</h2>
+      <button type="button" id="refrescar-dashboard" class="secondary">Actualizar</button>
+    </div>
+    <div id="dashboard-resumen" class="dashboard-cards"></div>
+
+    <h2>Alertas</h2>
+    <div id="dashboard-alertas" class="dashboard-alertas">
+      <div class="alerta-grupo">
+        <h3>Clientes con cupo agotado</h3>
+        <ul id="alerta-cupo-agotado" class="alerta-lista"></ul>
+      </div>
+      <div class="alerta-grupo">
+        <h3>Clientes por vencer (≤ 7 días)</h3>
+        <ul id="alerta-por-vencer" class="alerta-lista"></ul>
+      </div>
+      <div class="alerta-grupo">
+        <h3>Clientes con menos de 3 publicaciones restantes</h3>
+        <ul id="alerta-cupo-bajo" class="alerta-lista"></ul>
+      </div>
+      <div class="alerta-grupo">
+        <h3>Solicitudes esperando hace más de 4 horas</h3>
+        <ul id="alerta-solicitudes-antiguas" class="alerta-lista"></ul>
+      </div>
+    </div>
+
+    <h2>Ranking comercial</h2>
+    <table class="responsive-stack">
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Valor contratado</th>
+          <th>Peso comercial</th>
+          <th>Publicaciones restantes</th>
+          <th>Fecha de vencimiento</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-ranking"></tbody>
+    </table>
   </section>
 
 </main>

@@ -323,3 +323,131 @@ def test_solicitudes_antiguas_excludes_non_recibida_requests() -> None:
     resultado = _service(solicitudes=[antigua_publicada]).solicitudes_antiguas(horas=4)
 
     assert resultado == []
+
+
+# ---------- Sprint 4B: métricas nuevas para el Dashboard Comercial ----------
+
+
+def test_cantidad_publicaciones_publicadas_este_mes_counts_only_the_current_month() -> None:
+    este_mes = _solicitud(
+        id="s1",
+        estado=PublicationRequestStatus.PUBLICADA,
+        fecha_recepcion=datetime(2026, 8, 1, 9, 0, tzinfo=UTC),
+    )
+    mes_pasado = _solicitud(
+        id="s2",
+        estado=PublicationRequestStatus.PUBLICADA,
+        fecha_recepcion=datetime(2026, 7, 31, 23, 59, tzinfo=UTC),
+    )
+    no_publicada = _solicitud(
+        id="s3",
+        estado=PublicationRequestStatus.RECIBIDA,
+        fecha_recepcion=datetime(2026, 8, 1, 9, 0, tzinfo=UTC),
+    )
+
+    service = _service(solicitudes=[este_mes, mes_pasado, no_publicada])
+
+    assert service.cantidad_publicaciones_publicadas_este_mes() == 1
+
+
+def test_peso_comercial_promedio_averages_the_ranking() -> None:
+    pautas = [
+        _pauta(client_id="c1", valor_pagado=Decimal("100"), publicaciones_contratadas=10),
+        _pauta(client_id="c2", valor_pagado=Decimal("300"), publicaciones_contratadas=10),
+    ]
+    service = _service(clients=[_client(id="c1"), _client(id="c2")], pautas=pautas)
+
+    # pesos: 10.00 y 30.00 -> promedio 20.00
+    assert service.peso_comercial_promedio() == Decimal("20.00")
+
+
+def test_peso_comercial_promedio_is_zero_with_no_ranked_clients() -> None:
+    assert _service().peso_comercial_promedio() == Decimal("0")
+
+
+def test_clientes_con_menos_de_n_publicaciones_restantes_uses_an_absolute_count() -> None:
+    # 10 contratadas, 8 publicadas -> 2 restantes -> bajo el minimo de 3.
+    pocas = _client(id="pocas")
+    pautas = [_pauta(id="p1", client_id="pocas", publicaciones_contratadas=10)]
+    solicitudes = [
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(8)
+    ]
+
+    resultado = _service(
+        clients=[pocas], pautas=pautas, solicitudes=solicitudes
+    ).clientes_con_menos_de_n_publicaciones_restantes(minimo=3)
+
+    assert [c.id for c in resultado] == ["pocas"]
+
+
+def test_clientes_con_menos_de_n_publicaciones_restantes_excludes_exactly_the_minimum() -> None:
+    # 10 contratadas, 7 publicadas -> 3 restantes -> no es "menos de 3".
+    cliente = _client(id="c1")
+    pautas = [_pauta(id="p1", client_id="c1", publicaciones_contratadas=10)]
+    solicitudes = [
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(7)
+    ]
+
+    resultado = _service(
+        clients=[cliente], pautas=pautas, solicitudes=solicitudes
+    ).clientes_con_menos_de_n_publicaciones_restantes(minimo=3)
+
+    assert resultado == []
+
+
+def test_ranking_comercial_aggregates_across_a_clients_multiple_pautas() -> None:
+    cliente = _client(id="c1")
+    pautas = [
+        _pauta(
+            id="p1",
+            client_id="c1",
+            fecha_inicio=date(2026, 7, 1),
+            fecha_fin=date(2026, 8, 30),
+            publicaciones_contratadas=10,
+            valor_pagado=Decimal("100"),
+        ),
+        _pauta(
+            id="p2",
+            client_id="c1",
+            fecha_inicio=date(2026, 1, 1),
+            fecha_fin=date(2026, 2, 1),
+            publicaciones_contratadas=5,
+            valor_pagado=Decimal("50"),
+        ),
+    ]
+    solicitudes = [_solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA)]
+
+    service = _service(clients=[cliente], pautas=pautas, solicitudes=solicitudes)
+    ranking = service.ranking_comercial()
+
+    assert len(ranking) == 1
+    item = ranking[0]
+    assert item.cliente.id == "c1"
+    assert item.valor_contratado == Decimal("150")
+    # (100+50) / (10+5) = 10.00
+    assert item.peso_comercial == Decimal("10.00")
+    # restantes: (10-1) + (5-0) = 14
+    assert item.publicaciones_restantes == 14
+    # la fecha_fin mas temprana entre p1 (2026-08-30) y p2 (2026-02-01)
+    assert item.fecha_vencimiento == date(2026, 2, 1)
+    # p1 es vigente hoy (2026-07-01 a 2026-08-30, "hoy" = 2026-08-01)
+    assert item.vigente is True
+
+
+def test_ranking_comercial_excludes_clients_without_pautas() -> None:
+    sin_pautas = _client(id="sin-pautas")
+
+    assert _service(clients=[sin_pautas]).ranking_comercial() == []
+
+
+def test_ranking_comercial_is_sorted_by_peso_comercial_descending() -> None:
+    pautas = [
+        _pauta(client_id="bajo", valor_pagado=Decimal("10"), publicaciones_contratadas=10),
+        _pauta(client_id="alto", valor_pagado=Decimal("1000"), publicaciones_contratadas=10),
+    ]
+
+    ranking = _service(
+        clients=[_client(id="bajo"), _client(id="alto")], pautas=pautas
+    ).ranking_comercial()
+
+    assert [item.cliente.id for item in ranking] == ["alto", "bajo"]

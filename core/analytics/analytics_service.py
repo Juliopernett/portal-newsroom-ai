@@ -23,7 +23,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
-from core.analytics.view_models import ClienteIngreso, ClientePesoComercial
+from core.analytics.view_models import ClienteIngreso, ClientePesoComercial, RankingComercialItem
 from core.entities.client import Client
 from core.entities.pauta import Pauta
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
@@ -98,6 +98,39 @@ class AnalyticsService:
         """Return total `valor_pagado` across every `Pauta`, past or present."""
         return sum((p.valor_pagado for p in self._pautas), start=Decimal("0"))
 
+    def cantidad_publicaciones_publicadas_este_mes(self) -> int:
+        """Return how many `PublicationRequest`s were published in the current month.
+
+        `PublicationRequest` has no separate "fecha_publicacion" — only
+        `fecha_recepcion` (when it arrived). Sprint 4B (dashboard) needs
+        "this month" and the domain has no better date to use, so this
+        reads `fecha_recepcion` on the already-`PUBLICADA` requests. For
+        historical, migrated data this reflects when the request was
+        logged as received, not necessarily the exact publish date — a
+        known limitation, not something this sprint's scope covers fixing
+        (would need a new field on `PublicationRequest`).
+        """
+        ahora = self._clock()
+        return sum(
+            1
+            for s in self.solicitudes_publicadas()
+            if s.fecha_recepcion.year == ahora.year and s.fecha_recepcion.month == ahora.month
+        )
+
+    def peso_comercial_promedio(self) -> Decimal:
+        """Return the average `peso_comercial` across clients that have one.
+
+        Reuses `ranking_clientes_por_peso_comercial` rather than
+        recomputing — an arithmetic mean of each client's already
+        totals-first aggregate, not a second independent calculation.
+        Zero with no ranked clients, avoiding a division by zero.
+        """
+        ranking = self.ranking_clientes_por_peso_comercial()
+        if not ranking:
+            return Decimal("0")
+        total = sum((item.peso_comercial for item in ranking), start=Decimal("0"))
+        return (total / len(ranking)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
     # ---------- Reportes Comerciales ----------
 
     def ranking_clientes_por_ingresos(self) -> list[ClienteIngreso]:
@@ -151,6 +184,56 @@ class AnalyticsService:
         """
         client_ids = {pauta.client_id for pauta in self._pautas if self._tiene_cupo_bajo(pauta)}
         return [cliente for cliente in self._clients if cliente.id in client_ids]
+
+    def clientes_con_menos_de_n_publicaciones_restantes(self, minimo: int = 3) -> list[Client]:
+        """Return `Client`s with a `Pauta` at fewer than `minimo` publications remaining.
+
+        An absolute-count threshold, deliberately separate from
+        `clientes_con_cupo_bajo` (a 20% threshold) — Sprint 4B asked for
+        this exact reading ("menos de 3 publicaciones restantes"), not a
+        restatement of the percentage-based one. Both coexist; they serve
+        different questions ("how close to zero" vs. "what fraction is
+        left").
+        """
+        client_ids = {
+            pauta.client_id
+            for pauta in self._pautas
+            if self._pauta_service.publicaciones_restantes(pauta, self._solicitudes) < minimo
+        }
+        return [cliente for cliente in self._clients if cliente.id in client_ids]
+
+    def ranking_comercial(self) -> list[RankingComercialItem]:
+        """Return the Ranking Comercial: one row per `Client` with at least one `Pauta`.
+
+        Built entirely from `ranking_clientes_por_ingresos` and
+        `ranking_clientes_por_peso_comercial` — no revenue or peso_comercial
+        math is repeated here — enriched with two more client-level
+        aggregates (`publicaciones_restantes` summed, `fecha_vencimiento`
+        as the earliest) that don't exist anywhere else. Already sorted by
+        `peso_comercial` descending, inherited from
+        `ranking_clientes_por_peso_comercial`'s own order.
+        """
+        ingresos_por_cliente = {
+            item.cliente.id: item.ingresos for item in self.ranking_clientes_por_ingresos()
+        }
+        ranking = []
+        for peso_item in self.ranking_clientes_por_peso_comercial():
+            pautas_cliente = self._pautas_de(peso_item.cliente.id)
+            restantes = sum(
+                self._pauta_service.publicaciones_restantes(p, self._solicitudes)
+                for p in pautas_cliente
+            )
+            ranking.append(
+                RankingComercialItem(
+                    cliente=peso_item.cliente,
+                    valor_contratado=ingresos_por_cliente[peso_item.cliente.id],
+                    peso_comercial=peso_item.peso_comercial,
+                    publicaciones_restantes=restantes,
+                    fecha_vencimiento=min(p.fecha_fin for p in pautas_cliente),
+                    vigente=any(self._pauta_service.esta_vigente(p) for p in pautas_cliente),
+                )
+            )
+        return ranking
 
     # ---------- Reportes de Pautas ----------
 
