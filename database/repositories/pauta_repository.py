@@ -7,6 +7,8 @@ module.
 
 from __future__ import annotations
 
+from datetime import UTC
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -23,11 +25,18 @@ def _to_model(pauta: Pauta) -> PautaModel:
         publicaciones_contratadas=pauta.publicaciones_contratadas,
         valor_pagado=pauta.valor_pagado,
         fecha_pago=pauta.fecha_pago,
+        fecha_registro=pauta.fecha_registro,
         observaciones=pauta.observaciones,
     )
 
 
 def _to_domain(model: PautaModel) -> Pauta:
+    fecha_registro = model.fecha_registro
+    if fecha_registro.tzinfo is None:
+        # SQLite drops tzinfo on round trip (Postgres does not) — see
+        # database.repositories.publication_request_repository for the
+        # same fix, applied there first.
+        fecha_registro = fecha_registro.replace(tzinfo=UTC)
     return Pauta(
         id=model.id,
         client_id=model.client_id,
@@ -36,6 +45,7 @@ def _to_domain(model: PautaModel) -> Pauta:
         publicaciones_contratadas=model.publicaciones_contratadas,
         valor_pagado=model.valor_pagado,
         fecha_pago=model.fecha_pago,
+        fecha_registro=fecha_registro,
         observaciones=model.observaciones,
     )
 

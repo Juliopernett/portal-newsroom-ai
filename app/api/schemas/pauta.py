@@ -8,7 +8,7 @@ itself.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
@@ -44,6 +44,7 @@ class PautaOut(BaseModel):
     publicaciones_contratadas: int
     valor_pagado: Decimal
     fecha_pago: date
+    fecha_registro: datetime
     observaciones: str | None
     publicaciones_consumidas: int
     publicaciones_restantes: int

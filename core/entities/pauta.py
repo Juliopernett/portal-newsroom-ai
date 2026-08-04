@@ -12,7 +12,7 @@ that can drift from reality.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
 from uuid import uuid4
@@ -48,7 +48,16 @@ class PautaTipo(StrEnum):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Pauta:
-    """A commercial client's contracted publication slots for one period."""
+    """A commercial client's contracted publication slots for one period.
+
+    `fecha_registro` is an audit timestamp — when this record was created
+    in the system, never client-supplied (added 2026-08-05 after a pauta
+    got saved linked to the wrong Client and there was no reliable way to
+    even find "the one just created" to investigate). Deliberately
+    separate from `fecha_pago`/`fecha_inicio`/`fecha_fin`, which are all
+    business dates the operator enters by hand — this one is assigned by
+    the system itself and is never meant to be edited.
+    """
 
     id: str = field(default_factory=lambda: str(uuid4()))
     client_id: str
@@ -57,6 +66,7 @@ class Pauta:
     publicaciones_contratadas: int
     valor_pagado: Decimal
     fecha_pago: date
+    fecha_registro: datetime = field(default_factory=lambda: datetime.now(UTC))
     observaciones: str | None = None
 
     def __post_init__(self) -> None:
