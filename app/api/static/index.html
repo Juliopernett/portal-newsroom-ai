@@ -4,12 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Portal Vallenato — Pautas</title>
+<link rel="icon" href="img/icono-pv.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header id="app-header" hidden>
-  <h1>Portal Vallenato</h1>
+  <div class="app-brand">
+    <img src="img/icono-pv.png" alt="" class="app-brand-icon">
+    <h1>Portal Vallenato</h1>
+  </div>
   <nav id="nav-tabs" hidden>
     <button type="button" class="tab-btn" data-tab="solicitudes">Cola de Solicitudes</button>
     <button type="button" class="tab-btn" data-tab="clientes">Clientes y Pautas</button>
@@ -25,7 +29,7 @@
 <section id="login-screen">
   <div class="login-card">
     <div class="login-brand">
-      <span class="login-brand-mark">PV</span>
+      <img src="img/icono-pv.png" alt="" class="login-brand-mark">
       <span class="login-brand-name">Portal Vallenato</span>
     </div>
     <form id="form-login">
@@ -48,6 +52,13 @@
         <h2>Registrar solicitud</h2>
         <form id="form-solicitud">
           <label>Pauta
+            <input
+              type="text"
+              id="solicitud-pauta-buscar"
+              class="pauta-buscador"
+              placeholder="Buscar por nombre de cliente…"
+              autocomplete="off"
+            >
             <select id="solicitud-pauta">
               <option value="">(sin pauta todavía — se vincula después)</option>
             </select>

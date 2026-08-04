@@ -208,10 +208,27 @@ function pautaOptionLabel(pauta) {
   );
 }
 
-function pautaOptionsHtml() {
-  return Array.from(pautasById.values())
+function pautaOptionsHtml(pautas) {
+  return pautas
     .map((pauta) => `<option value="${pauta.id}">${pautaOptionLabel(pauta)}</option>`)
     .join("");
+}
+
+// Una pauta vencida ya no sirve para nada nuevo — no tiene sentido
+// ofrecerla para vincular una solicitud, ni la actual ni una futura. El
+// campo `vigente` ya viene calculado por la API (PautaService), no se
+// recalcula aquí.
+function pautasVigentes() {
+  return Array.from(pautasById.values()).filter((p) => p.vigente);
+}
+
+let solicitudPautaFiltro = "";
+
+function pautasParaSolicitud() {
+  const termino = solicitudPautaFiltro.trim().toLowerCase();
+  const vigentes = pautasVigentes();
+  if (!termino) return vigentes;
+  return vigentes.filter((pauta) => pautaOptionLabel(pauta).toLowerCase().includes(termino));
 }
 
 function renderSelectPautas() {
@@ -219,7 +236,7 @@ function renderSelectPautas() {
   const placeholder = select.querySelector('option[value=""]');
   select.innerHTML = "";
   select.appendChild(placeholder);
-  select.insertAdjacentHTML("beforeend", pautaOptionsHtml());
+  select.insertAdjacentHTML("beforeend", pautaOptionsHtml(pautasParaSolicitud()));
 }
 
 function estadoPautaBadges(pauta) {
@@ -323,7 +340,7 @@ async function loadSolicitudes() {
       : `<div class="link-pauta">
            <select class="link-pauta-select" data-id="${solicitud.id}">
              <option value="">Elegir pauta…</option>
-             ${pautaOptionsHtml()}
+             ${pautaOptionsHtml(pautasVigentes())}
            </select>
            <button type="button" class="btn-vincular secondary" data-id="${solicitud.id}">
              Vincular
@@ -580,6 +597,10 @@ async function init() {
   document.getElementById("refrescar-solicitudes").addEventListener("click", loadSolicitudes);
   document.getElementById("refrescar-clientes").addEventListener("click", loadClientesYPautas);
   document.getElementById("refrescar-dashboard").addEventListener("click", loadDashboard);
+  document.getElementById("solicitud-pauta-buscar").addEventListener("input", (event) => {
+    solicitudPautaFiltro = event.target.value;
+    renderSelectPautas();
+  });
 
   try {
     await apiFetch("/auth/me");
