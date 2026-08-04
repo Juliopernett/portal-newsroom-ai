@@ -127,6 +127,47 @@ def test_list_publication_requests_filters_by_estado(client: TestClient) -> None
     assert body[0]["texto"] == "Sigue pendiente"
 
 
+def test_list_publication_requests_orders_recibida_by_prioridad_then_peso_comercial(
+    client: TestClient,
+) -> None:
+    client_id = client.post(
+        "/clients", json={"nombre": "Cliente Alto Valor", "tipo": "artista", "telefono": "300"}
+    ).json()["id"]
+    pauta_alto = client.post(
+        "/pautas",
+        json={
+            "client_id": client_id,
+            "fecha_inicio": "2026-07-30",
+            "fecha_fin": "2026-08-30",
+            "publicaciones_contratadas": 1,
+            "valor_pagado": "500000.00",
+            "fecha_pago": "2026-07-30",
+        },
+    ).json()["id"]
+    pauta_bajo = client.post(
+        "/pautas",
+        json={
+            "client_id": client_id,
+            "fecha_inicio": "2026-07-30",
+            "fecha_fin": "2026-08-30",
+            "publicaciones_contratadas": 1,
+            "valor_pagado": "10000.00",
+            "fecha_pago": "2026-07-30",
+        },
+    ).json()["id"]
+
+    # Llega primero la de bajo peso comercial, despues la de alto.
+    client.post("/publication-requests", json={"pauta_id": pauta_bajo, "texto": "Bajo valor"})
+    client.post("/publication-requests", json={"pauta_id": pauta_alto, "texto": "Alto valor"})
+
+    response = client.get("/publication-requests", params={"estado": "recibida"})
+
+    assert response.status_code == 200
+    textos = [s["texto"] for s in response.json()]
+    # Peso comercial le gana al orden de llegada.
+    assert textos == ["Alto valor", "Bajo valor"]
+
+
 def test_list_publication_requests_rejects_an_invalid_estado(client: TestClient) -> None:
     response = client.get("/publication-requests", params={"estado": "no-existe"})
 

@@ -851,3 +851,65 @@ def test_estado_comercial_ignores_leftover_quota_from_a_vencida_pauta() -> None:
     # vigente (1 restante) -- el saldo de la vencida (20) no la "tapa".
     assert item.publicaciones_restantes == 1
     assert item.estado_comercial == EstadoComercial.ATENCION
+
+
+# ---------- solicitudes_pendientes_priorizadas (Sprint 4C, 2026-08-05) ----------
+
+
+def test_solicitudes_pendientes_priorizadas_matches_the_business_example() -> None:
+    # Ejemplo literal de la regla: prioridad manual > peso comercial > fecha.
+    pautas = [
+        _pauta(id="pa", client_id="a", valor_pagado=Decimal("25000"), publicaciones_contratadas=1),
+        _pauta(id="pb", client_id="b", valor_pagado=Decimal("73150"), publicaciones_contratadas=1),
+        _pauta(id="pc", client_id="c", valor_pagado=Decimal("50000"), publicaciones_contratadas=1),
+        _pauta(id="pd", client_id="d", valor_pagado=Decimal("50000"), publicaciones_contratadas=1),
+    ]
+    solicitudes = [
+        _solicitud(
+            id="A",
+            pauta_id="pa",
+            prioridad_manual=True,
+            fecha_recepcion=datetime(2026, 8, 1, 10, 30, tzinfo=UTC),
+        ),
+        _solicitud(
+            id="B", pauta_id="pb", fecha_recepcion=datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
+        ),
+        _solicitud(
+            id="C", pauta_id="pc", fecha_recepcion=datetime(2026, 8, 1, 8, 30, tzinfo=UTC)
+        ),
+        _solicitud(
+            id="D", pauta_id="pd", fecha_recepcion=datetime(2026, 8, 1, 8, 0, tzinfo=UTC)
+        ),
+    ]
+
+    service = _service(pautas=pautas, solicitudes=solicitudes)
+    resultado = service.solicitudes_pendientes_priorizadas()
+
+    assert [s.id for s in resultado] == ["A", "B", "D", "C"]
+
+
+def test_solicitudes_pendientes_priorizadas_treats_an_unlinked_solicitud_as_zero_peso() -> None:
+    pauta = _pauta(id="p1", client_id="c1", valor_pagado=Decimal("1"), publicaciones_contratadas=1)
+    con_pauta = _solicitud(
+        id="con-pauta", pauta_id="p1", fecha_recepcion=datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
+    )
+    sin_pauta = _solicitud(
+        id="sin-pauta", pauta_id=None, fecha_recepcion=datetime(2026, 8, 1, 8, 0, tzinfo=UTC)
+    )
+
+    resultado = _service(
+        pautas=[pauta], solicitudes=[con_pauta, sin_pauta]
+    ).solicitudes_pendientes_priorizadas()
+
+    # sin_pauta llegó primero, pero al no tener pauta cuenta como $0 de peso
+    # comercial -- con_pauta (peso $1.00) va primero.
+    assert [s.id for s in resultado] == ["con-pauta", "sin-pauta"]
+
+
+def test_solicitudes_pendientes_priorizadas_excludes_non_recibida() -> None:
+    recibida = _solicitud(id="r", estado=PublicationRequestStatus.RECIBIDA)
+    publicada = _solicitud(id="p", estado=PublicationRequestStatus.PUBLICADA)
+
+    resultado = _service(solicitudes=[recibida, publicada]).solicitudes_pendientes_priorizadas()
+
+    assert [s.id for s in resultado] == ["r"]
