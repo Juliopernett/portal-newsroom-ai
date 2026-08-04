@@ -83,7 +83,9 @@ function horasEnEspera(fechaRecepcionIso) {
 // ---------- autenticación ----------
 
 function showLogin() {
+  document.body.classList.add("login-active");
   document.getElementById("login-screen").hidden = false;
+  document.getElementById("app-header").hidden = true;
   document.getElementById("nav-tabs").hidden = true;
   document.getElementById("btn-logout").hidden = true;
   document.querySelector("main").hidden = true;
@@ -91,7 +93,9 @@ function showLogin() {
 }
 
 function showApp() {
+  document.body.classList.remove("login-active");
   document.getElementById("login-screen").hidden = true;
+  document.getElementById("app-header").hidden = false;
   document.getElementById("nav-tabs").hidden = false;
   document.getElementById("btn-logout").hidden = false;
   document.querySelector("main").hidden = false;

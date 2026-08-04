@@ -8,7 +8,7 @@
 </head>
 <body>
 
-<header>
+<header id="app-header" hidden>
   <h1>Portal Vallenato</h1>
   <nav id="nav-tabs" hidden>
     <button type="button" class="tab-btn" data-tab="solicitudes">Cola de Solicitudes</button>
@@ -22,16 +22,21 @@
 <div id="status" class="status" hidden></div>
 
 <section id="login-screen">
-  <form id="form-login">
-    <h2>Iniciar sesión</h2>
-    <label>Email
-      <input type="email" id="login-email" required autocomplete="username">
-    </label>
-    <label>Contraseña
-      <input type="password" id="login-password" required autocomplete="current-password">
-    </label>
-    <button type="submit">Entrar</button>
-  </form>
+  <div class="login-card">
+    <div class="login-brand">
+      <span class="login-brand-mark">PV</span>
+      <span class="login-brand-name">Portal Vallenato</span>
+    </div>
+    <form id="form-login">
+      <label>Email
+        <input type="email" id="login-email" required autocomplete="username">
+      </label>
+      <label>Contraseña
+        <input type="password" id="login-password" required autocomplete="current-password">
+      </label>
+      <button type="submit">Entrar</button>
+    </form>
+  </div>
 </section>
 
 <main hidden>
