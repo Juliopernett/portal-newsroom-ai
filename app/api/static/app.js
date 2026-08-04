@@ -881,6 +881,22 @@ function setupFormPauta() {
 
 // ---------- arranque ----------
 
+// Sin sincronización en tiempo real entre pestañas/dispositivos — si
+// cargaste algo en el celular y volvés a una pestaña de escritorio que ya
+// estaba abierta, esa pestaña no se entera sola. Refrescar al recuperar el
+// foco (Page Visibility API) cubre exactamente ese caso sin necesitar
+// websockets ni sondeo constante — solo dispara en la transición real de
+// "estaba en otra pestaña/app" a "volví a esta".
+function setupRefrescoAlVolver() {
+  document.addEventListener("visibilitychange", () => {
+    const appVisible = document.visibilityState === "visible" && !document.getElementById("app-shell").hidden;
+    if (!appVisible) return;
+    Promise.all([loadClientesYPautas(), loadSolicitudes(), loadDashboard()]).catch((error) => {
+      showStatus(error.message, true);
+    });
+  });
+}
+
 async function init() {
   setupTabs();
   setupMobileNav();
@@ -890,6 +906,7 @@ async function init() {
   setupFormPauta();
   setupFormLogin();
   setupLogout();
+  setupRefrescoAlVolver();
   renderSelectPlanes();
   document.getElementById("refrescar-solicitudes").addEventListener("click", loadSolicitudes);
   document.getElementById("refrescar-clientes").addEventListener("click", loadClientesYPautas);
