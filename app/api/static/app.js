@@ -27,10 +27,26 @@ const ESTADO_COMERCIAL_LABELS = {
 const PAUTA_TIPO_LABELS = {
   individual: "Individual",
   mensual: "Mensual",
+  bimestral: "Bimestral",
   trimestral: "Trimestral",
   semestral: "Semestral",
   anual: "Anual",
 };
+
+// Catálogo real de planes de Portal Vallenato (2026-08-05). `dias` es solo
+// para sugerir fecha_fin al elegir un plan — la clasificación real de
+// core.entities.pauta.Pauta.tipo sigue viniendo del backend según la
+// duración exacta que quede, nunca de este valor sugerido.
+const PLANES_CATALOGO = [
+  { id: "ind-1", label: "1 publicación — $100.000", cantidad: 1, valor: 100000, dias: 1 },
+  { id: "ind-2", label: "2 publicaciones — $150.000", cantidad: 2, valor: 150000, dias: 1 },
+  { id: "ind-3", label: "3 publicaciones — $190.000", cantidad: 3, valor: 190000, dias: 1 },
+  { id: "mes-1", label: "1 mes — $430.000", cantidad: 10, valor: 430000, dias: 30 },
+  { id: "mes-2", label: "2 meses — $760.000", cantidad: 20, valor: 760000, dias: 60 },
+  { id: "mes-3", label: "3 meses — $1.100.000", cantidad: 30, valor: 1100000, dias: 90 },
+  { id: "mes-6", label: "6 meses — $1.780.000", cantidad: 60, valor: 1780000, dias: 180 },
+  { id: "mes-12", label: "1 año — $3.050.000", cantidad: 120, valor: 3050000, dias: 365 },
+];
 
 const STALE_REQUEST_HOURS = 4; // solicitud recibida hace más de N horas, sin atender (solo visual)
 
@@ -274,6 +290,36 @@ function renderSelectClientes() {
     option.textContent = `${client.nombre} (${CLIENT_TIPO_LABELS[client.tipo] ?? client.tipo})`;
     select.appendChild(option);
   }
+}
+
+// Catálogo estático (no viene de la API) — se puebla una sola vez al arrancar.
+function renderSelectPlanes() {
+  const select = document.getElementById("pauta-plan");
+  for (const plan of PLANES_CATALOGO) {
+    const option = document.createElement("option");
+    option.value = plan.id;
+    option.textContent = plan.label;
+    select.appendChild(option);
+  }
+}
+
+// Autocompleta cantidad/valor/fechas al elegir un plan del catálogo — todo
+// queda editable despues, por si el trato real difiere del oficial (ej. 8
+// publicaciones en vez de las 10 del tope mensual).
+function aplicarPlanSeleccionado(planId) {
+  const plan = PLANES_CATALOGO.find((p) => p.id === planId);
+  if (!plan) return;
+
+  const inicioInput = document.getElementById("pauta-fecha-inicio");
+  if (!inicioInput.value) {
+    inicioInput.value = new Date().toISOString().slice(0, 10);
+  }
+  const inicio = new Date(inicioInput.value + "T00:00:00");
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + plan.dias);
+  document.getElementById("pauta-fecha-fin").value = fin.toISOString().slice(0, 10);
+  document.getElementById("pauta-cantidad").value = plan.cantidad;
+  document.getElementById("pauta-valor").value = plan.valor;
 }
 
 function pautaOptionLabel(pauta) {
@@ -802,6 +848,9 @@ function setupFormCliente() {
 }
 
 function setupFormPauta() {
+  document.getElementById("pauta-plan").addEventListener("change", (event) => {
+    aplicarPlanSeleccionado(event.target.value);
+  });
   document.getElementById("form-pauta").addEventListener("submit", async (event) => {
     event.preventDefault();
     const payload = {
@@ -841,6 +890,7 @@ async function init() {
   setupFormPauta();
   setupFormLogin();
   setupLogout();
+  renderSelectPlanes();
   document.getElementById("refrescar-solicitudes").addEventListener("click", loadSolicitudes);
   document.getElementById("refrescar-clientes").addEventListener("click", loadClientesYPautas);
   document.getElementById("refrescar-dashboard").addEventListener("click", loadDashboard);
