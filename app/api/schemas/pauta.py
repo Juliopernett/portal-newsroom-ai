@@ -13,6 +13,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
+from core.entities.pauta import PautaTipo
+
 
 class PautaCreate(BaseModel):
     """Request body for `POST /pautas`."""
@@ -29,9 +31,10 @@ class PautaCreate(BaseModel):
 class PautaOut(BaseModel):
     """Response body for a `Pauta`, including its computed quota status.
 
-    `peso_comercial` is read straight from the entity (`core.entities.pauta.Pauta.peso_comercial`)
-    rather than computed here — see that property's docstring for why it
-    lives on the entity instead of `PautaService`.
+    `peso_comercial` and `tipo` are read straight from the entity
+    (`core.entities.pauta.Pauta`) rather than computed here — see those
+    properties' docstrings for why they live on the entity instead of
+    `PautaService`.
     """
 
     id: str
@@ -48,3 +51,4 @@ class PautaOut(BaseModel):
     vencida: bool
     cuota_agotada: bool
     peso_comercial: Decimal
+    tipo: PautaTipo

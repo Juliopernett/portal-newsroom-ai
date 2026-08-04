@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from app.api.schemas.client import ClientOut
 from app.api.schemas.publication_request import PublicationRequestOut
+from core.analytics.view_models import EstadoComercial
 
 
 class DashboardResumenOut(BaseModel):
@@ -29,6 +30,8 @@ class DashboardResumenOut(BaseModel):
     ingreso_contratado_activo: Decimal
     ingreso_historico: Decimal
     peso_comercial_promedio: Decimal
+    valor_promedio_por_cliente: Decimal
+    clientes_premium: int
 
 
 class DashboardAlertasOut(BaseModel):
@@ -38,12 +41,20 @@ class DashboardAlertasOut(BaseModel):
     severe first: exhausted quota, then expiring soon, then low quota,
     then a stale-request backlog) — not a re-sort of any list's contents,
     which stay in the order `AnalyticsService` already returns them.
+
+    `clientes_publicaciones_sin_usar` is deliberately not in that
+    priority ordering — it's a historical/sales report ("who left money
+    on the table"), not an operational alert (see
+    `AnalyticsService.clientes_con_publicaciones_sin_usar`), listed last.
     """
 
     clientes_cupo_agotado: list[ClientOut]
     clientes_por_vencer: list[ClientOut]
-    clientes_cupo_bajo: list[ClientOut]
+    clientes_menos_de_3_restantes: list[ClientOut]
+    clientes_individuales_pendientes: list[ClientOut]
+    clientes_contrato_por_renovar: list[ClientOut]
     solicitudes_antiguas: list[PublicationRequestOut]
+    clientes_publicaciones_sin_usar: list[ClientOut]
 
 
 class RankingComercialOut(BaseModel):
@@ -51,7 +62,8 @@ class RankingComercialOut(BaseModel):
 
     Mirrors `core.analytics.view_models.RankingComercialItem` field for
     field — see that class's docstring for what `fecha_vencimiento` and
-    `vigente` mean for a client with more than one Pauta.
+    `vigente` mean for a client with more than one Pauta, and
+    `EstadoComercial`'s docstring for `estado_comercial`.
     """
 
     cliente: ClientOut
@@ -60,3 +72,4 @@ class RankingComercialOut(BaseModel):
     publicaciones_restantes: int
     fecha_vencimiento: date
     vigente: bool
+    estado_comercial: EstadoComercial

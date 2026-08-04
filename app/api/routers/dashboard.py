@@ -44,6 +44,8 @@ def get_resumen(uow: UnitOfWork = Depends(get_unit_of_work)) -> DashboardResumen
         ingreso_contratado_activo=analytics.ingresos_activos(),
         ingreso_historico=analytics.ingresos_historicos(),
         peso_comercial_promedio=analytics.peso_comercial_promedio(),
+        valor_promedio_por_cliente=analytics.valor_promedio_por_cliente(),
+        clientes_premium=len(analytics.clientes_premium()),
     )
 
 
@@ -58,13 +60,23 @@ def get_alertas(uow: UnitOfWork = Depends(get_unit_of_work)) -> DashboardAlertas
         clientes_por_vencer=[
             ClientOut.model_validate(c) for c in analytics.clientes_por_vencer(dias=7)
         ],
-        clientes_cupo_bajo=[
+        clientes_menos_de_3_restantes=[
             ClientOut.model_validate(c)
             for c in analytics.clientes_con_menos_de_n_publicaciones_restantes(minimo=3)
+        ],
+        clientes_individuales_pendientes=[
+            ClientOut.model_validate(c)
+            for c in analytics.clientes_con_publicaciones_individuales_pendientes()
+        ],
+        clientes_contrato_por_renovar=[
+            ClientOut.model_validate(c) for c in analytics.clientes_con_contrato_por_renovar(dias=7)
         ],
         solicitudes_antiguas=[
             PublicationRequestOut.model_validate(s)
             for s in analytics.solicitudes_antiguas(horas=4)
+        ],
+        clientes_publicaciones_sin_usar=[
+            ClientOut.model_validate(c) for c in analytics.clientes_con_publicaciones_sin_usar()
         ],
     )
 
@@ -81,6 +93,7 @@ def get_ranking(uow: UnitOfWork = Depends(get_unit_of_work)) -> list[RankingCome
             publicaciones_restantes=item.publicaciones_restantes,
             fecha_vencimiento=item.fecha_vencimiento,
             vigente=item.vigente,
+            estado_comercial=item.estado_comercial,
         )
         for item in analytics.ranking_comercial()
     ]

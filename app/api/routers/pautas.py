@@ -41,6 +41,7 @@ def _to_out(pauta: Pauta, uow: UnitOfWork) -> PautaOut:
         vencida=service.esta_vencida(pauta),
         cuota_agotada=service.cuota_agotada(pauta, solicitudes),
         peso_comercial=pauta.peso_comercial,
+        tipo=pauta.tipo,
     )
 
 

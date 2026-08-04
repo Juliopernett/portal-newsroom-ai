@@ -39,6 +39,8 @@ def test_create_pauta_returns_computed_quota_fields(client: TestClient) -> None:
     assert body["publicaciones_restantes"] == 10
     assert body["cuota_agotada"] is False
     assert body["peso_comercial"] == "50000.00"
+    # fecha_inicio 2026-07-30 a fecha_fin 2026-08-30 -> 31 dias -> mensual.
+    assert body["tipo"] == "mensual"
 
 
 def test_create_pauta_rejects_end_date_not_after_start_date(client: TestClient) -> None:

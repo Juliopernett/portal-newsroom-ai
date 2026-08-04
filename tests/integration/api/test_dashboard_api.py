@@ -74,6 +74,8 @@ def test_resumen_is_all_zero_with_no_data(client: TestClient) -> None:
     assert body["pautas_activas"] == 0
     assert body["ingreso_historico"] == "0"
     assert body["peso_comercial_promedio"] == "0"
+    assert body["valor_promedio_por_cliente"] == "0"
+    assert body["clientes_premium"] == 0
 
 
 def test_resumen_reflects_a_vigente_pauta(client: TestClient) -> None:
@@ -102,7 +104,59 @@ def test_alertas_lists_a_client_with_exhausted_quota(client: TestClient) -> None
     assert response.status_code == 200
     body = response.json()
     assert [c["id"] for c in body["clientes_cupo_agotado"]] == [client_id]
-    assert [c["id"] for c in body["clientes_cupo_bajo"]] == [client_id]
+    assert [c["id"] for c in body["clientes_menos_de_3_restantes"]] == [client_id]
+
+
+def test_alertas_lists_a_client_with_pending_individual_publications(client: TestClient) -> None:
+    client_id = _create_client(client)
+    _create_pauta(
+        client,
+        client_id,
+        fecha_inicio="2026-07-30",
+        fecha_fin="2026-08-05",
+        publicaciones_contratadas=3,
+    )
+
+    response = client.get("/dashboard/alertas")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [c["id"] for c in body["clientes_individuales_pendientes"]] == [client_id]
+    assert body["clientes_contrato_por_renovar"] == []
+
+
+def test_alertas_lists_a_client_with_a_package_contract_about_to_renew(client: TestClient) -> None:
+    client_id = _create_client(client)
+    _create_pauta(client, client_id, fecha_inicio="2026-07-01", fecha_fin="2026-08-10")
+
+    response = client.get("/dashboard/alertas")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [c["id"] for c in body["clientes_contrato_por_renovar"]] == [client_id]
+    assert body["clientes_individuales_pendientes"] == []
+
+
+def test_alertas_lists_a_client_who_left_publications_unused_on_an_expired_pauta(
+    client: TestClient,
+) -> None:
+    client_id = _create_client(client)
+    _create_pauta(
+        client,
+        client_id,
+        fecha_inicio="2026-01-01",
+        fecha_fin="2026-02-01",
+        publicaciones_contratadas=8,
+    )
+
+    response = client.get("/dashboard/alertas")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [c["id"] for c in body["clientes_publicaciones_sin_usar"]] == [client_id]
+    # No es una alerta operativa -- una pauta vencida no cuenta para estas.
+    assert body["clientes_cupo_agotado"] == []
+    assert body["clientes_menos_de_3_restantes"] == []
 
 
 def test_alertas_lists_an_old_pending_solicitud(client: TestClient) -> None:
@@ -129,6 +183,7 @@ def test_ranking_reflects_a_clients_pauta(client: TestClient) -> None:
     assert body[0]["peso_comercial"] == "20000.00"
     assert body[0]["publicaciones_restantes"] == 10
     assert body[0]["vigente"] is True
+    assert body[0]["estado_comercial"] == "saludable"
 
 
 def test_ranking_excludes_clients_without_a_pauta(client: TestClient) -> None:
