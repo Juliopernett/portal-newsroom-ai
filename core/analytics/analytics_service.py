@@ -318,12 +318,23 @@ class AnalyticsService:
     def ranking_comercial(self) -> list[RankingComercialItem]:
         """Return the Ranking Comercial: one row per `Client` with at least one `Pauta`.
 
-        Built entirely from `ranking_clientes_por_ingresos` and
-        `ranking_clientes_por_peso_comercial` — no revenue or peso_comercial
-        math is repeated here — enriched with client-level aggregates
-        (`publicaciones_restantes` summed, `fecha_vencimiento` as the
-        earliest, `estado_comercial`) that don't exist anywhere else.
-        Already sorted by `peso_comercial` descending, inherited from
+        `publicaciones_contratadas`/`publicaciones_restantes`/`fecha_vencimiento`
+        describe the client's *contrato de referencia* only (see
+        `_contrato_de_referencia`) — never a sum across every Pauta the
+        client has ever had. Each Pauta is an independent contract in
+        this business: quota left on an expired one does not carry over
+        to the next (functional review, 2026-08-05 — a "6/32" balance
+        that summed a vigente Pauta's 6 remaining with 26 already-dead
+        ones implied publications pile up across contracts, which is
+        false and actively misleading for someone about to publish).
+        `valor_contratado`/`peso_comercial` stay lifetime sums — money
+        already paid doesn't expire the way unused quota does, so
+        aggregating those is still accurate.
+
+        Built from `ranking_clientes_por_ingresos` and
+        `ranking_clientes_por_peso_comercial` — no revenue or
+        peso_comercial math is repeated here. Already sorted by
+        `peso_comercial` descending, inherited from
         `ranking_clientes_por_peso_comercial`'s own order.
         """
         ingresos_por_cliente = {
@@ -332,20 +343,18 @@ class AnalyticsService:
         ranking = []
         for peso_item in self.ranking_clientes_por_peso_comercial():
             pautas_cliente = self._pautas_de(peso_item.cliente.id)
-            restantes = sum(
-                self._pauta_service.publicaciones_restantes(p, self._solicitudes)
-                for p in pautas_cliente
-            )
-            contratadas = sum(p.publicaciones_contratadas for p in pautas_cliente)
+            contrato = self._contrato_de_referencia(pautas_cliente)
+            restantes = self._pauta_service.publicaciones_restantes(contrato, self._solicitudes)
             ranking.append(
                 RankingComercialItem(
                     cliente=peso_item.cliente,
                     valor_contratado=ingresos_por_cliente[peso_item.cliente.id],
                     peso_comercial=peso_item.peso_comercial,
-                    publicaciones_contratadas=contratadas,
+                    tipo=contrato.tipo,
+                    publicaciones_contratadas=contrato.publicaciones_contratadas,
                     publicaciones_restantes=restantes,
-                    fecha_vencimiento=min(p.fecha_fin for p in pautas_cliente),
-                    vigente=any(self._pauta_service.esta_vigente(p) for p in pautas_cliente),
+                    fecha_vencimiento=contrato.fecha_fin,
+                    vigente=self._pauta_service.esta_vigente(contrato),
                     estado_comercial=self._estado_comercial(pautas_cliente),
                 )
             )
@@ -406,18 +415,38 @@ class AnalyticsService:
         proporcion = Decimal(restantes) / Decimal(pauta.publicaciones_contratadas)
         return proporcion < _CUPO_BAJO_UMBRAL
 
+    def _contrato_de_referencia(self, pautas_cliente: Sequence[Pauta]) -> Pauta:
+        """Return the one Pauta that represents a Client "right now" for display.
+
+        Each Pauta is an independent contract — quota unused when one
+        expires is gone, never inherited by the next one (functional
+        review, 2026-08-05). So "the client's current contract" is the
+        vigente Pauta that started most recently, if any; with no
+        vigente Pauta at all, it falls back to the most recently
+        *started* one overall, so a fully-expired client's card still
+        has something concrete to show (clearly marked `vencido` via
+        `estado_comercial`) instead of nothing. In the rare case of two
+        simultaneously vigente Pautas, the newer one wins — it's the one
+        an operator most likely means by "their current plan".
+        """
+        vigentes = [p for p in pautas_cliente if self._pauta_service.esta_vigente(p)]
+        candidatas = vigentes or pautas_cliente
+        return max(candidatas, key=lambda p: p.fecha_inicio)
+
     def _estado_comercial(self, pautas_cliente: Sequence[Pauta]) -> EstadoComercial:
         """Classify a Client's `EstadoComercial` from their own Pautas — see that enum.
 
         Deliberately recomputes "restantes" and "días para vencer" scoped
-        to only the client's vigente Pautas, not reusing
-        `RankingComercialItem.publicaciones_restantes`/`fecha_vencimiento`
-        (which sum/take-the-earliest across ALL of a client's Pautas,
-        including vencidas) — an expired Pauta's leftover quota or its
-        already-past end date must never count toward "about to run out"
-        or "about to expire", or a client with one old, fully-expired
-        Pauta and one healthy new one could get flagged as urgent for no
-        real reason.
+        to only the client's vigente Pautas — an expired Pauta's leftover
+        quota or its already-past end date must never count toward
+        "about to run out" or "about to expire", or a client with one
+        old, fully-expired Pauta and one healthy new one could get
+        flagged as urgent for no real reason. Sums across every
+        currently-vigente Pauta rather than picking just one like
+        `_contrato_de_referencia` does — unlike an expired contract, two
+        Pautas that are *both* vigente right now are both genuinely
+        actionable, so both counting toward "is this client healthy"
+        is correct, not the same aggregation mistake.
         """
         vigentes = [p for p in pautas_cliente if self._pauta_service.esta_vigente(p)]
         if not vigentes:

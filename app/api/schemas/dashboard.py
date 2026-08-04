@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from app.api.schemas.client import ClientOut
 from app.api.schemas.publication_request import PublicationRequestOut
 from core.analytics.view_models import EstadoComercial
+from core.entities.pauta import PautaTipo
 
 
 class DashboardResumenOut(BaseModel):
@@ -73,6 +74,7 @@ class RankingComercialOut(BaseModel):
     cliente: ClientOut
     valor_contratado: Decimal
     peso_comercial: Decimal
+    tipo: PautaTipo
     publicaciones_contratadas: int
     publicaciones_restantes: int
     fecha_vencimiento: date
