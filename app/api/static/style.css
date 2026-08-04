@@ -882,6 +882,33 @@ button[type="submit"]:hover {
   font-weight: 700;
 }
 
+.client-card-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.client-card-edit {
+  width: 26px;
+  height: 26px;
+  border-color: transparent;
+  background: none;
+  color: var(--color-text-tertiary);
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.client-card-edit .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.client-card-edit:hover {
+  color: var(--color-accent);
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+
 .client-card-meta {
   margin: 0;
   font-size: 0.78rem;

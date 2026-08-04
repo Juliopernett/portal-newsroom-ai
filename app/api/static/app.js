@@ -31,6 +31,7 @@ let pautasById = new Map();
 let rankingByClientId = new Map();
 let solicitudPautaFiltro = "";
 let clientesFiltro = "";
+let editingClientId = null;
 
 // ---------- utilidades ----------
 
@@ -206,6 +207,11 @@ function setupGlobalClicks() {
   document.addEventListener("click", (event) => {
     const openBtn = event.target.closest("[data-open-drawer]");
     if (openBtn) {
+      if (openBtn.dataset.editClient) {
+        startEditCliente(openBtn.dataset.editClient);
+      } else if (openBtn.dataset.openDrawer === "drawer-cliente") {
+        resetFormClienteDrawer();
+      }
       openDrawer(openBtn.dataset.openDrawer);
       return;
     }
@@ -301,6 +307,19 @@ function clientesFiltrados() {
   return todos.filter((c) => c.nombre.toLowerCase().includes(termino));
 }
 
+function renderEditClienteButton(clienteId) {
+  return `
+    <button
+      type="button"
+      class="icon-btn client-card-edit"
+      data-open-drawer="drawer-cliente"
+      data-edit-client="${clienteId}"
+      aria-label="Editar cliente"
+    >
+      <svg class="icon"><use href="#icon-edit"></use></svg>
+    </button>`;
+}
+
 function renderClientCard(cliente) {
   const item = rankingByClientId.get(cliente.id);
   if (!item) {
@@ -308,7 +327,10 @@ function renderClientCard(cliente) {
       <div class="client-card">
         <div class="client-card-header">
           <h3>${cliente.nombre}</h3>
-          <span class="badge badge-neutral">Sin pauta</span>
+          <div class="client-card-header-actions">
+            <span class="badge badge-neutral">Sin pauta</span>
+            ${renderEditClienteButton(cliente.id)}
+          </div>
         </div>
         <p class="client-card-meta">
           <svg class="icon"><use href="#icon-phone"></use></svg>${cliente.telefono}
@@ -330,7 +352,10 @@ function renderClientCard(cliente) {
     <div class="client-card">
       <div class="client-card-header">
         <h3>${cliente.nombre}</h3>
-        <span class="badge badge-${item.estado_comercial}">${ESTADO_COMERCIAL_LABELS[item.estado_comercial]}</span>
+        <div class="client-card-header-actions">
+          <span class="badge badge-${item.estado_comercial}">${ESTADO_COMERCIAL_LABELS[item.estado_comercial]}</span>
+          ${renderEditClienteButton(cliente.id)}
+        </div>
       </div>
       <p class="client-card-meta">
         <svg class="icon"><use href="#icon-clock"></use></svg>Hasta ${formatFecha(item.fecha_vencimiento)}
@@ -670,6 +695,25 @@ function setupFormSolicitud() {
   });
 }
 
+function resetFormClienteDrawer() {
+  editingClientId = null;
+  document.getElementById("drawer-cliente-titulo").textContent = "Nuevo cliente";
+  document.getElementById("form-cliente-submit").textContent = "Crear cliente";
+  document.getElementById("form-cliente").reset();
+}
+
+function startEditCliente(clientId) {
+  const cliente = clientsById.get(clientId);
+  if (!cliente) return;
+  editingClientId = clientId;
+  document.getElementById("drawer-cliente-titulo").textContent = "Editar cliente";
+  document.getElementById("form-cliente-submit").textContent = "Guardar cambios";
+  document.getElementById("cliente-nombre").value = cliente.nombre;
+  document.getElementById("cliente-tipo").value = cliente.tipo;
+  document.getElementById("cliente-telefono").value = cliente.telefono;
+  document.getElementById("cliente-instagram").value = cliente.instagram || "";
+}
+
 function setupFormCliente() {
   document.getElementById("form-cliente").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -680,13 +724,22 @@ function setupFormCliente() {
       instagram: document.getElementById("cliente-instagram").value || null,
     };
     try {
-      await apiFetch("/clients", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      showStatus("Cliente creado.", false);
-      event.target.reset();
+      if (editingClientId) {
+        await apiFetch(`/clients/${editingClientId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        showStatus("Cliente actualizado.", false);
+      } else {
+        await apiFetch("/clients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        showStatus("Cliente creado.", false);
+      }
+      resetFormClienteDrawer();
       closeDrawer(document.getElementById("drawer-cliente"));
       await loadClientesYPautas();
     } catch (error) {

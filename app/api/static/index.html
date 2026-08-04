@@ -53,6 +53,10 @@
   <symbol id="icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
     <path d="M12 5v14"></path><path d="M5 12h14"></path>
   </symbol>
+  <symbol id="icon-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12.5 5.5 18 11l-9 9H4v-5.5z"></path>
+    <path d="m16.3 4.2 3 3a1.4 1.4 0 0 1 0 2L18 10.5 13.5 6l1.3-1.3a1.4 1.4 0 0 1 1.9 0z"></path>
+  </symbol>
   <symbol id="icon-money" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="9"></circle>
     <path d="M12 7v10"></path><path d="M15 9.5c0-1.4-1.4-2.5-3-2.5s-3 1.1-3 2.5 1.4 2 3 2.5 3 1.1 3 2.5-1.4 2.5-3 2.5-3-1.1-3-2.5"></path>
@@ -268,7 +272,7 @@
 
 <aside id="drawer-cliente" class="drawer" hidden aria-hidden="true">
   <div class="drawer-header">
-    <h2>Nuevo cliente</h2>
+    <h2 id="drawer-cliente-titulo">Nuevo cliente</h2>
     <button type="button" class="icon-btn" data-close-drawer aria-label="Cerrar">
       <svg class="icon"><use href="#icon-close"></use></svg>
     </button>
@@ -291,7 +295,7 @@
     <label>Instagram (opcional)
       <input type="text" id="cliente-instagram">
     </label>
-    <button type="submit" class="btn btn-primary">Crear cliente</button>
+    <button type="submit" id="form-cliente-submit" class="btn btn-primary">Crear cliente</button>
   </form>
 </aside>
 
