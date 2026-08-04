@@ -27,6 +27,17 @@ header[hidden] {
   display: none;
 }
 
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-brand-icon {
+  width: 1.8rem;
+  height: 1.8rem;
+}
+
 header h1 {
   font-size: 1.1rem;
   margin: 0;
@@ -140,17 +151,8 @@ body.login-active {
 }
 
 .login-brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 3rem;
-  height: 3rem;
-  border-radius: 10px;
-  background: #1f2937;
-  color: #fff;
-  font-weight: 700;
-  font-size: 1.05rem;
-  letter-spacing: 0.02em;
+  width: 4rem;
+  height: 4rem;
 }
 
 .login-brand-name {
@@ -350,6 +352,11 @@ form {
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   padding: 0.9rem;
+  /* Los hijos flex no se encogen por debajo de su ancho de contenido por
+     defecto — un <select> con textos de opción largos (nombre de cliente +
+     fechas + cupo) empujaba el formulario entero más ancho que la pantalla
+     en celular. */
+  min-width: 0;
 }
 
 /* Formularios de baja frecuencia (crear cliente/pauta): colapsados por
@@ -403,6 +410,7 @@ label {
   gap: 0.2rem;
   font-size: 0.85rem;
   color: #374151;
+  min-width: 0;
 }
 
 label.checkbox {
@@ -422,6 +430,12 @@ textarea {
   border: 1px solid #d1d5db;
   border-radius: 4px;
   font-family: inherit;
+  width: 100%;
+  max-width: 100%;
+}
+
+.pauta-buscador {
+  margin-bottom: 0.3rem;
 }
 
 button {
