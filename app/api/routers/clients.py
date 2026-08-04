@@ -7,7 +7,9 @@ protected automatically instead of by remembering to add it.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from dataclasses import replace
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.dependencies import get_current_user, get_unit_of_work
 from app.api.schemas.client import ClientCreate, ClientOut
@@ -30,3 +32,25 @@ def create_client(payload: ClientCreate, uow: UnitOfWork = Depends(get_unit_of_w
 def list_clients(uow: UnitOfWork = Depends(get_unit_of_work)) -> list[Client]:
     """Return every registered client."""
     return uow.clients.list_all()
+
+
+@router.put("/{client_id}", response_model=ClientOut)
+def update_client(
+    client_id: str, payload: ClientCreate, uow: UnitOfWork = Depends(get_unit_of_work)
+) -> Client:
+    """Replace an existing Client's editable fields (nombre, tipo, telefono, ...).
+
+    `Client` is immutable (`frozen=True`) — this builds a new instance via
+    `dataclasses.replace`, which re-runs `__post_init__` validation, the
+    same discipline `core.services.publication_request_service` already
+    uses for `PublicationRequest`. `id` is preserved; every other field
+    is replaced wholesale (PUT semantics — the payload is the new source
+    of truth for those fields, not a partial patch).
+    """
+    existing = uow.clients.get_by_id(client_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    updated = replace(existing, **payload.model_dump())
+    uow.clients.save(updated)
+    uow.commit()
+    return updated

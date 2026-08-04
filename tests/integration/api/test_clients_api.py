@@ -1,4 +1,4 @@
-"""Integration tests: POST /clients, GET /clients."""
+"""Integration tests: POST /clients, GET /clients, PUT /clients/{id}."""
 
 from __future__ import annotations
 
@@ -64,3 +64,68 @@ def test_list_clients_returns_every_created_client(client: TestClient) -> None:
     assert response.status_code == 200
     nombres = {c["nombre"] for c in response.json()}
     assert nombres == {"Silvestre Dangond", "Peter Manjarrés"}
+
+
+def test_update_client_replaces_editable_fields(client: TestClient) -> None:
+    created = client.post(
+        "/clients",
+        json={"nombre": "Silvestre Dangond", "tipo": "artista", "telefono": "+573001112233"},
+    ).json()
+
+    response = client.put(
+        f"/clients/{created['id']}",
+        json={
+            "nombre": "Silvestre Dangond Corregido",
+            "tipo": "manager",
+            "telefono": "+573009998877",
+            "instagram": "@silvestre",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == created["id"]
+    assert body["nombre"] == "Silvestre Dangond Corregido"
+    assert body["tipo"] == "manager"
+    assert body["telefono"] == "+573009998877"
+    assert body["instagram"] == "@silvestre"
+
+
+def test_update_client_persists_across_requests(client: TestClient) -> None:
+    created = client.post(
+        "/clients",
+        json={"nombre": "Nombre Original", "tipo": "artista", "telefono": "+573001112233"},
+    ).json()
+
+    client.put(
+        f"/clients/{created['id']}",
+        json={"nombre": "Nombre Corregido", "tipo": "artista", "telefono": "+573001112233"},
+    )
+
+    response = client.get("/clients")
+
+    nombres = {c["nombre"] for c in response.json()}
+    assert nombres == {"Nombre Corregido"}
+
+
+def test_update_client_returns_404_when_not_found(client: TestClient) -> None:
+    response = client.put(
+        "/clients/no-existe",
+        json={"nombre": "X", "tipo": "artista", "telefono": "+573001112233"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_update_client_rejects_empty_nombre(client: TestClient) -> None:
+    created = client.post(
+        "/clients",
+        json={"nombre": "Silvestre Dangond", "tipo": "artista", "telefono": "+573001112233"},
+    ).json()
+
+    response = client.put(
+        f"/clients/{created['id']}",
+        json={"nombre": "", "tipo": "artista", "telefono": "+573001112233"},
+    )
+
+    assert response.status_code == 422
