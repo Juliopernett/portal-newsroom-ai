@@ -9,6 +9,7 @@ because nothing outside `core/analytics/` constructs them.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
 from core.entities.client import Client
@@ -36,3 +37,32 @@ class ClientePesoComercial:
 
     cliente: Client
     peso_comercial: Decimal
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RankingComercialItem:
+    """One row of the Ranking Comercial: a `Client` aggregated across all their `Pauta`s.
+
+    A `Client` has no single "state" in the domain when they have more
+    than one `Pauta` — `fecha_vencimiento` and `vigente` are two
+    deliberate, documented ways to summarize that for reporting, decided
+    in Sprint 4B rather than left ambiguous:
+
+    - `fecha_vencimiento` is the earliest `fecha_fin` among the client's
+      Pautas — the soonest date that needs attention, whether it's still
+      upcoming or already past.
+    - `vigente` is true if at least one of the client's Pautas is vigente
+      today — a client counts as having something active if any one
+      contract does, not only if all of them do.
+
+    Only built for clients with at least one Pauta (see
+    `AnalyticsService.ranking_comercial`) — both fields are undefined
+    otherwise.
+    """
+
+    cliente: Client
+    valor_contratado: Decimal
+    peso_comercial: Decimal
+    publicaciones_restantes: int
+    fecha_vencimiento: date
+    vigente: bool

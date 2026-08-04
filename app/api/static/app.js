@@ -118,6 +118,7 @@ function setupFormLogin() {
       showApp();
       await loadClientesYPautas();
       await loadSolicitudes();
+      await loadDashboard();
     } catch (error) {
       showStatus(error.message, true);
     }
@@ -466,6 +467,100 @@ function setupFormPauta() {
   });
 }
 
+// ---------- dashboard comercial (Sprint 4B) ----------
+//
+// Todo lo que se ve aquí viene tal cual de /dashboard/{resumen,alertas,ranking}
+// — esta pantalla no calcula ni reordena nada por su cuenta, solo formatea
+// para pantalla (moneda, fechas) lo que ya entrega el backend.
+
+const DASHBOARD_CARDS = [
+  ["clientes_activos", "Clientes activos"],
+  ["pautas_activas", "Pautas activas"],
+  ["pautas_vencidas", "Pautas vencidas"],
+  ["solicitudes_pendientes", "Solicitudes pendientes"],
+  ["publicaciones_este_mes", "Publicaciones este mes"],
+  ["ingreso_contratado_activo", "Ingreso contratado activo"],
+  ["ingreso_historico", "Ingreso histórico"],
+  ["peso_comercial_promedio", "Peso comercial promedio"],
+];
+
+const DASHBOARD_CAMPOS_MONETARIOS = new Set([
+  "ingreso_contratado_activo",
+  "ingreso_historico",
+  "peso_comercial_promedio",
+]);
+
+function formatMoneda(valor) {
+  return "$" + Number(valor).toLocaleString("es-CO", { maximumFractionDigits: 0 });
+}
+
+function renderDashboardResumen(resumen) {
+  const el = document.getElementById("dashboard-resumen");
+  el.innerHTML = DASHBOARD_CARDS.map(([campo, etiqueta]) => {
+    const valor = resumen[campo];
+    const texto = DASHBOARD_CAMPOS_MONETARIOS.has(campo) ? formatMoneda(valor) : valor;
+    return `
+      <div class="dashboard-card">
+        <span class="dashboard-card-valor">${texto}</span>
+        <span class="dashboard-card-etiqueta">${etiqueta}</span>
+      </div>`;
+  }).join("");
+}
+
+function renderAlertaLista(id, items, formatear) {
+  const el = document.getElementById(id);
+  el.innerHTML =
+    items.length === 0
+      ? '<li class="muted">Sin novedades.</li>'
+      : items.map((item) => `<li>${formatear(item)}</li>`).join("");
+}
+
+function renderDashboardAlertas(alertas) {
+  renderAlertaLista("alerta-cupo-agotado", alertas.clientes_cupo_agotado, (c) => c.nombre);
+  renderAlertaLista("alerta-por-vencer", alertas.clientes_por_vencer, (c) => c.nombre);
+  renderAlertaLista("alerta-cupo-bajo", alertas.clientes_cupo_bajo, (c) => c.nombre);
+  renderAlertaLista("alerta-solicitudes-antiguas", alertas.solicitudes_antiguas, (s) => {
+    const recibida = s.fecha_recepcion.slice(0, 16).replace("T", " ");
+    return `${s.texto} — recibida ${recibida}`;
+  });
+}
+
+function renderDashboardRanking(ranking) {
+  const tbody = document.getElementById("tabla-ranking");
+  if (ranking.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="6" class="muted">Todavía no hay clientes con pautas.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = ranking
+    .map((item) => {
+      const estado = item.vigente
+        ? '<span class="badge badge-ok">vigente</span>'
+        : '<span class="badge badge-danger">vencido</span>';
+      return `
+      <tr>
+        <td data-label="Cliente">${item.cliente.nombre}</td>
+        <td data-label="Valor contratado">${formatMoneda(item.valor_contratado)}</td>
+        <td data-label="Peso comercial">${formatMoneda(item.peso_comercial)}</td>
+        <td data-label="Publicaciones restantes">${item.publicaciones_restantes}</td>
+        <td data-label="Fecha de vencimiento">${formatFecha(item.fecha_vencimiento)}</td>
+        <td data-label="Estado">${estado}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+async function loadDashboard() {
+  const [resumen, alertas, ranking] = await Promise.all([
+    apiFetch("/dashboard/resumen"),
+    apiFetch("/dashboard/alertas"),
+    apiFetch("/dashboard/ranking"),
+  ]);
+  renderDashboardResumen(resumen);
+  renderDashboardAlertas(alertas);
+  renderDashboardRanking(ranking);
+}
+
 // ---------- arranque ----------
 
 function setupTabs() {
@@ -484,6 +579,7 @@ async function init() {
   setupLogout();
   document.getElementById("refrescar-solicitudes").addEventListener("click", loadSolicitudes);
   document.getElementById("refrescar-clientes").addEventListener("click", loadClientesYPautas);
+  document.getElementById("refrescar-dashboard").addEventListener("click", loadDashboard);
 
   try {
     await apiFetch("/auth/me");
@@ -496,6 +592,7 @@ async function init() {
   try {
     await loadClientesYPautas();
     await loadSolicitudes();
+    await loadDashboard();
   } catch (error) {
     showStatus(error.message, true);
   }

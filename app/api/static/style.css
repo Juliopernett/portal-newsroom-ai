@@ -489,6 +489,72 @@ table.compact td {
   font-size: 0.82rem;
 }
 
+/* ---------- Dashboard comercial (Sprint 4B) ---------- */
+
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+}
+
+.dashboard-card-valor {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.dashboard-card-etiqueta {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.dashboard-alertas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.alerta-grupo {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.75rem 0.9rem;
+}
+
+.alerta-grupo h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.alerta-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.alerta-lista li {
+  padding: 0.3rem 0.5rem;
+  background: #f9fafb;
+  border-radius: 4px;
+}
+
 .client-card {
   background: #fff;
   border: 1px solid #e5e7eb;

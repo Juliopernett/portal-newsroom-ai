@@ -56,6 +56,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 from core.entities.client import Client, ClientType
 from core.entities.pauta import Pauta
@@ -102,7 +103,7 @@ class MigrationSummary:
     publicaciones_historicas_creadas: int = 0
 
 
-def migrate(rows: list[dict], uow: UnitOfWork) -> MigrationSummary:
+def migrate(rows: list[dict[str, Any]], uow: UnitOfWork) -> MigrationSummary:
     """Persist `rows` (as loaded from the JSON data file) through `uow`."""
     summary = MigrationSummary()
     clientes_por_nombre: dict[str, Client] = {c.nombre: c for c in uow.clients.list_all()}
@@ -156,7 +157,10 @@ def main() -> None:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Migrar aunque ya existan Pautas en la base de datos (por defecto se aborta para no duplicar).",
+        help=(
+            "Migrar aunque ya existan Pautas en la base de datos "
+            "(por defecto se aborta para no duplicar)."
+        ),
     )
     args = parser.parse_args()
 
