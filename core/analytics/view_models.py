@@ -74,14 +74,21 @@ class RankingComercialItem:
       today — a client counts as having something active if any one
       contract does, not only if all of them do.
 
+    `publicaciones_contratadas` and `publicaciones_restantes` are both
+    summed the same way (across every Pauta, vigente or not) so they
+    stay a matching numerator/denominator pair — a CRM card showing
+    "X restantes de Y contratadas" would be misleading if one side
+    counted vencida Pautas and the other didn't.
+
     Only built for clients with at least one Pauta (see
-    `AnalyticsService.ranking_comercial`) — both fields are undefined
+    `AnalyticsService.ranking_comercial`) — all fields are undefined
     otherwise.
     """
 
     cliente: Client
     valor_contratado: Decimal
     peso_comercial: Decimal
+    publicaciones_contratadas: int
     publicaciones_restantes: int
     fecha_vencimiento: date
     vigente: bool

@@ -638,6 +638,7 @@ def test_ranking_comercial_aggregates_across_a_clients_multiple_pautas() -> None
     assert item.valor_contratado == Decimal("150")
     # (100+50) / (10+5) = 10.00
     assert item.peso_comercial == Decimal("10.00")
+    assert item.publicaciones_contratadas == 15
     # restantes: (10-1) + (5-0) = 14
     assert item.publicaciones_restantes == 14
     # la fecha_fin mas temprana entre p1 (2026-08-30) y p2 (2026-02-01)
