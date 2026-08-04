@@ -20,15 +20,26 @@ from config.settings import get_settings
 
 
 def normalize_database_url(database_url: str) -> str:
-    """Rewrite a legacy `postgres://` URL to the `postgresql+psycopg://` scheme.
+    """Rewrite a driver-less Postgres URL to explicitly use `psycopg` (v3).
 
-    Railway (and Heroku before it) hand out `DATABASE_URL` values starting
-    with `postgres://` — a scheme SQLAlchemy 2.0 no longer accepts, and
-    without an explicit driver it would fall back to psycopg2, which this
-    project does not install (see `requirements.txt`, `psycopg[binary]`).
+    Two distinct real-world cases, both observed from actual Railway
+    `DATABASE_URL` values, not just Railway's docs:
+
+    - `postgres://...` — the legacy scheme Railway/Heroku have historically
+      handed out. SQLAlchemy 2.0 rejects it outright.
+    - `postgresql://...` — Railway's *current* internal `DATABASE_URL`
+      (e.g. `${{Postgres.DATABASE_URL}}`) uses this, valid but driver-less.
+      SQLAlchemy 2.0 accepts it and silently defaults to `psycopg2`, which
+      this project does not install (see `requirements.txt`,
+      `psycopg[binary]`, the v3 driver) — this failed an actual deploy
+      before this fix (`ModuleNotFoundError: No module named 'psycopg2'`).
+
+    A URL that already names a driver (`postgresql+psycopg://`,
+    `postgresql+asyncpg://`, ...) is left untouched.
     """
-    if database_url.startswith("postgres://"):
-        return "postgresql+psycopg://" + database_url.removeprefix("postgres://")
+    scheme, separator, rest = database_url.partition("://")
+    if separator and scheme in ("postgres", "postgresql"):
+        return f"postgresql+psycopg://{rest}"
     return database_url
 
 

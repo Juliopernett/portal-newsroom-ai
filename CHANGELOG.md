@@ -7,6 +7,32 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Primer deploy real a Railway, 2 fallos encontrados y corregidos en el camino:**
+  - Railway usaba su builder automático (Railpack), no
+    `docker/Dockerfile` — no lo detecta fuera de la raíz del repo.
+    Railpack falló con "No start command detected" al no poder adivinar
+    `alembic upgrade head && uvicorn app.api.main:app`. Corregido con
+    `railway.json` (`build.dockerfilePath: "docker/Dockerfile"`),
+    versionado en el repo — no una configuración manual en el dashboard
+    que nadie recordaría después.
+  - Con el Dockerfile ya en uso, el deploy siguiente falló distinto:
+    `ModuleNotFoundError: No module named 'psycopg2'`. La
+    `DATABASE_URL` interna real de Railway
+    (`${{Postgres.DATABASE_URL}}`) usa el esquema `postgresql://`, no
+    el legacy `postgres://` que `normalize_database_url` ya sabía
+    reescribir — sin driver explícito, SQLAlchemy 2.0 cae por defecto a
+    `psycopg2`, no instalado (el proyecto usa `psycopg` v3). La función
+    ahora reescribe cualquier esquema `postgres://`/`postgresql://` sin
+    driver a `postgresql+psycopg://`, dejando intactos los que ya
+    especifican uno (`+psycopg`, `+asyncpg`, ...).
+  - El test existente de `normalize_database_url` traía la expectativa
+    **incorrecta** para el caso `postgresql://` (afirmaba que se
+    quedaba igual) desde que se escribió en Sprint 3C — nunca corrió
+    contra una URL real de Railway hasta este deploy. Corregido, y se
+    agregó el caso `+asyncpg` para blindar contra la próxima variante.
+
 ### Added
 
 - **Login MVP**: autenticación con sesiones server-side, reincorporada
