@@ -96,6 +96,10 @@ main {
   padding: 3rem 1.25rem;
 }
 
+#login-screen[hidden] {
+  display: none;
+}
+
 #login-screen form {
   width: 100%;
   max-width: 320px;
