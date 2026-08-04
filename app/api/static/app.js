@@ -241,6 +241,13 @@ function setupGlobalClicks() {
         startEditCliente(openBtn.dataset.editClient);
       } else if (openBtn.dataset.openDrawer === "drawer-cliente") {
         resetFormClienteDrawer();
+      } else if (openBtn.dataset.openDrawer === "drawer-pauta") {
+        // Si "Nueva pauta" se abrió desde la ficha de un cliente puntual,
+        // preseleccionarlo — sin esto el <select> queda en el primer
+        // cliente de la lista si nadie lo toca a mano, y una pauta puede
+        // terminar vinculada al cliente equivocado sin que nadie lo note
+        // (pasó de verdad: terminó en "Cliente Final", 2026-08-05).
+        document.getElementById("pauta-cliente").value = openBtn.dataset.preselectClient ?? "";
       }
       openDrawer(openBtn.dataset.openDrawer);
       return;
@@ -283,7 +290,13 @@ async function loadClientesYPautas() {
 
 function renderSelectClientes() {
   const select = document.getElementById("pauta-cliente");
+  // Nunca se borra el placeholder vacío: sin él, el <select> queda
+  // silenciosamente en el primer cliente de la lista si nadie lo toca —
+  // así fue como una pauta terminó vinculada a "Cliente Final" en vez del
+  // cliente real que se pretendía (2026-08-05).
+  const placeholder = select.querySelector('option[value=""]');
   select.innerHTML = "";
+  if (placeholder) select.appendChild(placeholder);
   for (const client of clientsById.values()) {
     const option = document.createElement("option");
     option.value = client.id;
@@ -396,7 +409,7 @@ function renderClientCard(cliente) {
           <svg class="icon"><use href="#icon-phone"></use></svg>${cliente.telefono}
         </p>
         <div class="client-card-footer">
-          <button type="button" class="btn-link" data-open-drawer="drawer-pauta">
+          <button type="button" class="btn-link" data-open-drawer="drawer-pauta" data-preselect-client="${cliente.id}">
             <svg class="icon"><use href="#icon-plus"></use></svg>Nueva pauta
           </button>
         </div>
@@ -435,7 +448,7 @@ function renderClientCard(cliente) {
         <button type="button" class="btn-link" data-show-historial="${cliente.id}">
           <svg class="icon"><use href="#icon-clock"></use></svg>Historial
         </button>
-        <button type="button" class="btn-link" data-open-drawer="drawer-pauta">
+        <button type="button" class="btn-link" data-open-drawer="drawer-pauta" data-preselect-client="${cliente.id}">
           <svg class="icon"><use href="#icon-plus"></use></svg>Nueva pauta
         </button>
       </div>
@@ -485,12 +498,27 @@ function openHistorial(clientId) {
 
 // ---------- Solicitudes: kanban ----------
 
+// Explica por qué una solicitud pendiente quedó en esa posición — mismo
+// criterio que ordena la cola en el backend (AnalyticsService.
+// solicitudes_pendientes_priorizadas), solo que acá se formatea en texto
+// para el tooltip; no se recalcula el orden, solo se explica.
+function razonOrdenSolicitud(solicitud, pauta) {
+  if (solicitud.prioridad_manual) {
+    return "Prioridad manual — siempre va primero en la cola.";
+  }
+  if (!pauta) {
+    return "Sin pauta vinculada todavía — cuenta como $0 de peso comercial hasta que se vincule.";
+  }
+  return `Peso comercial: ${formatMoneda(pauta.peso_comercial)} — a mayor peso, más arriba en la cola.`;
+}
+
 function renderKanbanCard(solicitud, esPublicada) {
   const pauta = solicitud.pauta_id ? pautasById.get(solicitud.pauta_id) : null;
   const client = pauta ? clientsById.get(pauta.client_id) : null;
   const nombreCliente = client ? client.nombre : "(sin vincular)";
   const esperandoMucho = !esPublicada && horasEnEspera(solicitud.fecha_recepcion) >= STALE_REQUEST_HOURS;
   const hora = solicitud.fecha_recepcion.slice(0, 16).replace("T", " ");
+  const tituloOrden = esPublicada ? "" : ` title="${razonOrdenSolicitud(solicitud, pauta)}"`;
 
   let accionHtml = "";
   if (!esPublicada) {
@@ -506,7 +534,7 @@ function renderKanbanCard(solicitud, esPublicada) {
   const claseExtra = esPublicada ? "is-publicada" : esperandoMucho ? "is-urgent" : "";
 
   return `
-    <div class="kanban-card ${claseExtra}">
+    <div class="kanban-card ${claseExtra}"${tituloOrden}>
       <div class="kanban-card-header">
         <span class="kanban-card-cliente">${nombreCliente}${solicitud.prioridad_manual ? " ⚑" : ""}</span>
         <span class="kanban-card-time">${esperandoMucho ? "⏱ " : ""}${hora}</span>
@@ -517,15 +545,14 @@ function renderKanbanCard(solicitud, esPublicada) {
 }
 
 async function loadSolicitudes() {
+  // El backend ya entrega "recibida" en orden de trabajo (prioridad manual
+  // > peso comercial > fecha de recepción) — ver
+  // AnalyticsService.solicitudes_pendientes_priorizadas. No se reordena
+  // acá; hacerlo pisaría esa regla con una versión más pobre (solo fecha).
   const [pendientes, publicadas] = await Promise.all([
     apiFetch("/publication-requests?estado=recibida"),
     apiFetch("/publication-requests?estado=publicada"),
   ]);
-  // orden de llegada, con las de prioridad manual primero — regla del negocio
-  pendientes.sort((a, b) => {
-    if (a.prioridad_manual !== b.prioridad_manual) return a.prioridad_manual ? -1 : 1;
-    return a.fecha_recepcion.localeCompare(b.fecha_recepcion);
-  });
   publicadas.sort((a, b) => b.fecha_recepcion.localeCompare(a.fecha_recepcion));
   const publicadasRecientes = publicadas.slice(0, 30);
 
@@ -724,10 +751,10 @@ function renderDashboardAlertas(alertas) {
   ).join("");
 }
 
-function renderRankingComercial(ranking) {
-  const el = document.getElementById("ranking-comercial");
+function renderRankingComercial(ranking, elementId = "ranking-comercial", vacioMensaje = "Todavía no hay clientes con pautas.") {
+  const el = document.getElementById(elementId);
   if (ranking.length === 0) {
-    el.innerHTML = '<p class="muted">Todavía no hay clientes con pautas.</p>';
+    el.innerHTML = `<p class="muted">${vacioMensaje}</p>`;
     return;
   }
   const maxPeso = Math.max(...ranking.map((item) => Number(item.peso_comercial)));
@@ -763,6 +790,14 @@ async function loadDashboard() {
   renderStatRow("dashboard-actividad", DASHBOARD_ACTIVIDAD, resumen);
   renderDashboardAlertas(alertas);
   renderRankingComercial(ranking);
+  // Mismo ranking, filtrado a clientes cuyo contrato de referencia está
+  // vigente hoy — el histórico ya trae `vigente` por item, así que no hace
+  // falta otro round-trip al backend, solo filtrar aquí.
+  renderRankingComercial(
+    ranking.filter((item) => item.vigente),
+    "ranking-comercial-activos",
+    "Ningún cliente tiene un contrato vigente en este momento."
+  );
 }
 
 // ---------- formularios ----------
@@ -881,20 +916,38 @@ function setupFormPauta() {
 
 // ---------- arranque ----------
 
-// Sin sincronización en tiempo real entre pestañas/dispositivos — si
-// cargaste algo en el celular y volvés a una pestaña de escritorio que ya
-// estaba abierta, esa pestaña no se entera sola. Refrescar al recuperar el
-// foco (Page Visibility API) cubre exactamente ese caso sin necesitar
-// websockets ni sondeo constante — solo dispara en la transición real de
-// "estaba en otra pestaña/app" a "volví a esta".
-function setupRefrescoAlVolver() {
+const AUTO_REFRESH_INTERVAL_MS = 30_000; // sensacion de "casi en vivo" sin websockets
+
+function appEstaVisible() {
+  return document.visibilityState === "visible" && !document.getElementById("app-shell").hidden;
+}
+
+function refrescarTodo() {
+  return Promise.all([loadClientesYPautas(), loadSolicitudes(), loadDashboard()]);
+}
+
+// Sin sincronización en tiempo real entre pestañas/dispositivos — sin esto,
+// una pestaña abierta hace rato no se entera de nada hasta que alguien
+// toca "Actualizar" a mano. Dos mecanismos, ninguno necesita websockets:
+//
+// 1. Al volver de estar en otra pestaña/app (Page Visibility API) — cubre
+//    "cargué algo desde el celular y volví al escritorio".
+// 2. Sondeo cada AUTO_REFRESH_INTERVAL_MS mientras la pestaña esté visible
+//    — cubre "me quedé quieto en una pantalla y alguien más cambió algo".
+//    Se salta en silencio si falla (un hipo de red no debe interrumpir con
+//    un toast cada 30 segundos) y no hace nada si la pestaña está oculta,
+//    para no gastar red de fondo sin motivo.
+function setupRefrescoAutomatico() {
   document.addEventListener("visibilitychange", () => {
-    const appVisible = document.visibilityState === "visible" && !document.getElementById("app-shell").hidden;
-    if (!appVisible) return;
-    Promise.all([loadClientesYPautas(), loadSolicitudes(), loadDashboard()]).catch((error) => {
-      showStatus(error.message, true);
-    });
+    if (!appEstaVisible()) return;
+    refrescarTodo().catch((error) => showStatus(error.message, true));
   });
+  window.setInterval(() => {
+    if (!appEstaVisible()) return;
+    refrescarTodo().catch(() => {
+      // silencioso -- ver comentario arriba
+    });
+  }, AUTO_REFRESH_INTERVAL_MS);
 }
 
 async function init() {
@@ -906,7 +959,7 @@ async function init() {
   setupFormPauta();
   setupFormLogin();
   setupLogout();
-  setupRefrescoAlVolver();
+  setupRefrescoAutomatico();
   renderSelectPlanes();
   document.getElementById("refrescar-solicitudes").addEventListener("click", loadSolicitudes);
   document.getElementById("refrescar-clientes").addEventListener("click", loadClientesYPautas);
