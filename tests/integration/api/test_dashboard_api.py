@@ -181,6 +181,7 @@ def test_ranking_reflects_a_clients_pauta(client: TestClient) -> None:
     assert body[0]["cliente"]["id"] == client_id
     assert body[0]["valor_contratado"] == "200000.00"
     assert body[0]["peso_comercial"] == "20000.00"
+    assert body[0]["publicaciones_contratadas"] == 10
     assert body[0]["publicaciones_restantes"] == 10
     assert body[0]["vigente"] is True
     assert body[0]["estado_comercial"] == "saludable"

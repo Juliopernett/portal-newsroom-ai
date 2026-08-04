@@ -336,11 +336,13 @@ class AnalyticsService:
                 self._pauta_service.publicaciones_restantes(p, self._solicitudes)
                 for p in pautas_cliente
             )
+            contratadas = sum(p.publicaciones_contratadas for p in pautas_cliente)
             ranking.append(
                 RankingComercialItem(
                     cliente=peso_item.cliente,
                     valor_contratado=ingresos_por_cliente[peso_item.cliente.id],
                     peso_comercial=peso_item.peso_comercial,
+                    publicaciones_contratadas=contratadas,
                     publicaciones_restantes=restantes,
                     fecha_vencimiento=min(p.fecha_fin for p in pautas_cliente),
                     vigente=any(self._pauta_service.esta_vigente(p) for p in pautas_cliente),

@@ -69,6 +69,7 @@ class RankingComercialOut(BaseModel):
     cliente: ClientOut
     valor_contratado: Decimal
     peso_comercial: Decimal
+    publicaciones_contratadas: int
     publicaciones_restantes: int
     fecha_vencimiento: date
     vigente: bool
