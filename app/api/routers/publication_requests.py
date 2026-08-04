@@ -23,6 +23,7 @@ from app.api.schemas.publication_request import (
     PublicationRequestLinkPauta,
     PublicationRequestOut,
 )
+from core.analytics import AnalyticsService
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.ports.unit_of_work import UnitOfWork
 from core.services.publication_request_service import link_pauta, mark_as_published
@@ -50,7 +51,22 @@ def list_publication_requests(
     estado: PublicationRequestStatus | None = None,
     uow: UnitOfWork = Depends(get_unit_of_work),
 ) -> list[PublicationRequest]:
-    """Return requests, optionally filtered to a single `estado` (e.g. RECIBIDA)."""
+    """Return requests, optionally filtered to a single `estado` (e.g. RECIBIDA).
+
+    `estado=RECIBIDA` comes back in the editorial team's actual working
+    order — prioridad manual, then peso comercial of the linked Pauta,
+    then arrival time (see `AnalyticsService.solicitudes_pendientes_priorizadas`)
+    — not just insertion order. Every other filter (or no filter) returns
+    `list_all`'s own order, unchanged; only the one screen this ordering
+    was asked for is affected.
+    """
+    if estado == PublicationRequestStatus.RECIBIDA:
+        analytics = AnalyticsService(
+            clients=uow.clients.list_all(),
+            pautas=uow.pautas.list_all(),
+            solicitudes=uow.publication_requests.list_all(),
+        )
+        return analytics.solicitudes_pendientes_priorizadas()
     return uow.publication_requests.list_all(estado=estado)
 
 

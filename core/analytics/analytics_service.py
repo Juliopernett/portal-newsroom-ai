@@ -389,6 +389,32 @@ class AnalyticsService:
         """Return every `PublicationRequest` still awaiting triage (`RECIBIDA`)."""
         return [s for s in self._solicitudes if s.estado == PublicationRequestStatus.RECIBIDA]
 
+    def solicitudes_pendientes_priorizadas(self) -> list[PublicationRequest]:
+        """Return `solicitudes_pendientes` in the order the editorial team should work them.
+
+        Prioridad manual > peso comercial de la Pauta asociada (mayor
+        primero) > fecha de recepción (la más antigua primero) — una
+        regla de negocio explícita (2026-08-05): la cola no debe
+        depender solo de cuándo llegó cada solicitud, debe reflejar qué
+        cliente genera más ingreso para Portal Vallenato, sin que eso
+        nunca le gane a una prioridad manual puesta a mano.
+
+        Una solicitud sin Pauta vinculada todavía (`pauta_id is None`)
+        cuenta como peso comercial 0 — el valor más bajo posible, así
+        nunca compite injustamente con una ya vinculada a un cliente
+        real; sigue pudiendo saltar al frente con prioridad manual.
+        """
+        pautas_por_id = {p.id: p for p in self._pautas}
+
+        def peso_comercial_de(solicitud: PublicationRequest) -> Decimal:
+            pauta = pautas_por_id.get(solicitud.pauta_id) if solicitud.pauta_id else None
+            return pauta.peso_comercial if pauta is not None else Decimal("0")
+
+        return sorted(
+            self.solicitudes_pendientes(),
+            key=lambda s: (not s.prioridad_manual, -peso_comercial_de(s), s.fecha_recepcion),
+        )
+
     def solicitudes_publicadas(self) -> list[PublicationRequest]:
         """Return every `PublicationRequest` already published."""
         return [s for s in self._solicitudes if s.estado == PublicationRequestStatus.PUBLICADA]

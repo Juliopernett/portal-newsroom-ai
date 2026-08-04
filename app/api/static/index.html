@@ -150,10 +150,20 @@
         </div>
 
         <div class="section-block">
-          <div class="section-header-flex">
-            <h2 class="section-title">Ranking comercial</h2>
+          <div class="ranking-grid">
+            <div>
+              <div class="section-header-flex">
+                <h2 class="section-title">Ranking comercial — histórico</h2>
+              </div>
+              <div id="ranking-comercial" class="ranking-list"></div>
+            </div>
+            <div>
+              <div class="section-header-flex">
+                <h2 class="section-title">Ranking comercial — activos ahora</h2>
+              </div>
+              <div id="ranking-comercial-activos" class="ranking-list"></div>
+            </div>
           </div>
-          <div id="ranking-comercial" class="ranking-list"></div>
         </div>
       </section>
 
@@ -313,7 +323,9 @@
       </select>
     </label>
     <label>Cliente
-      <select id="pauta-cliente" required></select>
+      <select id="pauta-cliente" required>
+        <option value="">Selecciona un cliente…</option>
+      </select>
     </label>
     <label>Fecha de inicio
       <input type="date" id="pauta-fecha-inicio" required>
@@ -331,7 +343,7 @@
       <input type="date" id="pauta-fecha-pago" required>
     </label>
     <label>Observaciones (opcional)
-      <input type="text" id="pauta-observaciones">
+      <input type="text" id="pauta-observaciones" autocomplete="off">
     </label>
     <button type="submit" class="btn btn-primary">Crear pauta</button>
   </form>

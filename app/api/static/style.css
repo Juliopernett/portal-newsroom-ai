@@ -568,6 +568,12 @@ button[type="submit"]:hover {
 
 /* ---------- ranking comercial ---------- */
 
+.ranking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-6);
+}
+
 .ranking-list {
   display: flex;
   flex-direction: column;
