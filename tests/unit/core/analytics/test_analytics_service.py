@@ -1,0 +1,325 @@
+"""Unit tests for AnalyticsService, using in-memory Client/Pauta/PublicationRequest data."""
+
+from __future__ import annotations
+
+from datetime import UTC, date, datetime
+from decimal import Decimal
+
+from core.analytics.analytics_service import AnalyticsService
+from core.entities.client import Client, ClientType
+from core.entities.pauta import Pauta
+from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
+
+_HOY = date(2026, 8, 1)
+_AHORA = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
+
+
+def _client(**overrides: object) -> Client:
+    defaults: dict[str, object] = {
+        "nombre": "Cliente de prueba",
+        "tipo": ClientType.ARTISTA,
+        "telefono": "3000000000",
+    }
+    defaults.update(overrides)
+    return Client(**defaults)
+
+
+def _pauta(**overrides: object) -> Pauta:
+    defaults: dict[str, object] = {
+        "client_id": "client-1",
+        "fecha_inicio": date(2026, 7, 1),
+        "fecha_fin": date(2026, 8, 30),
+        "publicaciones_contratadas": 10,
+        "valor_pagado": Decimal("500000"),
+        "fecha_pago": date(2026, 7, 1),
+    }
+    defaults.update(overrides)
+    return Pauta(**defaults)
+
+
+def _solicitud(**overrides: object) -> PublicationRequest:
+    defaults: dict[str, object] = {
+        "pauta_id": "pauta-1",
+        "texto": "Solicitud de ejemplo",
+        "fecha_recepcion": _AHORA,
+    }
+    defaults.update(overrides)
+    return PublicationRequest(**defaults)
+
+
+def _service(
+    clients: list[Client] | None = None,
+    pautas: list[Pauta] | None = None,
+    solicitudes: list[PublicationRequest] | None = None,
+) -> AnalyticsService:
+    return AnalyticsService(
+        clients=clients or [],
+        pautas=pautas or [],
+        solicitudes=solicitudes or [],
+        clock=lambda: _AHORA,
+    )
+
+
+# ---------- Dashboard Ejecutivo ----------
+
+
+def test_cantidad_clientes_counts_every_client_regardless_of_activity() -> None:
+    clientes = [_client(id="c1"), _client(id="c2")]
+
+    assert _service(clients=clientes).cantidad_clientes() == 2
+
+
+def test_cantidad_clientes_activos_counts_only_clients_with_a_vigente_pauta() -> None:
+    activo = _client(id="c1")
+    inactivo = _client(id="c2")
+    pautas = [
+        _pauta(client_id="c1", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 30)),
+        _pauta(client_id="c2", fecha_inicio=date(2026, 1, 1), fecha_fin=date(2026, 2, 1)),
+    ]
+
+    activos = _service(clients=[activo, inactivo], pautas=pautas).cantidad_clientes_activos()
+
+    assert activos == 1
+
+
+def test_cantidad_clientes_activos_counts_each_client_once_with_multiple_vigente_pautas() -> None:
+    pautas = [
+        _pauta(client_id="c1", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 30)),
+        _pauta(client_id="c1", fecha_inicio=date(2026, 7, 15), fecha_fin=date(2026, 9, 1)),
+    ]
+
+    activos = _service(clients=[_client(id="c1")], pautas=pautas).cantidad_clientes_activos()
+
+    assert activos == 1
+
+
+def test_cantidad_pautas_vigentes_and_vencidas() -> None:
+    vigente = _pauta(id="p1", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 30))
+    vencida = _pauta(id="p2", fecha_inicio=date(2026, 1, 1), fecha_fin=date(2026, 2, 1))
+    service = _service(pautas=[vigente, vencida])
+
+    assert service.cantidad_pautas_vigentes() == 1
+    assert service.cantidad_pautas_vencidas() == 1
+
+
+def test_cantidad_publicaciones_pendientes_and_publicadas() -> None:
+    solicitudes = [
+        _solicitud(estado=PublicationRequestStatus.RECIBIDA),
+        _solicitud(estado=PublicationRequestStatus.PUBLICADA),
+        _solicitud(estado=PublicationRequestStatus.PUBLICADA),
+    ]
+    service = _service(solicitudes=solicitudes)
+
+    assert service.cantidad_publicaciones_pendientes() == 1
+    assert service.cantidad_publicaciones_publicadas() == 2
+
+
+def test_ingresos_activos_sums_only_vigente_pautas() -> None:
+    vigente = _pauta(
+        fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 30), valor_pagado=Decimal("100")
+    )
+    vencida = _pauta(
+        fecha_inicio=date(2026, 1, 1), fecha_fin=date(2026, 2, 1), valor_pagado=Decimal("999")
+    )
+
+    ingresos = _service(pautas=[vigente, vencida]).ingresos_activos()
+
+    assert ingresos == Decimal("100")
+
+
+def test_ingresos_historicos_sums_every_pauta() -> None:
+    pautas = [_pauta(valor_pagado=Decimal("100")), _pauta(valor_pagado=Decimal("200"))]
+
+    assert _service(pautas=pautas).ingresos_historicos() == Decimal("300")
+
+
+def test_ingresos_historicos_is_zero_with_no_pautas() -> None:
+    assert _service().ingresos_historicos() == Decimal("0")
+
+
+# ---------- Reportes Comerciales ----------
+
+
+def test_ranking_clientes_por_ingresos_sorts_descending_and_includes_zero_revenue() -> None:
+    top = _client(id="top", nombre="Top")
+    bottom = _client(id="bottom", nombre="Bottom")
+    sin_pautas = _client(id="sin-pautas", nombre="Sin pautas")
+    pautas = [
+        _pauta(client_id="top", valor_pagado=Decimal("900")),
+        _pauta(client_id="bottom", valor_pagado=Decimal("100")),
+    ]
+
+    service = _service(clients=[bottom, sin_pautas, top], pautas=pautas)
+    ranking = service.ranking_clientes_por_ingresos()
+
+    assert [item.cliente.id for item in ranking] == ["top", "bottom", "sin-pautas"]
+    assert ranking[0].ingresos == Decimal("900")
+    assert ranking[2].ingresos == Decimal("0")
+
+
+def test_ranking_clientes_por_peso_comercial_excludes_clients_without_pautas() -> None:
+    con_pauta = _client(id="con-pauta")
+    sin_pauta = _client(id="sin-pauta")
+    pautas = [_pauta(client_id="con-pauta")]
+
+    ranking = _service(
+        clients=[con_pauta, sin_pauta], pautas=pautas
+    ).ranking_clientes_por_peso_comercial()
+
+    assert [item.cliente.id for item in ranking] == ["con-pauta"]
+
+
+def test_ranking_clientes_por_peso_comercial_uses_totals_not_average_of_ratios() -> None:
+    # Un cliente con dos pautas muy distintas: 1000/10 y 100/10 -> promedio de
+    # ratios daria (100+10)/2=55, pero sumando totales da 1100/20=55 tambien
+    # en este caso simetrico; se prueba un caso asimetrico para diferenciar.
+    pautas = [
+        _pauta(client_id="c1", valor_pagado=Decimal("1000"), publicaciones_contratadas=100),
+        _pauta(client_id="c1", valor_pagado=Decimal("100"), publicaciones_contratadas=1),
+    ]
+    # Promedio de ratios: (10 + 100) / 2 = 55.00
+    # Totales: (1000+100) / (100+1) = 1100/101 = 10.891089... -> 10.89
+    service = _service(clients=[_client(id="c1")], pautas=pautas)
+    ranking = service.ranking_clientes_por_peso_comercial()
+
+    assert ranking[0].peso_comercial == Decimal("10.89")
+
+
+def test_ranking_clientes_por_peso_comercial_sorts_descending() -> None:
+    pautas = [
+        _pauta(client_id="bajo", valor_pagado=Decimal("10"), publicaciones_contratadas=10),
+        _pauta(client_id="alto", valor_pagado=Decimal("1000"), publicaciones_contratadas=10),
+    ]
+
+    ranking = _service(
+        clients=[_client(id="bajo"), _client(id="alto")], pautas=pautas
+    ).ranking_clientes_por_peso_comercial()
+
+    assert [item.cliente.id for item in ranking] == ["alto", "bajo"]
+
+
+def test_clientes_por_vencer_returns_clients_with_a_pauta_expiring_soon() -> None:
+    pronto = _client(id="pronto")
+    lejos = _client(id="lejos")
+    pautas = [
+        _pauta(client_id="pronto", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 5)),
+        _pauta(client_id="lejos", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 12, 1)),
+    ]
+
+    resultado = _service(clients=[pronto, lejos], pautas=pautas).clientes_por_vencer(dias=7)
+
+    assert [c.id for c in resultado] == ["pronto"]
+
+
+def test_clientes_con_cupo_agotado_returns_clients_with_an_exhausted_pauta() -> None:
+    agotado = _client(id="agotado")
+    con_cupo = _client(id="con-cupo")
+    pautas = [
+        _pauta(id="p1", client_id="agotado", publicaciones_contratadas=2),
+        _pauta(id="p2", client_id="con-cupo", publicaciones_contratadas=2),
+    ]
+    solicitudes = [
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA),
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA),
+        _solicitud(pauta_id="p2", estado=PublicationRequestStatus.PUBLICADA),
+    ]
+
+    resultado = _service(
+        clients=[agotado, con_cupo], pautas=pautas, solicitudes=solicitudes
+    ).clientes_con_cupo_agotado()
+
+    assert [c.id for c in resultado] == ["agotado"]
+
+
+def test_clientes_con_cupo_bajo_uses_percentage_not_absolute_count() -> None:
+    # 10 contratadas, 9 consumidas -> 1 restante -> 10% -> bajo cupo.
+    bajo = _client(id="bajo")
+    pautas = [_pauta(id="p1", client_id="bajo", publicaciones_contratadas=10)]
+    solicitudes = [
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(9)
+    ]
+
+    resultado = _service(
+        clients=[bajo], pautas=pautas, solicitudes=solicitudes
+    ).clientes_con_cupo_bajo()
+
+    assert [c.id for c in resultado] == ["bajo"]
+
+
+def test_clientes_con_cupo_bajo_excludes_exactly_20_percent_remaining() -> None:
+    # 10 contratadas, 8 consumidas -> 2 restantes -> exactamente 20% -> NO es bajo cupo.
+    cliente = _client(id="c1")
+    pautas = [_pauta(id="p1", client_id="c1", publicaciones_contratadas=10)]
+    solicitudes = [
+        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(8)
+    ]
+
+    resultado = _service(
+        clients=[cliente], pautas=pautas, solicitudes=solicitudes
+    ).clientes_con_cupo_bajo()
+
+    assert resultado == []
+
+
+# ---------- Reportes de Pautas ----------
+
+
+def test_pautas_activas_and_vencidas() -> None:
+    vigente = _pauta(id="p1", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 30))
+    vencida = _pauta(id="p2", fecha_inicio=date(2026, 1, 1), fecha_fin=date(2026, 2, 1))
+    service = _service(pautas=[vigente, vencida])
+
+    assert service.pautas_activas() == [vigente]
+    assert service.pautas_vencidas() == [vencida]
+
+
+def test_pautas_por_vencer_delegates_to_pauta_service() -> None:
+    pronto = _pauta(id="p1", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 5))
+    lejos = _pauta(id="p2", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 12, 1))
+
+    resultado = _service(pautas=[pronto, lejos]).pautas_por_vencer(dias=7)
+
+    assert resultado == [pronto]
+
+
+def test_pautas_agotadas_returns_pautas_with_no_quota_left() -> None:
+    agotada = _pauta(id="p1", publicaciones_contratadas=1)
+    con_cupo = _pauta(id="p2", publicaciones_contratadas=5)
+    solicitudes = [_solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA)]
+
+    resultado = _service(pautas=[agotada, con_cupo], solicitudes=solicitudes).pautas_agotadas()
+
+    assert resultado == [agotada]
+
+
+# ---------- Reportes Editoriales ----------
+
+
+def test_solicitudes_pendientes_and_publicadas() -> None:
+    recibida = _solicitud(id="s1", estado=PublicationRequestStatus.RECIBIDA)
+    publicada = _solicitud(id="s2", estado=PublicationRequestStatus.PUBLICADA)
+    service = _service(solicitudes=[recibida, publicada])
+
+    assert service.solicitudes_pendientes() == [recibida]
+    assert service.solicitudes_publicadas() == [publicada]
+
+
+def test_solicitudes_antiguas_includes_requests_waiting_at_least_horas() -> None:
+    justo_a_tiempo = _solicitud(id="s1", fecha_recepcion=datetime(2026, 8, 1, 8, 0, tzinfo=UTC))
+    reciente = _solicitud(id="s2", fecha_recepcion=datetime(2026, 8, 1, 11, 0, tzinfo=UTC))
+
+    resultado = _service(solicitudes=[justo_a_tiempo, reciente]).solicitudes_antiguas(horas=4)
+
+    assert resultado == [justo_a_tiempo]
+
+
+def test_solicitudes_antiguas_excludes_non_recibida_requests() -> None:
+    antigua_publicada = _solicitud(
+        fecha_recepcion=datetime(2026, 8, 1, 1, 0, tzinfo=UTC),
+        estado=PublicationRequestStatus.PUBLICADA,
+        pauta_id="pauta-1",
+    )
+
+    resultado = _service(solicitudes=[antigua_publicada]).solicitudes_antiguas(horas=4)
+
+    assert resultado == []
