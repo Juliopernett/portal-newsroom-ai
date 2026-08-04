@@ -16,12 +16,21 @@ from database.engine import enable_sqlite_foreign_keys, normalize_database_url
             "postgresql+psycopg://user:pass@host.railway.internal:5432/railway",
         ),
         (
+            # Railway's *internal* DATABASE_URL (${{Postgres.DATABASE_URL}})
+            # uses this exact driver-less scheme — this case shipped with
+            # the wrong expected value (asserting it stayed unchanged)
+            # until an actual Railway deploy failed with
+            # `ModuleNotFoundError: No module named 'psycopg2'` and exposed it.
             "postgresql://user:pass@host:5432/db",
-            "postgresql://user:pass@host:5432/db",
+            "postgresql+psycopg://user:pass@host:5432/db",
         ),
         (
             "postgresql+psycopg://user:pass@host:5432/db",
             "postgresql+psycopg://user:pass@host:5432/db",
+        ),
+        (
+            "postgresql+asyncpg://user:pass@host:5432/db",
+            "postgresql+asyncpg://user:pass@host:5432/db",
         ),
         ("sqlite:///database/newsroom.db", "sqlite:///database/newsroom.db"),
     ],
