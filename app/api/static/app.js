@@ -1020,7 +1020,7 @@ async function vincularPauta(id, pautaId) {
 // "Otros indicadores" más abajo, para no competir en espacio con estas.
 const DASHBOARD_METRICAS_PRINCIPALES = [
   ["clientes_activos", "Clientes activos", "icon-users", false],
-  ["ingreso_contratado_activo", "Ingresos vigencia actual", "icon-money", true],
+  ["ingreso_contratado_activo", "Ingresos año actual", "icon-money", true],
   ["solicitudes_pendientes", "Solicitudes pendientes", "icon-inbox", false],
   ["publicaciones_este_mes", "Publicaciones este mes", "icon-check", false],
   ["renovaciones_del_mes", "Renovaciones del mes", "icon-refresh", false],

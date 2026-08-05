@@ -100,9 +100,20 @@ class AnalyticsService:
         """Return how many `PublicationRequest`s have been `PUBLICADA`."""
         return len(self.solicitudes_publicadas())
 
-    def ingresos_activos(self) -> Decimal:
-        """Return total `valor_pagado` across only currently-vigente `Pauta`s."""
-        return sum((p.valor_pagado for p in self.pautas_activas()), start=Decimal("0"))
+    def ingresos_anio_actual(self) -> Decimal:
+        """Return total `valor_pagado` across every `Pauta` started in the current year.
+
+        Uses `fecha_inicio` as the revenue-recognition date — migrated
+        records have no separate "date received" field, so `fecha_inicio`
+        is the closest proxy for "when this revenue counts". Includes
+        vigente, vencida, and future `Pauta`s alike; only the year of
+        `fecha_inicio` matters, not whether the contract is active today.
+        """
+        anio_actual = self._clock().year
+        return sum(
+            (p.valor_pagado for p in self._pautas if p.fecha_inicio.year == anio_actual),
+            start=Decimal("0"),
+        )
 
     def ingresos_historicos(self) -> Decimal:
         """Return total `valor_pagado` across every `Pauta`, past or present."""

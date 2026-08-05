@@ -115,17 +115,25 @@ def test_cantidad_publicaciones_pendientes_and_publicadas() -> None:
     assert service.cantidad_publicaciones_publicadas() == 2
 
 
-def test_ingresos_activos_sums_only_vigente_pautas() -> None:
-    vigente = _pauta(
+def test_ingresos_anio_actual_sums_pautas_by_fecha_inicio_year_regardless_of_vigencia() -> None:
+    vigente_este_anio = _pauta(
         fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 30), valor_pagado=Decimal("100")
     )
-    vencida = _pauta(
-        fecha_inicio=date(2026, 1, 1), fecha_fin=date(2026, 2, 1), valor_pagado=Decimal("999")
+    vencida_este_anio = _pauta(
+        fecha_inicio=date(2026, 1, 1), fecha_fin=date(2026, 2, 1), valor_pagado=Decimal("50")
+    )
+    futura_este_anio = _pauta(
+        fecha_inicio=date(2026, 12, 1), fecha_fin=date(2027, 1, 1), valor_pagado=Decimal("25")
+    )
+    de_otro_anio = _pauta(
+        fecha_inicio=date(2025, 1, 1), fecha_fin=date(2025, 2, 1), valor_pagado=Decimal("999")
     )
 
-    ingresos = _service(pautas=[vigente, vencida]).ingresos_activos()
+    ingresos = _service(
+        pautas=[vigente_este_anio, vencida_este_anio, futura_este_anio, de_otro_anio]
+    ).ingresos_anio_actual()
 
-    assert ingresos == Decimal("100")
+    assert ingresos == Decimal("175")
 
 
 def test_ingresos_historicos_sums_every_pauta() -> None:
