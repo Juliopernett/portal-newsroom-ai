@@ -10,10 +10,12 @@ AnalyticsService`), same convention as `core/services/`.
 from __future__ import annotations
 
 from core.analytics.analytics_service import AnalyticsService
+from core.analytics.decision_engine import DecisionEngineService
 from core.analytics.view_models import ClienteIngreso, ClientePesoComercial
 
 __all__ = [
     "AnalyticsService",
     "ClienteIngreso",
     "ClientePesoComercial",
+    "DecisionEngineService",
 ]

@@ -98,6 +98,45 @@ function formatFecha(iso) {
   return iso ? iso.slice(0, 10) : "";
 }
 
+// Portal Vallenato opera en Colombia (UTC-5) pero el backend guarda
+// fecha_recepcion/fecha_registro en UTC (bien, para almacenamiento) --
+// mostrar ese string crudo corre la hora 5h adelante de la hora real del
+// negocio (una solicitud de las 7:51pm aparecía como "00:51" del día
+// siguiente). Mismo bug que core/clock.py resolvió en el backend para
+// vigencia de Pauta, aquí para lo que se muestra en pantalla.
+const NEGOCIO_TZ = "America/Bogota";
+
+function formatFechaHoraNegocio(iso) {
+  if (!iso) return "";
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: NEGOCIO_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+// "Hoy" (solo fecha) en la zona horaria del negocio, a partir de un ISO
+// UTC o de "ahora" -- para comparar "¿esto pasó hoy?" sin el mismo
+// desfase.
+function fechaNegocioISO(iso) {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: NEGOCIO_TZ }).format(
+    iso ? new Date(iso) : new Date()
+  );
+}
+
+// Suma/resta días en aritmética de calendario pura, anclada a medianoche
+// UTC -- evita que el desfase horario del navegador corra el resultado
+// un día, independiente de en qué zona esté configurado el equipo.
+function sumarDiasFecha(fechaIso, dias) {
+  const fecha = new Date(fechaIso + "T00:00:00Z");
+  fecha.setUTCDate(fecha.getUTCDate() + dias);
+  return fecha.toISOString().slice(0, 10);
+}
+
 function formatMoneda(valor) {
   return "$" + Number(valor).toLocaleString("es-CO", { maximumFractionDigits: 0 });
 }
@@ -181,6 +220,7 @@ function setupFormLogin() {
       await loadClientesYPautas();
       await loadSolicitudes();
       await loadDashboard();
+      await loadAlertas();
     } catch (error) {
       showStatus(error.message, true);
     }
@@ -202,6 +242,7 @@ function setupLogout() {
 
 const TAB_TITLES = {
   dashboard: "Dashboard",
+  alertas: "Alertas",
   solicitudes: "Solicitudes",
   clientes: "Clientes",
   contratos: "Contratos activos",
@@ -410,12 +451,9 @@ function aplicarPlanSeleccionado(planId) {
 
   const inicioInput = document.getElementById("pauta-fecha-inicio");
   if (!inicioInput.value) {
-    inicioInput.value = new Date().toISOString().slice(0, 10);
+    inicioInput.value = fechaNegocioISO();
   }
-  const inicio = new Date(inicioInput.value + "T00:00:00");
-  const fin = new Date(inicio);
-  fin.setDate(fin.getDate() + plan.dias);
-  document.getElementById("pauta-fecha-fin").value = fin.toISOString().slice(0, 10);
+  document.getElementById("pauta-fecha-fin").value = sumarDiasFecha(inicioInput.value, plan.dias);
   document.getElementById("pauta-cantidad").value = plan.cantidad;
   document.getElementById("pauta-valor").value = plan.valor;
 }
@@ -768,7 +806,7 @@ function abrirFichaCliente(clientId) {
           (s) => `
         <div class="ficha-list-item">
           <span class="ficha-list-item-main">${truncarTexto(s.texto)}</span>
-          <span class="ficha-list-item-time">${s.fecha_recepcion.slice(0, 16).replace("T", " ")}</span>
+          <span class="ficha-list-item-time">${formatFechaHoraNegocio(s.fecha_recepcion)}</span>
         </div>`
         )
         .join("")
@@ -781,7 +819,7 @@ function abrirFichaCliente(clientId) {
           (s) => `
         <div class="ficha-list-item">
           <span class="ficha-list-item-main">${truncarTexto(s.texto, 40)}</span>
-          <span class="ficha-list-item-time">${s.fecha_recepcion.slice(0, 16).replace("T", " ")}</span>
+          <span class="ficha-list-item-time">${formatFechaHoraNegocio(s.fecha_recepcion)}</span>
         </div>`
         )
         .join("")
@@ -834,7 +872,9 @@ function abrirFichaCliente(clientId) {
   openDrawer("drawer-ficha");
 }
 
-// ---------- Solicitudes: kanban ----------
+// ---------- Solicitudes: Inbox Editorial ----------
+
+let editingSolicitudId = null;
 
 // Explica por qué una solicitud pendiente quedó en esa posición — mismo
 // criterio que ordena la cola en el backend (AnalyticsService.
@@ -850,24 +890,85 @@ function razonOrdenSolicitud(solicitud, pauta) {
   return `Peso comercial: ${formatMoneda(pauta.peso_comercial)} — a mayor peso, más arriba en la cola.`;
 }
 
-// Misma explicación de razonOrdenSolicitud, en una frase corta para
-// mostrar siempre visible en la tarjeta (no solo al pasar el mouse) — el
-// editor necesita ver de un vistazo por qué esa solicitud quedó en esa
-// posición de la cola, sin tener que interpretarlo.
+// Misma explicación de razonOrdenSolicitud, con el prefijo "↑" pedido para
+// que la tarjeta explique su propia posición sin que nadie tenga que
+// interpretarlo (Sprint UX 3.1) — mostrada siempre visible, no solo al
+// pasar el mouse.
 function motivoPrioridadCorto(solicitud, pauta) {
-  if (solicitud.prioridad_manual) return "Prioridad manual";
-  if (!pauta) return "FIFO — sin pauta vinculada";
-  return `Mayor peso comercial (${formatMoneda(pauta.peso_comercial)})`;
+  if (solicitud.prioridad_manual) return "↑ Prioridad manual";
+  if (!pauta) return "↑ Llegó primero — sin pauta vinculada (FIFO)";
+  return `↑ Mayor peso comercial (${formatMoneda(pauta.peso_comercial)})`;
+}
+
+// Score visual (🔥/🟠/🟢) -- una capa de presentación sobre los mismos tres
+// factores que ya deciden el orden real (prioridad manual, peso comercial,
+// tiempo esperando). No es una cuarta regla de negocio: STALE_REQUEST_HOURS
+// (4h) es el mismo umbral ya usado en toda la app para marcar "esperando
+// demasiado"; el doble de ese umbral (8h) es la única cifra nueva, y solo
+// decide qué emoji se pinta, nunca el orden real de la cola.
+function scoreSolicitud(solicitud, pauta, horas) {
+  if (solicitud.prioridad_manual || horas >= STALE_REQUEST_HOURS * 2) {
+    return { emoji: "🔥", label: "Alta prioridad" };
+  }
+  if ((pauta && Number(pauta.peso_comercial) > 0) || horas >= STALE_REQUEST_HOURS) {
+    return { emoji: "🟠", label: "Importante" };
+  }
+  return { emoji: "🟢", label: "Normal" };
+}
+
+// "Cliente Premium" = misma definición que AnalyticsService.clientes_premium
+// (Pauta vigente semestral o anual) -- replicada aquí sobre datos que ya
+// están en memoria (pautasById) en vez de pedirle este dato al backend.
+function esClientePremium(clientId) {
+  for (const pauta of pautasById.values()) {
+    if (
+      pauta.client_id === clientId &&
+      pauta.vigente &&
+      (pauta.tipo === "semestral" || pauta.tipo === "anual")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function renderKanbanCardEditForm(solicitud) {
+  return `
+    <div class="kanban-card is-editing">
+      <div class="kanban-card-header">
+        <span class="kanban-card-cliente">Editando solicitud…</span>
+      </div>
+      <form class="kanban-card-edit-form" data-id="${solicitud.id}">
+        <textarea class="kanban-card-edit-texto" rows="3" required>${solicitud.texto}</textarea>
+        <label class="checkbox">
+          <input type="checkbox" class="kanban-card-edit-prioridad" ${solicitud.prioridad_manual ? "checked" : ""}>
+          Prioridad manual
+        </label>
+        <div class="kanban-card-edit-actions">
+          <button type="submit" class="btn btn-primary">
+            <svg class="icon"><use href="#icon-check"></use></svg>Guardar
+          </button>
+          <button type="button" class="btn btn-secondary btn-cancelar-edicion" data-id="${solicitud.id}">
+            <svg class="icon"><use href="#icon-close"></use></svg>Cancelar
+          </button>
+        </div>
+      </form>
+    </div>`;
 }
 
 function renderKanbanCard(solicitud, esPublicada) {
+  if (!esPublicada && solicitud.id === editingSolicitudId) {
+    return renderKanbanCardEditForm(solicitud);
+  }
+
   const pauta = solicitud.pauta_id ? pautasById.get(solicitud.pauta_id) : null;
   const client = pauta ? clientsById.get(pauta.client_id) : null;
   const nombreCliente = client ? client.nombre : "(sin vincular)";
   const horas = horasEnEspera(solicitud.fecha_recepcion);
   const esperandoMucho = !esPublicada && horas >= STALE_REQUEST_HOURS;
-  const hora = solicitud.fecha_recepcion.slice(0, 16).replace("T", " ");
+  const hora = formatFechaHoraNegocio(solicitud.fecha_recepcion);
   const tituloOrden = esPublicada ? "" : ` title="${razonOrdenSolicitud(solicitud, pauta)}"`;
+  const score = esPublicada ? null : scoreSolicitud(solicitud, pauta, horas);
 
   const tags = [];
   if (!esPublicada) {
@@ -880,6 +981,9 @@ function renderKanbanCard(solicitud, esPublicada) {
     tags.push(
       `<span class="kanban-card-chip kanban-card-chip-restantes">${pauta.publicaciones_restantes}/${pauta.publicaciones_contratadas} restantes</span>`
     );
+    if (esPublicada) {
+      tags.push(`<span class="kanban-card-chip">${formatMoneda(pauta.peso_comercial)}</span>`);
+    }
   }
 
   let accionHtml = "";
@@ -895,6 +999,10 @@ function renderKanbanCard(solicitud, esPublicada) {
          <button type="button" class="btn btn-secondary btn-vincular" data-id="${solicitud.id}">
            <svg class="icon"><use href="#icon-contract"></use></svg>Vincular
          </button>`;
+    accionHtml += `
+         <button type="button" class="btn btn-secondary btn-editar" data-id="${solicitud.id}">
+           <svg class="icon"><use href="#icon-edit"></use></svg>Editar
+         </button>`;
   }
 
   const claseExtra = esPublicada ? "is-publicada" : esperandoMucho ? "is-urgent" : "";
@@ -909,7 +1017,10 @@ function renderKanbanCard(solicitud, esPublicada) {
   return `
     <div class="kanban-card ${claseExtra}"${tituloOrden}>
       <div class="kanban-card-header">
-        <span class="kanban-card-cliente">${nombreCliente}${solicitud.prioridad_manual ? " ⚑" : ""}</span>
+        <span class="kanban-card-header-left">
+          <span class="kanban-card-cliente">${nombreCliente}${solicitud.prioridad_manual ? " ⚑" : ""}</span>
+          ${score ? `<span class="kanban-card-score" title="${score.label}"><span class="kanban-card-score-emoji">${score.emoji}</span>${score.label}</span>` : ""}
+        </span>
         <span class="kanban-card-time">${hora}</span>
       </div>
       ${tags.length ? `<div class="kanban-card-tags">${tags.join("")}</div>` : ""}
@@ -919,26 +1030,165 @@ function renderKanbanCard(solicitud, esPublicada) {
     </div>`;
 }
 
-// Métricas rápidas de la cola -- todo calculado desde las mismas listas ya
-// cargadas, sin round-trips nuevos al backend. No incluye "tiempo promedio
-// de publicación": el dominio solo guarda fecha_recepcion (cuándo llegó la
-// solicitud), no cuándo se publicó realmente -- inventar esa métrica con
-// el dato equivocado sería más engañoso que no mostrarla.
+// Estadísticas accionables de la cola -- las 6 que pide Sprint UX 3.1,
+// todas calculadas desde las mismas listas ya cargadas, sin round-trips
+// nuevos al backend. No incluye "tiempo promedio de publicación": el
+// dominio solo guarda fecha_recepcion (cuándo llegó la solicitud), no
+// cuándo se publicó realmente -- inventar esa métrica con el dato
+// equivocado sería más engañoso que no mostrarla.
 function renderMetricasSolicitudes(pendientes, publicadas) {
-  const hoyStr = new Date().toISOString().slice(0, 10);
+  const hoyStr = fechaNegocioISO();
+  const pautaDe = (s) => (s.pauta_id ? pautasById.get(s.pauta_id) : null);
+
+  const premiumPendientes = pendientes.filter((s) => {
+    const pauta = pautaDe(s);
+    return pauta && esClientePremium(pauta.client_id);
+  }).length;
+
+  const valorPendiente = pendientes.reduce((acc, s) => {
+    const pauta = pautaDe(s);
+    return acc + (pauta ? Number(pauta.peso_comercial) : 0);
+  }, 0);
+
+  const horasPendientes = pendientes.map((s) => horasEnEspera(s.fecha_recepcion));
+  const tiempoPromedio =
+    horasPendientes.length > 0
+      ? horasPendientes.reduce((acc, h) => acc + h, 0) / horasPendientes.length
+      : 0;
+
+  const criticas = pendientes.filter(
+    (s) => scoreSolicitud(s, pautaDe(s), horasEnEspera(s.fecha_recepcion)).emoji === "🔥"
+  ).length;
+
   const datos = {
     pendientes: pendientes.length,
-    prioridad: pendientes.filter((s) => s.prioridad_manual).length,
-    sinPauta: pendientes.filter((s) => !s.pauta_id).length,
-    publicadasHoy: publicadas.filter((s) => s.fecha_recepcion.slice(0, 10) === hoyStr).length,
+    premiumPendientes,
+    publicadasHoy: publicadas.filter((s) => fechaNegocioISO(s.fecha_recepcion) === hoyStr).length,
+    valorPendiente,
+    tiempoPromedio: pendientes.length > 0 ? formatHoras(tiempoPromedio).replace("hace ", "") : "—",
+    criticas,
   };
   const campos = [
     ["pendientes", "Pendientes", "icon-inbox", false],
-    ["prioridad", "Prioridad", "icon-alert", false],
-    ["sinPauta", "Sin pauta", "icon-clock", false],
+    ["premiumPendientes", "Premium pendientes", "icon-target", false],
     ["publicadasHoy", "Publicadas hoy", "icon-check", false],
+    ["valorPendiente", "Valor pendiente por publicar", "icon-money", true],
+    ["tiempoPromedio", "Espera promedio", "icon-clock", false],
+    ["criticas", "Críticas", "icon-alert", false],
   ];
   renderStatRow("solicitudes-metricas", campos, datos);
+}
+
+// ---------- Actividad reciente (panel derecho del Inbox) ----------
+//
+// Mezcla tres fuentes que ya están en memoria -- publicaciones recientes,
+// solicitudes recién recibidas, pautas recién registradas -- en un único
+// timeline ordenado por fecha. Se recalcula en cada refresco (ver
+// setupRefrescoAutomatico), lo que le da sensación de "en vivo" sin
+// necesitar websockets, mismo mecanismo que ya usa el resto de la app.
+const ACTIVIDAD_RECIENTE_LIMITE = 25;
+
+function renderActividadReciente() {
+  const el = document.getElementById("actividad-reciente");
+  if (!el) return;
+
+  const eventos = [];
+  for (const s of solicitudesPublicadasTodas) {
+    const pauta = s.pauta_id ? pautasById.get(s.pauta_id) : null;
+    const cliente = pauta ? clientsById.get(pauta.client_id) : null;
+    eventos.push({
+      fecha: s.fecha_recepcion,
+      texto: `✅ Se publicó ${cliente ? cliente.nombre : "(cliente desconocido)"}`,
+    });
+  }
+  for (const s of solicitudesPendientesTodas) {
+    const pauta = s.pauta_id ? pautasById.get(s.pauta_id) : null;
+    const cliente = pauta ? clientsById.get(pauta.client_id) : null;
+    eventos.push({
+      fecha: s.fecha_recepcion,
+      texto: `➕ Nueva solicitud${cliente ? ` de ${cliente.nombre}` : ""}`,
+    });
+  }
+  for (const pauta of pautasById.values()) {
+    const cliente = clientsById.get(pauta.client_id);
+    eventos.push({
+      fecha: pauta.fecha_registro || pauta.fecha_inicio,
+      texto: `🟠 Pauta registrada${cliente ? ` — ${cliente.nombre}` : ""}`,
+    });
+  }
+
+  eventos.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  const recientes = eventos.slice(0, ACTIVIDAD_RECIENTE_LIMITE);
+
+  el.innerHTML = recientes.length
+    ? recientes
+        .map(
+          (e) => `
+        <div class="timeline-item">
+          <div class="timeline-item-date">${formatHoras(horasEnEspera(e.fecha))}</div>
+          <div class="timeline-item-text">${e.texto}</div>
+        </div>`
+        )
+        .join("")
+    : renderEmptyState("🕐", "Sin actividad todavía.", true);
+}
+
+// Re-renderiza solo la columna de pendientes desde el estado ya cargado en
+// memoria (solicitudesPendientesTodas) -- usado al entrar/salir de modo
+// edición, donde no hace falta pedirle nada nuevo al backend.
+function renderKanbanPendientesColumn() {
+  const pendEl = document.getElementById("kanban-pendientes");
+  pendEl.innerHTML = solicitudesPendientesTodas.length
+    ? solicitudesPendientesTodas.map((s) => renderKanbanCard(s, false)).join("")
+    : renderEmptyState("✅", "No tienes solicitudes pendientes.");
+
+  for (const btn of pendEl.querySelectorAll(".btn-publicar")) {
+    btn.addEventListener("click", () => publicarSolicitud(btn.dataset.id));
+  }
+  for (const btn of pendEl.querySelectorAll(".btn-vincular")) {
+    btn.addEventListener("click", () => {
+      const select = pendEl.querySelector(`.link-pauta-select[data-id="${btn.dataset.id}"]`);
+      vincularPauta(btn.dataset.id, select.value);
+    });
+  }
+  for (const btn of pendEl.querySelectorAll(".btn-editar")) {
+    btn.addEventListener("click", () => {
+      editingSolicitudId = btn.dataset.id;
+      renderKanbanPendientesColumn();
+      pendEl.querySelector(".kanban-card-edit-texto")?.focus();
+    });
+  }
+  for (const btn of pendEl.querySelectorAll(".btn-cancelar-edicion")) {
+    btn.addEventListener("click", () => {
+      editingSolicitudId = null;
+      renderKanbanPendientesColumn();
+    });
+  }
+  for (const form of pendEl.querySelectorAll(".kanban-card-edit-form")) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      guardarEdicionSolicitud(
+        form.dataset.id,
+        form.querySelector(".kanban-card-edit-texto").value,
+        form.querySelector(".kanban-card-edit-prioridad").checked
+      );
+    });
+  }
+}
+
+async function guardarEdicionSolicitud(id, texto, prioridadManual) {
+  try {
+    await apiFetch(`/publication-requests/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texto, prioridad_manual: prioridadManual }),
+    });
+    showStatus("Solicitud actualizada.", false);
+    editingSolicitudId = null;
+    await loadSolicitudes();
+  } catch (error) {
+    showStatus(error.message, true);
+  }
 }
 
 async function loadSolicitudes() {
@@ -960,32 +1210,21 @@ async function loadSolicitudes() {
   document.getElementById("kanban-count-pendientes").textContent = pendientes.length;
   document.getElementById("kanban-count-publicadas").textContent = publicadas.length;
 
-  const pendEl = document.getElementById("kanban-pendientes");
-  pendEl.innerHTML = pendientes.length
-    ? pendientes.map((s) => renderKanbanCard(s, false)).join("")
-    : renderEmptyState("✅", "No tienes solicitudes pendientes.");
+  renderKanbanPendientesColumn();
 
   const pubEl = document.getElementById("kanban-publicadas");
   pubEl.innerHTML = publicadasRecientes.length
     ? publicadasRecientes.map((s) => renderKanbanCard(s, true)).join("")
     : renderEmptyState("📭", "Todavía no hay publicaciones.");
 
-  for (const btn of pendEl.querySelectorAll(".btn-publicar")) {
-    btn.addEventListener("click", () => publicarSolicitud(btn.dataset.id));
-  }
-  for (const btn of pendEl.querySelectorAll(".btn-vincular")) {
-    btn.addEventListener("click", () => {
-      const select = pendEl.querySelector(`.link-pauta-select[data-id="${btn.dataset.id}"]`);
-      vincularPauta(btn.dataset.id, select.value);
-    });
-  }
+  renderActividadReciente();
 }
 
 async function publicarSolicitud(id) {
   try {
     await apiFetch(`/publication-requests/${id}/publish`, { method: "POST" });
     showStatus("Solicitud publicada.", false);
-    await Promise.all([loadSolicitudes(), loadClientesYPautas(), loadDashboard()]);
+    await Promise.all([loadSolicitudes(), loadClientesYPautas(), loadDashboard(), loadAlertas()]);
   } catch (error) {
     showStatus(error.message, true);
   }
@@ -1077,107 +1316,7 @@ function renderMetricasPrincipales(resumen) {
   renderStatRow("dashboard-metricas-principales", DASHBOARD_METRICAS_PRINCIPALES, datos);
 }
 
-// ---------- Acciones para hoy ----------
-//
-// Traduce las mismas listas de /dashboard/alertas (ya calculadas por
-// AnalyticsService) a frases concretas — no agrega ninguna regla de
-// negocio nueva, solo prioriza y redacta lo que ya existe para que el
-// editor no tenga que interpretar tablas.
-
-const SEVERIDAD_ORDEN = { danger: 0, warning: 1, success: 2 };
-const SEVERIDAD_EMOJI = { danger: "🔴", warning: "🟠", success: "🟢" };
-
-function computarAccionesHoy(resumen, alertas) {
-  const acciones = [];
-  const idsCupoAgotado = new Set(alertas.clientes_cupo_agotado.map((c) => c.id));
-
-  for (const cliente of alertas.clientes_por_vencer) {
-    const item = rankingByClientId.get(cliente.id);
-    if (!item || !item.vigente) continue;
-    const dias = diasHasta(item.fecha_vencimiento);
-    if (dias <= 0) {
-      acciones.push({ severidad: "danger", texto: `Hoy vence ${cliente.nombre}`, clienteId: cliente.id, renovar: true });
-    } else if (dias <= 3) {
-      acciones.push({
-        severidad: "warning",
-        texto: `${cliente.nombre} vence en ${dias} día${dias === 1 ? "" : "s"}`,
-        clienteId: cliente.id,
-        renovar: true,
-      });
-    }
-  }
-
-  for (const cliente of alertas.clientes_cupo_agotado) {
-    acciones.push({
-      severidad: "danger",
-      texto: `${cliente.nombre}: cupo agotado, necesita renovación`,
-      clienteId: cliente.id,
-      renovar: true,
-    });
-  }
-
-  for (const cliente of alertas.clientes_menos_de_3_restantes) {
-    if (idsCupoAgotado.has(cliente.id)) continue;
-    const item = rankingByClientId.get(cliente.id);
-    const restantes = item ? item.publicaciones_restantes : "pocas";
-    acciones.push({
-      severidad: "warning",
-      texto: `${cliente.nombre} tiene solo ${restantes} publicaciones disponibles`,
-      clienteId: cliente.id,
-    });
-  }
-
-  if (alertas.solicitudes_antiguas.length > 0) {
-    const n = alertas.solicitudes_antiguas.length;
-    acciones.push({
-      severidad: "danger",
-      texto: `${n} solicitud${n === 1 ? "" : "es"} lleva${n === 1 ? "" : "n"} más de 4h esperando respuesta`,
-      tab: "solicitudes",
-    });
-  }
-
-  if (resumen.solicitudes_pendientes > 0) {
-    const n = resumen.solicitudes_pendientes;
-    acciones.push({
-      severidad: "warning",
-      texto: `Hay ${n} solicitud${n === 1 ? "" : "es"} pendiente${n === 1 ? "" : "s"}`,
-      tab: "solicitudes",
-    });
-  }
-
-  acciones.sort((a, b) => SEVERIDAD_ORDEN[a.severidad] - SEVERIDAD_ORDEN[b.severidad]);
-  return acciones;
-}
-
-function renderAccionesHoy(resumen, alertas) {
-  const acciones = computarAccionesHoy(resumen, alertas);
-  const el = document.getElementById("dashboard-acciones");
-  if (acciones.length === 0) {
-    el.innerHTML = renderEmptyState("✅", "Sin pendientes urgentes — todo al día.");
-    return;
-  }
-  el.innerHTML = acciones
-    .map((accion) => {
-      let botones = "";
-      if (accion.clienteId) {
-        botones += `<button type="button" class="btn btn-secondary" data-ficha-cliente="${accion.clienteId}"><svg class="icon"><use href="#icon-detail"></use></svg>Ver cliente</button>`;
-        if (accion.renovar) {
-          botones += `<button type="button" class="btn btn-primary" data-open-drawer="drawer-pauta" data-preselect-client="${accion.clienteId}"><svg class="icon"><use href="#icon-refresh"></use></svg>Renovar</button>`;
-        }
-      } else if (accion.tab) {
-        botones += `<button type="button" class="btn btn-secondary" data-go-tab="${accion.tab}"><svg class="icon"><use href="#icon-detail"></use></svg>Ver</button>`;
-      }
-      return `
-        <div class="action-item" data-severity="${accion.severidad}">
-          <span class="action-item-emoji">${SEVERIDAD_EMOJI[accion.severidad]}</span>
-          <span class="action-item-text">${accion.texto}</span>
-          <span class="action-item-actions">${botones}</span>
-        </div>`;
-    })
-    .join("");
-}
-
-// ---------- Próximas renovaciones ----------
+// ---------- Radar de Renovaciones (pestaña Alertas) ----------
 //
 // Solo clientes activos (vigente=true) con un paquete de tiempo (no
 // Individual — un cliente Individual no "renueva", ver
@@ -1185,10 +1324,20 @@ function renderAccionesHoy(resumen, alertas) {
 // tan cerca está su vencimiento. Nunca muestra vencidos.
 
 const RENEWAL_BUCKETS = [
-  { limite: 7, titulo: "Vence en 7 días" },
-  { limite: 15, titulo: "Vence en 15 días" },
-  { limite: 30, titulo: "Vence en 30 días" },
+  { limite: 7, titulo: "Vence en 7 días", emoji: "🔴" },
+  { limite: 15, titulo: "Vence en 15 días", emoji: "🟠" },
+  { limite: 30, titulo: "Vence en 30 días", emoji: "🟢" },
 ];
+
+// wa.me no acepta espacios/guiones/paréntesis en el teléfono -- se limpia
+// aquí en vez de pedirle al operador que lo capture ya limpio.
+function renderContactarBoton(cliente) {
+  const telefono = (cliente.telefono || "").replace(/[^\d]/g, "");
+  if (!telefono) return "";
+  return `<a class="btn btn-primary" href="https://wa.me/${telefono}" target="_blank" rel="noopener">
+    <svg class="icon"><use href="#icon-phone"></use></svg>Contactar
+  </a>`;
+}
 
 function renderRenewalCard(item, dias) {
   return `
@@ -1204,66 +1353,55 @@ function renderRenewalCard(item, dias) {
         <button type="button" class="btn btn-primary" data-open-drawer="drawer-pauta" data-preselect-client="${item.cliente.id}">
           <svg class="icon"><use href="#icon-refresh"></use></svg>Renovar
         </button>
+        ${renderContactarBoton(item.cliente)}
       </div>
     </div>`;
 }
 
-function renderProximasRenovaciones(ranking) {
+// Agrupa en los mismos 3 buckets tanto el resumen de conteos (arriba) como
+// las tarjetas detalladas (abajo) -- una sola partición, nunca dos cálculos
+// que puedan desincronizarse entre el número grande y las tarjetas.
+function computarRadarBuckets(ranking) {
   const candidatos = ranking
     .filter((item) => item.vigente && item.tipo !== "individual")
     .map((item) => ({ item, dias: diasHasta(item.fecha_vencimiento) }))
     .filter(({ dias }) => dias >= 0 && dias <= 30)
     .sort((a, b) => a.dias - b.dias);
 
-  const el = document.getElementById("dashboard-renovaciones");
-  if (candidatos.length === 0) {
+  let restantes = candidatos;
+  return RENEWAL_BUCKETS.map(({ limite, titulo, emoji }) => {
+    const items = restantes.filter(({ dias }) => dias <= limite);
+    restantes = restantes.filter(({ dias }) => dias > limite);
+    return { titulo, emoji, items };
+  });
+}
+
+function renderRadarResumen(buckets) {
+  document.getElementById("radar-resumen").innerHTML = buckets
+    .map(({ emoji, items, titulo }) => renderStatCard(null, items.length, titulo, emoji))
+    .join("");
+}
+
+function renderRadarRenovaciones(buckets) {
+  const el = document.getElementById("radar-renovaciones");
+  const total = buckets.reduce((acc, b) => acc + b.items.length, 0);
+  if (total === 0) {
     el.innerHTML = renderEmptyState("📅", "No hay renovaciones programadas por ahora.");
     return;
   }
-
-  let restantes = candidatos;
-  el.innerHTML = RENEWAL_BUCKETS.map(({ limite, titulo }) => {
-    const enEsteBucket = restantes.filter(({ dias }) => dias <= limite);
-    restantes = restantes.filter(({ dias }) => dias > limite);
-    const cuerpo = enEsteBucket.length
-      ? enEsteBucket.map(({ item, dias }) => renderRenewalCard(item, dias)).join("")
-      : '<p class="renewal-empty">Sin renovaciones en este rango.</p>';
-    return `
+  el.innerHTML = buckets
+    .map(({ titulo, items }) => {
+      const cuerpo = items.length
+        ? items.map(({ item, dias }) => renderRenewalCard(item, dias)).join("")
+        : '<p class="renewal-empty">Sin renovaciones en este rango.</p>';
+      return `
       <div>
         <h3 class="renewal-group-title">${titulo}</h3>
         <div class="renewal-cards">${cuerpo}</div>
       </div>`;
-  }).join("");
+    })
+    .join("");
 }
-
-// "Clientes críticos" -- quiénes necesitan seguimiento comercial ya
-// mismo. Las solicitudes atrasadas viven en su propia sección
-// ("Solicitudes pendientes", ver renderDashboardSolicitudes) — no son un
-// cliente, son un problema de cola editorial, así que salieron de esta
-// lista para no mezclar dos preguntas distintas.
-const ALERTAS_ATENCION = [
-  {
-    id: "cupo-agotado",
-    campo: "clientes_cupo_agotado",
-    icon: "icon-alert",
-    severity: "danger",
-    label: "clientes con cupo agotado",
-  },
-  {
-    id: "menos-3",
-    campo: "clientes_menos_de_3_restantes",
-    icon: "icon-clock",
-    severity: "warning",
-    label: "clientes por agotar publicaciones",
-  },
-  {
-    id: "por-vencer",
-    campo: "clientes_por_vencer",
-    icon: "icon-clock",
-    severity: "warning",
-    label: "clientes por vencer (≤7 días)",
-  },
-];
 
 // Categorías comerciales — oportunidades de venta/renovación, no urgencias.
 const ALERTAS_OPORTUNIDAD = [
@@ -1297,10 +1435,16 @@ const ALERTAS_OPORTUNIDAD = [
   },
 ];
 
-function renderStatCard(icon, valor, label) {
+// `emoji` reemplaza el ícono SVG por un emoji de severidad (🔴/🟠/🟢) --
+// usado por el resumen del Radar de Renovaciones, donde el color importa
+// más que el ícono.
+function renderStatCard(icon, valor, label, emoji) {
+  const iconoHtml = emoji
+    ? `<span class="stat-card-icon stat-card-icon-emoji">${emoji}</span>`
+    : `<span class="stat-card-icon"><svg class="icon"><use href="#${icon}"></use></svg></span>`;
   return `
     <div class="stat-card">
-      <span class="stat-card-icon"><svg class="icon"><use href="#${icon}"></use></svg></span>
+      ${iconoHtml}
       <span class="stat-card-value">${valor}</span>
       <span class="stat-card-label">${label}</span>
     </div>`;
@@ -1346,10 +1490,12 @@ function renderAlertGrid(elementId, categorias, alertas, mensajeVacio) {
       : categorias.map((cfg) => renderAlertCard(cfg, alertas[cfg.campo])).join("");
 }
 
-function renderDashboardAlertas(alertas) {
-  renderAlertGrid("dashboard-alertas", ALERTAS_ATENCION, alertas, "Ningún cliente requiere atención ahora mismo.");
+// Las 4 categorías "generales" que ya existían (Sprint 4B) -- las 5
+// finas basadas en patrones de compra (racha, tipo habitual, etc.) viven
+// en renderOportunidadesPatrones, con datos de /insights/oportunidades.
+function renderOportunidadesGenerales(alertas) {
   renderAlertGrid(
-    "dashboard-oportunidades",
+    "alertas-oportunidades-generales",
     ALERTAS_OPORTUNIDAD,
     alertas,
     "No hay oportunidades comerciales identificadas por ahora."
@@ -1421,10 +1567,7 @@ async function loadDashboard() {
     apiFetch("/dashboard/alertas"),
     apiFetch("/dashboard/ranking"),
   ]);
-  renderAccionesHoy(resumen, alertas);
-  renderProximasRenovaciones(ranking);
   renderDashboardSolicitudes(resumen, alertas);
-  renderDashboardAlertas(alertas);
   renderMetricasPrincipales(resumen);
   renderStatRow("dashboard-actividad", DASHBOARD_ACTIVIDAD, resumen);
   renderRankingComercial(ranking);
@@ -1436,6 +1579,182 @@ async function loadDashboard() {
     "ranking-comercial-activos",
     "Ningún cliente tiene un contrato vigente en este momento."
   );
+}
+
+// ---------- Centro de Decisión (pestaña Alertas, Sprint 5A) ----------
+//
+// A diferencia del Dashboard, estas listas SÍ vienen ya priorizadas y
+// redactadas por el backend (core.analytics.DecisionEngineService) --
+// severidad, mensaje y acción sugerida son decisiones de negocio del
+// motor, no de esta pantalla. Lo único que se calcula aquí es el Radar de
+// Renovaciones (ver arriba), que sigue reutilizando /dashboard/ranking.
+
+const ALERTA_SEVERIDAD_CSS = { critica: "danger", atencion: "warning", informativa: "success" };
+const ALERTA_SEVERIDAD_EMOJI = { critica: "🔴", atencion: "🟠", informativa: "🟢" };
+
+function renderAlertaInteligenteBotones(item) {
+  let botones = "";
+  if (item.cliente) {
+    botones += `<button type="button" class="btn btn-secondary" data-ficha-cliente="${item.cliente.id}"><svg class="icon"><use href="#icon-detail"></use></svg>Ver cliente</button>`;
+  }
+  if (item.accion === "renovar" && item.cliente) {
+    botones += `<button type="button" class="btn btn-primary" data-open-drawer="drawer-pauta" data-preselect-client="${item.cliente.id}"><svg class="icon"><use href="#icon-refresh"></use></svg>Renovar</button>`;
+  } else if (item.accion === "reactivar" && item.cliente) {
+    botones += `<button type="button" class="btn btn-primary" data-open-drawer="drawer-pauta" data-preselect-client="${item.cliente.id}"><svg class="icon"><use href="#icon-plus"></use></svg>Reactivar</button>`;
+  } else if (item.accion === "contactar" && item.cliente) {
+    botones += renderContactarBoton(item.cliente);
+  } else if (item.accion === "ver_solicitudes") {
+    botones += `<button type="button" class="btn btn-secondary" data-go-tab="solicitudes"><svg class="icon"><use href="#icon-detail"></use></svg>Ver</button>`;
+  }
+  return botones;
+}
+
+function renderCentroAlertas(alertas) {
+  const el = document.getElementById("alertas-centro");
+  if (alertas.length === 0) {
+    el.innerHTML = renderEmptyState("✅", "Sin pendientes urgentes — todo al día.");
+    return;
+  }
+  el.innerHTML = alertas
+    .map(
+      (item) => `
+        <div class="action-item" data-severity="${ALERTA_SEVERIDAD_CSS[item.severidad] ?? "warning"}">
+          <span class="action-item-emoji">${ALERTA_SEVERIDAD_EMOJI[item.severidad] ?? "⚪"}</span>
+          <span class="action-item-text">${item.mensaje}</span>
+          <span class="action-item-actions">${renderAlertaInteligenteBotones(item)}</span>
+        </div>`
+    )
+    .join("");
+}
+
+function renderRiesgoAbandono(items) {
+  const el = document.getElementById("alertas-riesgo-abandono");
+  if (items.length === 0) {
+    el.innerHTML = renderEmptyState("✅", "Ningún cliente vigente lleva demasiado tiempo en silencio.");
+    return;
+  }
+  el.innerHTML = items
+    .map(
+      (item) => `
+        <div class="action-item" data-severity="danger">
+          <span class="action-item-emoji">⚠️</span>
+          <span class="action-item-text">
+            ${item.cliente.nombre}: hace ${item.dias_sin_actividad} días no envía material.
+            Tiene ${item.publicaciones_restantes} publicaciones disponibles.
+          </span>
+          <span class="action-item-actions">
+            <button type="button" class="btn btn-secondary" data-ficha-cliente="${item.cliente.id}"><svg class="icon"><use href="#icon-detail"></use></svg>Ver cliente</button>
+            ${renderContactarBoton(item.cliente)}
+          </span>
+        </div>`
+    )
+    .join("");
+}
+
+function renderDormidos(items) {
+  const el = document.getElementById("alertas-dormidos");
+  if (items.length === 0) {
+    el.innerHTML = renderEmptyState("✅", "No hay clientes dormidos por ahora.");
+    return;
+  }
+  el.innerHTML = items
+    .map(
+      (item) => `
+        <div class="action-item" data-severity="warning">
+          <span class="action-item-emoji">💤</span>
+          <span class="action-item-text">
+            ${item.cliente.nombre}: hace ${item.dias_sin_actividad} días sin actividad.
+            Último contrato ${PAUTA_TIPO_LABELS[item.ultimo_contrato_tipo] ?? item.ultimo_contrato_tipo},
+            venció ${formatFecha(item.ultimo_contrato_fecha_fin)}.
+          </span>
+          <span class="action-item-actions">
+            <button type="button" class="btn btn-secondary" data-ficha-cliente="${item.cliente.id}"><svg class="icon"><use href="#icon-detail"></use></svg>Ver cliente</button>
+            <button type="button" class="btn btn-primary" data-open-drawer="drawer-pauta" data-preselect-client="${item.cliente.id}"><svg class="icon"><use href="#icon-plus"></use></svg>Reactivar</button>
+          </span>
+        </div>`
+    )
+    .join("");
+}
+
+// Cortes de estrellas/nivel definidos por DecisionEngineService.score_salud_cliente
+// -- este mapa solo traduce el nivel (enum) a una frase para pantalla, la
+// misma convención que ESTADO_COMERCIAL_LABELS/PAUTA_TIPO_LABELS.
+const NIVEL_SALUD_LABELS = {
+  excelente: "Cliente saludable",
+  bueno: "Sin riesgo inminente",
+  regular: "Atención recomendada",
+  riesgo: "Riesgo de perder renovación",
+  critico: "Riesgo alto — contactar ya",
+};
+
+function renderEstrellas(n) {
+  return "★".repeat(n) + "☆".repeat(5 - n);
+}
+
+function renderSaludClientes(items) {
+  const el = document.getElementById("alertas-salud");
+  if (items.length === 0) {
+    el.innerHTML = renderEmptyState("✅", "Ningún cliente con pautas todavía.");
+    return;
+  }
+  el.innerHTML = items
+    .map(
+      (item) => `
+        <div class="health-card" data-ficha-cliente="${item.cliente.id}">
+          <div class="health-card-header">
+            <h3>${item.cliente.nombre}</h3>
+            <span class="badge badge-${item.nivel}">${NIVEL_SALUD_LABELS[item.nivel] ?? item.nivel}</span>
+          </div>
+          <div class="health-card-stars">${renderEstrellas(item.estrellas)}</div>
+          <div class="health-card-score">${item.score}%</div>
+        </div>`
+    )
+    .join("");
+}
+
+// Los patrones fine-grained ya vienen con `mensaje` redactado por el
+// backend (core.analytics.DecisionEngineService.oportunidades_comerciales)
+// -- esta pantalla no arma texto, solo lo muestra con acción "Ver cliente".
+function renderOportunidadesPatrones(items) {
+  const el = document.getElementById("alertas-oportunidades-patrones");
+  if (items.length === 0) {
+    el.innerHTML = renderEmptyState("✅", "No se detectaron patrones de compra por ahora.");
+    return;
+  }
+  el.innerHTML = items
+    .map(
+      (item) => `
+        <div class="action-item" data-severity="success">
+          <span class="action-item-emoji">💡</span>
+          <span class="action-item-text">${item.mensaje}</span>
+          <span class="action-item-actions">
+            <button type="button" class="btn btn-secondary" data-ficha-cliente="${item.cliente.id}"><svg class="icon"><use href="#icon-detail"></use></svg>Ver cliente</button>
+          </span>
+        </div>`
+    )
+    .join("");
+}
+
+async function loadAlertas() {
+  const [centroAlertas, riesgoAbandono, dormidos, saludClientes, oportunidades, alertas, ranking] =
+    await Promise.all([
+      apiFetch("/insights/centro-alertas"),
+      apiFetch("/insights/riesgo-abandono"),
+      apiFetch("/insights/dormidos"),
+      apiFetch("/insights/salud-clientes"),
+      apiFetch("/insights/oportunidades"),
+      apiFetch("/dashboard/alertas"),
+      apiFetch("/dashboard/ranking"),
+    ]);
+  renderCentroAlertas(centroAlertas);
+  const buckets = computarRadarBuckets(ranking);
+  renderRadarResumen(buckets);
+  renderRadarRenovaciones(buckets);
+  renderRiesgoAbandono(riesgoAbandono);
+  renderDormidos(dormidos);
+  renderSaludClientes(saludClientes);
+  renderOportunidadesGenerales(alertas);
+  renderOportunidadesPatrones(oportunidades);
 }
 
 // ---------- buscador global ----------
@@ -1547,7 +1866,68 @@ function setupBuscadorGlobal() {
 
 // ---------- formularios ----------
 
+// Tarjeta lateral con el estado del contrato apenas se elige una pauta —
+// "¿debo publicar o hablar de renovación?" sin abrir nada más (Sprint UX
+// 3.1). Todo desde datos ya cargados (pautasById, solicitudesPublicadasTodas).
+function renderContratoPreview(pautaId) {
+  const el = document.getElementById("solicitud-contrato-preview");
+  const pauta = pautaId ? pautasById.get(pautaId) : null;
+  if (!pauta) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  const cliente = clientsById.get(pauta.client_id);
+  const ultimaPublicacion = solicitudesPublicadasTodas
+    .filter((s) => s.pauta_id && pautasById.get(s.pauta_id)?.client_id === pauta.client_id)
+    .sort((a, b) => b.fecha_recepcion.localeCompare(a.fecha_recepcion))[0];
+
+  el.innerHTML = `
+    <span class="contract-preview-name">${cliente ? cliente.nombre : "(cliente desconocido)"}</span>
+    <div class="contract-preview-stats">
+      <div class="contract-preview-stat">
+        <span class="contract-preview-stat-label">Plan</span>
+        <span class="contract-preview-stat-value">${PAUTA_TIPO_LABELS[pauta.tipo] ?? pauta.tipo}</span>
+      </div>
+      <div class="contract-preview-stat">
+        <span class="contract-preview-stat-label">Restantes</span>
+        <span class="contract-preview-stat-value">${pauta.publicaciones_restantes} de ${pauta.publicaciones_contratadas}</span>
+      </div>
+      <div class="contract-preview-stat">
+        <span class="contract-preview-stat-label">Vence</span>
+        <span class="contract-preview-stat-value">${formatFecha(pauta.fecha_fin)}</span>
+      </div>
+      <div class="contract-preview-stat">
+        <span class="contract-preview-stat-label">Valor contratado</span>
+        <span class="contract-preview-stat-value">${formatMoneda(pauta.valor_pagado)}</span>
+      </div>
+      <div class="contract-preview-stat">
+        <span class="contract-preview-stat-label">Peso comercial</span>
+        <span class="contract-preview-stat-value">${formatMoneda(pauta.peso_comercial)}</span>
+      </div>
+      <div class="contract-preview-stat">
+        <span class="contract-preview-stat-label">Última publicación</span>
+        <span class="contract-preview-stat-value">${ultimaPublicacion ? formatHoras(horasEnEspera(ultimaPublicacion.fecha_recepcion)) : "Sin publicaciones todavía"}</span>
+      </div>
+    </div>`;
+  el.hidden = false;
+}
+
 function setupFormSolicitud() {
+  document.getElementById("solicitud-pauta").addEventListener("change", (event) => {
+    renderContratoPreview(event.target.value);
+  });
+
+  // Ctrl/Cmd+Enter envía -- Enter solo hace salto de línea, para no
+  // publicar una solicitud a medio escribir por accidente (confirmado con
+  // el negocio, Sprint UX 3.1).
+  document.getElementById("solicitud-texto").addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      document.getElementById("form-solicitud").requestSubmit();
+    }
+  });
+
   document.getElementById("form-solicitud").addEventListener("submit", async (event) => {
     event.preventDefault();
     const pautaId = document.getElementById("solicitud-pauta").value;
@@ -1567,6 +1947,7 @@ function setupFormSolicitud() {
       document.getElementById("solicitud-pauta-buscar").value = "";
       solicitudPautaFiltro = "";
       renderSelectPautas();
+      renderContratoPreview(null);
       await loadSolicitudes();
     } catch (error) {
       showStatus(error.message, true);
@@ -1664,6 +2045,7 @@ function setupFormPauta() {
       closeDrawer(document.getElementById("drawer-pauta"));
       await loadClientesYPautas();
       await loadDashboard();
+      await loadAlertas();
     } catch (error) {
       showStatus(error.message, true);
     }
@@ -1679,7 +2061,7 @@ function appEstaVisible() {
 }
 
 function refrescarTodo() {
-  return Promise.all([loadClientesYPautas(), loadSolicitudes(), loadDashboard()]);
+  return Promise.all([loadClientesYPautas(), loadSolicitudes(), loadDashboard(), loadAlertas()]);
 }
 
 // Sin sincronización en tiempo real entre pestañas/dispositivos — sin esto,
@@ -1706,6 +2088,40 @@ function setupRefrescoAutomatico() {
   }, AUTO_REFRESH_INTERVAL_MS);
 }
 
+// Atajos de teclado del Inbox Editorial (Sprint UX 3.1). Se ignoran
+// mientras se escribe en un campo -- salvo Ctrl/Cmd+Enter, que ya tiene su
+// propio listener en el textarea -- para no interceptar teclas normales
+// mientras alguien redacta el texto de una publicación.
+function setupAtajosTeclado() {
+  document.addEventListener("keydown", (event) => {
+    const enCampoDeTexto = ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName);
+
+    if (event.key === "/" && !enCampoDeTexto) {
+      event.preventDefault();
+      document.getElementById("buscador-global").focus();
+      return;
+    }
+
+    if (enCampoDeTexto) return;
+    const enSolicitudes = document.getElementById("tab-solicitudes").classList.contains("active");
+    if (!enSolicitudes) return;
+
+    if (event.key === "n" || event.key === "N") {
+      event.preventDefault();
+      document.getElementById("solicitud-texto").focus();
+    } else if (event.key === "p" || event.key === "P") {
+      event.preventDefault();
+      const primera = solicitudesPendientesTodas[0];
+      if (!primera) return;
+      if (primera.pauta_id) {
+        publicarSolicitud(primera.id);
+      } else {
+        showStatus("La primera solicitud de la cola todavía no tiene pauta vinculada.", true);
+      }
+    }
+  });
+}
+
 async function init() {
   setupTabs();
   setupMobileNav();
@@ -1717,10 +2133,12 @@ async function init() {
   setupLogout();
   setupRefrescoAutomatico();
   setupBuscadorGlobal();
+  setupAtajosTeclado();
   renderSelectPlanes();
   document.getElementById("refrescar-solicitudes").addEventListener("click", loadSolicitudes);
   document.getElementById("refrescar-clientes").addEventListener("click", loadClientesYPautas);
   document.getElementById("refrescar-dashboard").addEventListener("click", loadDashboard);
+  document.getElementById("refrescar-alertas").addEventListener("click", loadAlertas);
   document.getElementById("refrescar-contratos").addEventListener("click", loadClientesYPautas);
   document.getElementById("solicitud-pauta-buscar").addEventListener("input", (event) => {
     solicitudPautaFiltro = event.target.value;
@@ -1747,6 +2165,7 @@ async function init() {
     await loadClientesYPautas();
     await loadSolicitudes();
     await loadDashboard();
+    await loadAlertas();
   } catch (error) {
     showStatus(error.message, true);
   }

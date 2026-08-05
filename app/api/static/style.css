@@ -624,6 +624,11 @@ button[type="submit"]:hover {
   height: 16px;
 }
 
+.stat-card-icon-emoji {
+  font-size: 1rem;
+  background: none;
+}
+
 .stat-card-value {
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -909,6 +914,54 @@ button[type="submit"]:hover {
   background: var(--color-bg);
 }
 
+/* ---------- Score de Salud del Cliente (Sprint 5A) ---------- */
+
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.health-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  cursor: pointer;
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+}
+
+.health-card:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.health-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.health-card-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.health-card-stars {
+  color: #d97706;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+}
+
+.health-card-score {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
 /* ---------- ranking comercial ---------- */
 
 .ranking-grid {
@@ -1033,6 +1086,30 @@ button[type="submit"]:hover {
   color: var(--color-neutral);
 }
 
+/* Sprint 5A — Score de Salud del Cliente (NivelSalud, distinto de
+   EstadoComercial arriba: cortes de un puntaje 0-100, no un estado
+   derivado del contrato de referencia). */
+.badge-excelente,
+.badge-bueno {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge-regular {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.badge-riesgo {
+  background: var(--color-orange-bg);
+  color: var(--color-orange);
+}
+
+.badge-critico {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
 /* ---------- kanban de solicitudes ---------- */
 
 .quick-form {
@@ -1133,12 +1210,24 @@ button[type="submit"]:hover {
   border-left-color: var(--color-success);
 }
 
+.kanban-card.is-editing {
+  border-left-color: var(--color-accent);
+}
+
 .kanban-card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: var(--space-2);
   margin-bottom: 4px;
+}
+
+.kanban-card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .kanban-card-cliente {
@@ -1232,6 +1321,179 @@ button[type="submit"]:hover {
   padding: 5px 10px;
   min-height: auto;
   font-size: 0.78rem;
+}
+
+/* ---------- Inbox Editorial (Sprint UX 3.1) ---------- */
+
+/* Panel izquierdo (cola de trabajo, 60%) + panel derecho (actividad
+   reciente, 40%). En pantallas angostas se apilan -- ver @media más
+   abajo. */
+.inbox-layout {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.inbox-main {
+  min-width: 0;
+}
+
+.inbox-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 var(--space-3);
+}
+
+.inbox-section-header:not(:first-child) {
+  margin-top: var(--space-6);
+}
+
+.inbox-activity {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  position: sticky;
+  top: var(--space-4);
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+}
+
+.inbox-activity-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 var(--space-4);
+}
+
+.inbox-activity-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-success);
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Reutiliza .timeline/.timeline-item (ver ficha del cliente) para que la
+   actividad reciente se vea igual en toda la app. */
+.inbox-activity .timeline {
+  gap: 0;
+}
+
+/* ---------- score visual de prioridad ---------- */
+
+.kanban-card-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.kanban-card-score-emoji {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+/* ---------- formulario compacto + preview de contrato ---------- */
+
+.quick-form-flow {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.contract-preview {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+}
+
+.contract-preview-name {
+  font-weight: 700;
+  font-size: var(--text-info);
+  color: var(--color-text);
+}
+
+.contract-preview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.contract-preview-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.contract-preview-stat-label {
+  font-size: var(--text-metadata);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.contract-preview-stat-value {
+  font-size: var(--text-info);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* ---------- edición inline de una tarjeta pendiente ---------- */
+
+.kanban-card-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.kanban-card-edit-form textarea {
+  font-size: 0.85rem;
+}
+
+.kanban-card-edit-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+@media (max-width: 1100px) {
+  .inbox-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .inbox-activity {
+    position: static;
+    max-height: none;
+  }
 }
 
 /* ---------- fichas de cliente (CRM) ---------- */
