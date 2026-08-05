@@ -20,7 +20,7 @@ reaches out to any repository itself.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from core.analytics.view_models import (
@@ -29,6 +29,7 @@ from core.analytics.view_models import (
     EstadoComercial,
     RankingComercialItem,
 )
+from core.clock import now_local
 from core.entities.client import Client
 from core.entities.pauta import Pauta, PautaTipo
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
@@ -50,7 +51,7 @@ class AnalyticsService:
         clients: Sequence[Client],
         pautas: Sequence[Pauta],
         solicitudes: Sequence[PublicationRequest],
-        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        clock: Callable[[], datetime] = lambda: now_local(),
     ) -> None:
         """`clock` is injectable so tests can control what "now" means.
 

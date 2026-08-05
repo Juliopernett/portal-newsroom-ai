@@ -11,8 +11,9 @@ actually happened.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 
+from core.clock import now_local
 from core.entities.pauta import Pauta
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 
@@ -20,7 +21,7 @@ from core.entities.publication_request import PublicationRequest, PublicationReq
 class PautaService:
     """Computes quota and validity for a `Pauta` from source data."""
 
-    def __init__(self, clock: Callable[[], date] = lambda: datetime.now(UTC).date()) -> None:
+    def __init__(self, clock: Callable[[], date] = lambda: now_local().date()) -> None:
         """`clock` is injectable so tests can control what "today" means."""
         self._clock = clock
 
