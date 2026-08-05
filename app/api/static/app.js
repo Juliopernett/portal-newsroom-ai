@@ -124,6 +124,17 @@ function truncarTexto(texto, maxLen = 60) {
   return texto.length > maxLen ? texto.slice(0, maxLen).trimEnd() + "…" : texto;
 }
 
+// Estado vacío amigable, reutilizado en toda la app en vez de listas o
+// tablas en blanco (Sprint UX 4) -- `inline` es la variante chica para
+// usarse dentro de una tarjeta/drawer en vez de ocupar toda la sección.
+function renderEmptyState(emoji, mensaje, inline = false) {
+  return `
+    <div class="empty-state${inline ? " empty-state-inline" : ""}">
+      <span class="empty-state-emoji">${emoji}</span>
+      <p class="empty-state-text">${mensaje}</p>
+    </div>`;
+}
+
 // Color puramente visual sobre publicaciones_restantes/contratadas -- no
 // reemplaza estado_comercial (ese lo calcula AnalyticsService y ya tiene su
 // propio significado de negocio), solo colorea barras y bordes según qué
@@ -480,13 +491,15 @@ function renderClientCard(cliente) {
           </p>
         </div>
         <div class="client-card-footer">
-          <button type="button" class="btn-link" data-ficha-cliente="${cliente.id}">
-            <svg class="icon"><use href="#icon-users"></use></svg>Ver detalle
-          </button>
-          <button type="button" class="btn-link" data-open-drawer="drawer-pauta" data-preselect-client="${cliente.id}">
+          <button type="button" class="btn btn-secondary" data-open-drawer="drawer-pauta" data-preselect-client="${cliente.id}">
             <svg class="icon"><use href="#icon-plus"></use></svg>Nueva pauta
           </button>
-          ${renderEditClienteButton(cliente.id)}
+          <span class="client-card-footer-secondary">
+            <button type="button" class="btn-link" data-ficha-cliente="${cliente.id}">
+              <svg class="icon"><use href="#icon-detail"></use></svg>Detalle
+            </button>
+            ${renderEditClienteButton(cliente.id)}
+          </span>
         </div>
       </div>`;
   }
@@ -501,6 +514,9 @@ function renderClientCard(cliente) {
       : 0;
   const nivel = nivelCupo(item.publicaciones_restantes, item.publicaciones_contratadas, item.vigente);
 
+  // Nivel 1 (se lee primero): nombre + estado, en la cabecera.
+  // Nivel 2 (secundario, agrupado): plan, cupo, vencimiento, valor.
+  // Nivel 3: peso comercial -- dato interno, la línea más chica de todas.
   return `
     <div class="client-card" data-quota="${nivel}">
       <div class="client-card-body" data-ficha-cliente="${cliente.id}">
@@ -508,30 +524,34 @@ function renderClientCard(cliente) {
           <h3>${cliente.nombre}</h3>
           <span class="badge badge-${item.estado_comercial}">${ESTADO_COMERCIAL_LABELS[item.estado_comercial]}</span>
         </div>
-        <p class="client-card-plan">Plan: ${PAUTA_TIPO_LABELS[item.tipo] ?? item.tipo}</p>
-        <div class="client-card-progress-track">
-          <div class="client-card-progress-fill" style="width:${pct}%"></div>
+        <div class="client-card-secondary">
+          <p class="client-card-plan">Plan ${PAUTA_TIPO_LABELS[item.tipo] ?? item.tipo}</p>
+          <div class="client-card-progress-track">
+            <div class="client-card-progress-fill" style="width:${pct}%"></div>
+          </div>
+          <p class="client-card-restantes">
+            <strong>${item.publicaciones_restantes} de ${item.publicaciones_contratadas}</strong> publicaciones disponibles
+          </p>
+          <p class="client-card-meta">
+            <svg class="icon"><use href="#icon-clock"></use></svg>Vence ${formatFecha(item.fecha_vencimiento)}
+          </p>
+          <p class="client-card-valor">${formatMoneda(item.valor_contratado)} contratados</p>
+          <p class="client-card-peso" title="Peso comercial — uso interno">Peso comercial: ${formatMoneda(item.peso_comercial)}</p>
         </div>
-        <p class="client-card-restantes">
-          <strong>${item.publicaciones_restantes}</strong> de ${item.publicaciones_contratadas} publicaciones disponibles
-        </p>
-        <p class="client-card-meta">
-          <svg class="icon"><use href="#icon-clock"></use></svg>Vence ${formatFecha(item.fecha_vencimiento)}
-        </p>
-        <p class="client-card-valor">${formatMoneda(item.valor_contratado)} contratados</p>
-        <p class="client-card-peso" title="Peso comercial — uso interno">Peso comercial: ${formatMoneda(item.peso_comercial)}</p>
       </div>
       <div class="client-card-footer">
-        <button type="button" class="btn-link" data-ficha-cliente="${cliente.id}">
-          <svg class="icon"><use href="#icon-users"></use></svg>Ver detalle
-        </button>
-        <button type="button" class="btn-link" data-quick-solicitud="${cliente.id}">
+        <button type="button" class="btn btn-secondary" data-quick-solicitud="${cliente.id}">
           <svg class="icon"><use href="#icon-inbox"></use></svg>Registrar publicación
         </button>
-        <button type="button" class="btn-link" data-open-drawer="drawer-pauta" data-preselect-client="${cliente.id}">
-          <svg class="icon"><use href="#icon-plus"></use></svg>Renovar pauta
+        <button type="button" class="btn btn-secondary" data-open-drawer="drawer-pauta" data-preselect-client="${cliente.id}">
+          <svg class="icon"><use href="#icon-refresh"></use></svg>Renovar
         </button>
-        ${renderEditClienteButton(cliente.id)}
+        <span class="client-card-footer-secondary">
+          <button type="button" class="btn-link" data-ficha-cliente="${cliente.id}">
+            <svg class="icon"><use href="#icon-detail"></use></svg>Detalle
+          </button>
+          ${renderEditClienteButton(cliente.id)}
+        </span>
       </div>
     </div>`;
 }
@@ -539,9 +559,13 @@ function renderClientCard(cliente) {
 function renderListaClientes() {
   const el = document.getElementById("lista-clientes");
   const clientes = clientesFiltrados();
-  el.innerHTML = clientes.length
-    ? clientes.map(renderClientCard).join("")
-    : '<p class="muted">No se encontraron clientes.</p>';
+  if (clientes.length) {
+    el.innerHTML = clientes.map(renderClientCard).join("");
+  } else if (clientesFiltro.trim()) {
+    el.innerHTML = renderEmptyState("🔍", "No se encontraron clientes con ese criterio.");
+  } else {
+    el.innerHTML = renderEmptyState("👥", "Aún no tienes clientes registrados.");
+  }
 }
 
 // Cada Pauta de un cliente es un contrato independiente — el historial
@@ -623,7 +647,7 @@ function renderListaContratos() {
   const contratos = contratosFiltrados();
   el.innerHTML = contratos.length
     ? contratos.map(renderContractCard).join("")
-    : '<p class="muted">No hay contratos vigentes.</p>';
+    : renderEmptyState("📄", contratosFiltro.trim() ? "No se encontraron contratos con ese criterio." : "No hay contratos vigentes en este momento.");
 }
 
 // ---------- Ficha completa del cliente (CRM) ----------
@@ -736,7 +760,7 @@ function abrirFichaCliente(clientId) {
 
   const pautasHtml = pautasCliente.length
     ? pautasCliente.map(renderHistorialItem).join("")
-    : '<p class="muted">Este cliente todavía no tiene pautas.</p>';
+    : renderEmptyState("📄", "Este cliente todavía no tiene pautas.", true);
 
   const pendientesHtml = solicitudesPendientesCliente.length
     ? solicitudesPendientesCliente
@@ -748,7 +772,7 @@ function abrirFichaCliente(clientId) {
         </div>`
         )
         .join("")
-    : '<p class="muted">Sin solicitudes pendientes.</p>';
+    : renderEmptyState("✅", "Sin solicitudes pendientes.", true);
 
   const publicadasHtml = solicitudesPublicadasCliente.length
     ? solicitudesPublicadasCliente
@@ -761,7 +785,7 @@ function abrirFichaCliente(clientId) {
         </div>`
         )
         .join("")
-    : '<p class="muted">Todavía no hay publicaciones.</p>';
+    : renderEmptyState("📭", "Todavía no hay publicaciones.", true);
 
   const timelineHtml = eventos.length
     ? eventos
@@ -773,7 +797,7 @@ function abrirFichaCliente(clientId) {
         </div>`
         )
         .join("")
-    : '<p class="muted">Sin actividad todavía.</p>';
+    : renderEmptyState("🕐", "Sin actividad todavía.", true);
 
   document.getElementById("ficha-content").innerHTML = `
     <div class="ficha-quick-actions">
@@ -861,12 +885,16 @@ function renderKanbanCard(solicitud, esPublicada) {
   let accionHtml = "";
   if (!esPublicada) {
     accionHtml = solicitud.pauta_id
-      ? `<button type="button" class="btn btn-primary btn-publicar" data-id="${solicitud.id}">Publicar</button>`
+      ? `<button type="button" class="btn btn-primary btn-publicar" data-id="${solicitud.id}">
+           <svg class="icon"><use href="#icon-check"></use></svg>Publicar
+         </button>`
       : `<select class="link-pauta-select" data-id="${solicitud.id}">
            <option value="">Elegir pauta…</option>
            ${pautaOptionsHtml(pautasVigentes())}
          </select>
-         <button type="button" class="btn btn-secondary btn-vincular" data-id="${solicitud.id}">Vincular</button>`;
+         <button type="button" class="btn btn-secondary btn-vincular" data-id="${solicitud.id}">
+           <svg class="icon"><use href="#icon-contract"></use></svg>Vincular
+         </button>`;
   }
 
   const claseExtra = esPublicada ? "is-publicada" : esperandoMucho ? "is-urgent" : "";
@@ -935,12 +963,12 @@ async function loadSolicitudes() {
   const pendEl = document.getElementById("kanban-pendientes");
   pendEl.innerHTML = pendientes.length
     ? pendientes.map((s) => renderKanbanCard(s, false)).join("")
-    : '<div class="kanban-empty">No hay solicitudes pendientes.</div>';
+    : renderEmptyState("✅", "No tienes solicitudes pendientes.");
 
   const pubEl = document.getElementById("kanban-publicadas");
   pubEl.innerHTML = publicadasRecientes.length
     ? publicadasRecientes.map((s) => renderKanbanCard(s, true)).join("")
-    : '<div class="kanban-empty">Todavía no hay publicaciones.</div>';
+    : renderEmptyState("📭", "Todavía no hay publicaciones.");
 
   for (const btn of pendEl.querySelectorAll(".btn-publicar")) {
     btn.addEventListener("click", () => publicarSolicitud(btn.dataset.id));
@@ -1056,8 +1084,8 @@ function renderMetricasPrincipales(resumen) {
 // negocio nueva, solo prioriza y redacta lo que ya existe para que el
 // editor no tenga que interpretar tablas.
 
-const SEVERIDAD_ORDEN = { danger: 0, warning: 1, info: 2, success: 3 };
-const SEVERIDAD_EMOJI = { danger: "🔴", warning: "🟠", info: "🔵", success: "🟢" };
+const SEVERIDAD_ORDEN = { danger: 0, warning: 1, success: 2 };
+const SEVERIDAD_EMOJI = { danger: "🔴", warning: "🟠", success: "🟢" };
 
 function computarAccionesHoy(resumen, alertas) {
   const acciones = [];
@@ -1125,19 +1153,19 @@ function renderAccionesHoy(resumen, alertas) {
   const acciones = computarAccionesHoy(resumen, alertas);
   const el = document.getElementById("dashboard-acciones");
   if (acciones.length === 0) {
-    el.innerHTML = '<div class="action-feed-empty">Sin pendientes urgentes — todo al día.</div>';
+    el.innerHTML = renderEmptyState("✅", "Sin pendientes urgentes — todo al día.");
     return;
   }
   el.innerHTML = acciones
     .map((accion) => {
       let botones = "";
       if (accion.clienteId) {
-        botones += `<button type="button" class="btn btn-secondary" data-ficha-cliente="${accion.clienteId}">Ver cliente</button>`;
+        botones += `<button type="button" class="btn btn-secondary" data-ficha-cliente="${accion.clienteId}"><svg class="icon"><use href="#icon-detail"></use></svg>Ver cliente</button>`;
         if (accion.renovar) {
-          botones += `<button type="button" class="btn btn-primary" data-open-drawer="drawer-pauta" data-preselect-client="${accion.clienteId}">Renovar pauta</button>`;
+          botones += `<button type="button" class="btn btn-primary" data-open-drawer="drawer-pauta" data-preselect-client="${accion.clienteId}"><svg class="icon"><use href="#icon-refresh"></use></svg>Renovar</button>`;
         }
       } else if (accion.tab) {
-        botones += `<button type="button" class="btn btn-secondary" data-go-tab="${accion.tab}">Ver</button>`;
+        botones += `<button type="button" class="btn btn-secondary" data-go-tab="${accion.tab}"><svg class="icon"><use href="#icon-detail"></use></svg>Ver</button>`;
       }
       return `
         <div class="action-item" data-severity="${accion.severidad}">
@@ -1170,8 +1198,12 @@ function renderRenewalCard(item, dias) {
         ${PAUTA_TIPO_LABELS[item.tipo] ?? item.tipo} · vence ${formatFecha(item.fecha_vencimiento)} (${dias} día${dias === 1 ? "" : "s"})
       </div>
       <div class="renewal-card-actions">
-        <button type="button" class="btn btn-secondary" data-ficha-cliente="${item.cliente.id}">Ver cliente</button>
-        <button type="button" class="btn btn-primary" data-open-drawer="drawer-pauta" data-preselect-client="${item.cliente.id}">Renovar pauta</button>
+        <button type="button" class="btn btn-secondary" data-ficha-cliente="${item.cliente.id}">
+          <svg class="icon"><use href="#icon-detail"></use></svg>Ver cliente
+        </button>
+        <button type="button" class="btn btn-primary" data-open-drawer="drawer-pauta" data-preselect-client="${item.cliente.id}">
+          <svg class="icon"><use href="#icon-refresh"></use></svg>Renovar
+        </button>
       </div>
     </div>`;
 }
@@ -1183,14 +1215,19 @@ function renderProximasRenovaciones(ranking) {
     .filter(({ dias }) => dias >= 0 && dias <= 30)
     .sort((a, b) => a.dias - b.dias);
 
-  let restantes = candidatos;
   const el = document.getElementById("dashboard-renovaciones");
+  if (candidatos.length === 0) {
+    el.innerHTML = renderEmptyState("📅", "No hay renovaciones programadas por ahora.");
+    return;
+  }
+
+  let restantes = candidatos;
   el.innerHTML = RENEWAL_BUCKETS.map(({ limite, titulo }) => {
     const enEsteBucket = restantes.filter(({ dias }) => dias <= limite);
     restantes = restantes.filter(({ dias }) => dias > limite);
     const cuerpo = enEsteBucket.length
       ? enEsteBucket.map(({ item, dias }) => renderRenewalCard(item, dias)).join("")
-      : '<p class="renewal-empty">Nada por aquí.</p>';
+      : '<p class="renewal-empty">Sin renovaciones en este rango.</p>';
     return `
       <div>
         <h3 class="renewal-group-title">${titulo}</h3>
@@ -1199,7 +1236,11 @@ function renderProximasRenovaciones(ranking) {
   }).join("");
 }
 
-// Categorías operativas — necesitan acción del equipo hoy.
+// "Clientes críticos" -- quiénes necesitan seguimiento comercial ya
+// mismo. Las solicitudes atrasadas viven en su propia sección
+// ("Solicitudes pendientes", ver renderDashboardSolicitudes) — no son un
+// cliente, son un problema de cola editorial, así que salieron de esta
+// lista para no mezclar dos preguntas distintas.
 const ALERTAS_ATENCION = [
   {
     id: "cupo-agotado",
@@ -1222,14 +1263,6 @@ const ALERTAS_ATENCION = [
     severity: "warning",
     label: "clientes por vencer (≤7 días)",
   },
-  {
-    id: "solicitudes-antiguas",
-    campo: "solicitudes_antiguas",
-    icon: "icon-inbox",
-    severity: "danger",
-    label: "solicitudes esperando +4h",
-    esSolicitud: true,
-  },
 ];
 
 // Categorías comerciales — oportunidades de venta/renovación, no urgencias.
@@ -1238,21 +1271,21 @@ const ALERTAS_OPORTUNIDAD = [
     id: "individuales",
     campo: "clientes_individuales_pendientes",
     icon: "icon-inbox",
-    severity: "info",
+    severity: "neutral",
     label: "publicaciones individuales pendientes",
   },
   {
     id: "renovar",
     campo: "clientes_contrato_por_renovar",
     icon: "icon-refresh",
-    severity: "info",
+    severity: "neutral",
     label: "contratos próximos a renovar",
   },
   {
     id: "sin-usar",
     campo: "clientes_publicaciones_sin_usar",
     icon: "icon-money",
-    severity: "info",
+    severity: "neutral",
     label: "dejaron publicaciones sin usar",
   },
   {
@@ -1281,22 +1314,12 @@ function renderStatRow(containerId, campos, resumen) {
     .join("");
 }
 
-function formatearClienteAlerta(cliente) {
-  return cliente.nombre;
-}
-
-function formatearSolicitudAlerta(solicitud) {
-  const recibida = solicitud.fecha_recepcion.slice(0, 16).replace("T", " ");
-  return `${solicitud.texto} — recibida ${recibida}`;
-}
-
 function renderAlertCard(config, items) {
-  const formatear = config.esSolicitud ? formatearSolicitudAlerta : formatearClienteAlerta;
   const count = items.length;
   const detalle =
     count === 0
       ? '<p class="muted">Sin novedades.</p>'
-      : items.map((item) => `<div class="alert-detail-item">${formatear(item)}</div>`).join("");
+      : items.map((item) => `<div class="alert-detail-item">${item.nombre}</div>`).join("");
 
   return `
     <div class="alert-card" data-severity="${config.severity}">
@@ -1312,13 +1335,55 @@ function renderAlertCard(config, items) {
     </div>`;
 }
 
+// Si ninguna categoría tiene nada que mostrar, una fila de tarjetas todas
+// en "0" es ruido -- un solo mensaje amigable dice lo mismo mejor.
+function renderAlertGrid(elementId, categorias, alertas, mensajeVacio) {
+  const totalItems = categorias.reduce((acc, cfg) => acc + alertas[cfg.campo].length, 0);
+  const el = document.getElementById(elementId);
+  el.innerHTML =
+    totalItems === 0
+      ? renderEmptyState("✅", mensajeVacio)
+      : categorias.map((cfg) => renderAlertCard(cfg, alertas[cfg.campo])).join("");
+}
+
 function renderDashboardAlertas(alertas) {
-  document.getElementById("dashboard-alertas").innerHTML = ALERTAS_ATENCION.map((cfg) =>
-    renderAlertCard(cfg, alertas[cfg.campo])
-  ).join("");
-  document.getElementById("dashboard-oportunidades").innerHTML = ALERTAS_OPORTUNIDAD.map((cfg) =>
-    renderAlertCard(cfg, alertas[cfg.campo])
-  ).join("");
+  renderAlertGrid("dashboard-alertas", ALERTAS_ATENCION, alertas, "Ningún cliente requiere atención ahora mismo.");
+  renderAlertGrid(
+    "dashboard-oportunidades",
+    ALERTAS_OPORTUNIDAD,
+    alertas,
+    "No hay oportunidades comerciales identificadas por ahora."
+  );
+}
+
+// ---------- Solicitudes pendientes (resumen en el Dashboard) ----------
+//
+// Mismo dato que ya se ve en la pestaña Solicitudes (resumen.solicitudes_
+// pendientes, alertas.solicitudes_antiguas) -- esto solo lo resume para
+// que el flujo de lectura del Dashboard no obligue a cambiar de pestaña
+// para saber si hay algo esperando.
+
+function renderDashboardSolicitudes(resumen, alertas) {
+  const el = document.getElementById("dashboard-solicitudes-resumen");
+  const pendientes = resumen.solicitudes_pendientes;
+
+  if (pendientes === 0) {
+    el.innerHTML = renderEmptyState("✅", "No tienes solicitudes pendientes.");
+    return;
+  }
+
+  const antiguas = alertas.solicitudes_antiguas.length;
+  el.innerHTML = `
+    <div class="dash-inbox-summary">
+      <div class="dash-inbox-summary-main">
+        <span class="dash-inbox-count">${pendientes}</span>
+        <span class="dash-inbox-label">solicitud${pendientes === 1 ? "" : "es"} pendiente${pendientes === 1 ? "" : "s"}</span>
+      </div>
+      ${antiguas > 0 ? `<p class="dash-inbox-warning">🔴 ${antiguas} lleva${antiguas === 1 ? "" : "n"} más de 4h esperando respuesta</p>` : ""}
+      <button type="button" class="btn btn-primary" data-go-tab="solicitudes">
+        <svg class="icon"><use href="#icon-inbox"></use></svg>Ir a solicitudes
+      </button>
+    </div>`;
 }
 
 function renderRankingComercial(ranking, elementId = "ranking-comercial", vacioMensaje = "Todavía no hay clientes con pautas.") {
@@ -1357,10 +1422,11 @@ async function loadDashboard() {
     apiFetch("/dashboard/ranking"),
   ]);
   renderAccionesHoy(resumen, alertas);
-  renderMetricasPrincipales(resumen);
   renderProximasRenovaciones(ranking);
-  renderStatRow("dashboard-actividad", DASHBOARD_ACTIVIDAD, resumen);
+  renderDashboardSolicitudes(resumen, alertas);
   renderDashboardAlertas(alertas);
+  renderMetricasPrincipales(resumen);
+  renderStatRow("dashboard-actividad", DASHBOARD_ACTIVIDAD, resumen);
   renderRankingComercial(ranking);
   // Mismo ranking, filtrado a clientes cuyo contrato de referencia está
   // vigente hoy — el histórico ya trae `vigente` por item, así que no hace
@@ -1508,10 +1574,18 @@ function setupFormSolicitud() {
   });
 }
 
+// Los botones "Crear"/"Guardar" comparten un único <svg><use> fijo en el
+// HTML -- lo reapuntamos en vez de reescribir el botón entero, porque
+// `.textContent = ...` habría borrado el ícono junto con la etiqueta.
+function setIconUse(iconEl, symbolId) {
+  iconEl.querySelector("use").setAttribute("href", `#${symbolId}`);
+}
+
 function resetFormClienteDrawer() {
   editingClientId = null;
   document.getElementById("drawer-cliente-titulo").textContent = "Nuevo cliente";
-  document.getElementById("form-cliente-submit").textContent = "Crear cliente";
+  document.getElementById("form-cliente-submit-label").textContent = "Crear cliente";
+  setIconUse(document.getElementById("form-cliente-submit-icon"), "icon-plus");
   document.getElementById("form-cliente").reset();
 }
 
@@ -1520,7 +1594,8 @@ function startEditCliente(clientId) {
   if (!cliente) return;
   editingClientId = clientId;
   document.getElementById("drawer-cliente-titulo").textContent = "Editar cliente";
-  document.getElementById("form-cliente-submit").textContent = "Guardar cambios";
+  document.getElementById("form-cliente-submit-label").textContent = "Guardar cambios";
+  setIconUse(document.getElementById("form-cliente-submit-icon"), "icon-check");
   document.getElementById("cliente-nombre").value = cliente.nombre;
   document.getElementById("cliente-tipo").value = cliente.tipo;
   document.getElementById("cliente-telefono").value = cliente.telefono;

@@ -22,8 +22,6 @@
   --color-orange-bg: #fff1e8;
   --color-danger: #dc2626;
   --color-danger-bg: #fef2f2;
-  --color-info: #2563eb;
-  --color-info-bg: #eff6ff;
   --color-neutral: #4b5563;
   --color-neutral-bg: #f3f4f6;
 
@@ -33,6 +31,7 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
+  --space-7: 48px;
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -43,7 +42,16 @@
   --shadow-lg: 0 24px 48px rgba(17, 24, 39, 0.28);
 
   --font-sans: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  --transition-fast: 140ms ease;
+  /* Jerarquía tipográfica (Sprint UX 4) -- título / subtítulo / cuerpo /
+     metadata. Todo el texto de la app debe caer en una de estas cinco
+     escalas, no en tamaños sueltos por componente. */
+  --text-title: 1.5rem;
+  --text-subtitle: 1.05rem;
+  --text-body: 0.875rem;
+  --text-info: 0.8rem;
+  --text-metadata: 0.72rem;
+
+  --transition-fast: 160ms ease;
   --transition-base: 220ms ease;
 
   --sidebar-width: 224px;
@@ -397,20 +405,26 @@ main {
 }
 
 .page-title {
-  font-size: 1.4rem;
+  font-size: var(--text-title);
   font-weight: 700;
   margin: 0;
   letter-spacing: -0.01em;
 }
 
 .page-subtitle {
-  margin: 2px 0 0;
+  margin: 4px 0 0;
   color: var(--color-text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-info);
 }
 
 .section-block {
+  margin-top: var(--space-7);
+}
+
+.section-block-secondary {
   margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
 }
 
 .section-title {
@@ -426,6 +440,61 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* Subtítulos dentro de un section-block de-enfatizado (ej. "Indicadores"
+   en el Dashboard) -- un nivel más chico que .section-title, para separar
+   sub-grupos sin que compitan con las secciones principales. */
+.section-subtitle {
+  font-size: var(--text-metadata);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+.section-subtitle:first-child {
+  margin-top: 0;
+}
+
+/* ---------- estados vacíos ---------- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+}
+
+.empty-state-emoji {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.empty-state-text {
+  margin: 0;
+  font-size: var(--text-info);
+}
+
+.empty-state-inline {
+  padding: var(--space-3);
+  flex-direction: row;
+  border: none;
+  background: none;
+  justify-content: flex-start;
+  gap: var(--space-2);
+}
+
+.empty-state-inline .empty-state-emoji {
+  font-size: 1.1rem;
 }
 
 /* ---------- botones ---------- */
@@ -594,10 +663,6 @@ button[type="submit"]:hover {
   border-left-color: var(--color-orange);
 }
 
-.action-item[data-severity="info"] {
-  border-left-color: var(--color-info);
-}
-
 .action-item[data-severity="success"] {
   border-left-color: var(--color-success);
 }
@@ -627,14 +692,44 @@ button[type="submit"]:hover {
   font-size: 0.78rem;
 }
 
-.action-feed-empty {
-  padding: var(--space-5);
-  text-align: center;
-  color: var(--color-text-tertiary);
+/* ---------- resumen de solicitudes (Dashboard) ---------- */
+
+.dash-inbox-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
   background: var(--color-surface);
-  border: 1px dashed var(--color-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  font-size: 0.85rem;
+  padding: var(--space-4) var(--space-5);
+}
+
+.dash-inbox-summary-main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.dash-inbox-count {
+  font-size: var(--text-title);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.dash-inbox-label {
+  font-size: var(--text-info);
+  color: var(--color-text-secondary);
+}
+
+.dash-inbox-warning {
+  margin: 0;
+  font-size: var(--text-info);
+  color: var(--color-danger);
+}
+
+.dash-inbox-summary .btn {
+  margin-left: auto;
 }
 
 /* ---------- próximas renovaciones ---------- */
@@ -744,9 +839,9 @@ button[type="submit"]:hover {
   color: var(--color-warning);
 }
 
-.alert-card[data-severity="info"] .alert-card-icon {
-  background: var(--color-info-bg);
-  color: var(--color-info);
+.alert-card[data-severity="neutral"] .alert-card-icon {
+  background: var(--color-neutral-bg);
+  color: var(--color-neutral);
 }
 
 .alert-card[data-severity="success"] .alert-card-icon {
@@ -1012,7 +1107,7 @@ button[type="submit"]:hover {
 .kanban-cards {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-height: 60px;
 }
 
@@ -1020,8 +1115,8 @@ button[type="submit"]:hover {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
   transition: box-shadow var(--transition-base), transform var(--transition-base);
 }
 
@@ -1139,16 +1234,37 @@ button[type="submit"]:hover {
   font-size: 0.78rem;
 }
 
-.kanban-empty {
-  color: var(--color-text-tertiary);
-  font-size: 0.82rem;
-  text-align: center;
-  padding: var(--space-4);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-sm);
+/* ---------- fichas de cliente (CRM) ---------- */
+
+/* Buscador genérico reutilizado en Clientes, Contratos y el selector de
+   pauta de Solicitudes -- mismo ícono, mismo look que el buscador global
+   del topbar, para que "buscar" se vea igual en toda la app. */
+.search-input {
+  position: relative;
+  max-width: 360px;
+  margin-bottom: var(--space-4);
 }
 
-/* ---------- fichas de cliente (CRM) ---------- */
+.search-input .icon-search-prefix {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+}
+
+.search-input input {
+  padding-left: 32px;
+  margin: 0;
+}
+
+.quick-form-field-pauta .search-input {
+  max-width: none;
+  margin-bottom: 0;
+}
 
 .clientes-buscador {
   max-width: 360px;
@@ -1157,18 +1273,18 @@ button[type="submit"]:hover {
 
 .client-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: var(--space-4);
 }
 
 .client-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: var(--space-4);
+  padding: var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   transition: box-shadow var(--transition-base), transform var(--transition-base);
 }
 
@@ -1184,22 +1300,32 @@ button[type="submit"]:hover {
   gap: var(--space-2);
 }
 
+/* Nivel 1 de la jerarquía (Sprint UX 4): nombre + estado son lo primero
+   que se lee. Todo lo demás en la tarjeta cae a nivel 2 (texto info) o 3
+   (metadata), ver .client-card-peso. */
 .client-card-header h3 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--text-subtitle);
   font-weight: 700;
+  letter-spacing: -0.005em;
+}
+
+.client-card-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .client-card-plan {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--text-info);
   font-weight: 600;
   color: var(--color-text-secondary);
 }
 
 .client-card-meta {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--text-info);
   color: var(--color-text-secondary);
   display: flex;
   align-items: center;
@@ -1228,41 +1354,67 @@ button[type="submit"]:hover {
 
 .client-card-restantes {
   margin: 2px 0 0;
-  font-size: 0.82rem;
+  font-size: var(--text-info);
   color: var(--color-text-secondary);
 }
 
 .client-card-restantes strong {
   color: var(--color-text);
-  font-size: 0.95rem;
+  font-weight: 700;
 }
 
+/* Nivel 3: la acción necesaria (los dos botones principales) se ve como
+   botones reales; "Ver detalle"/"Editar" quedan como enlaces discretos al
+   lado, sin competir por atención. */
 .client-card-footer {
   margin-top: var(--space-2);
-  padding-top: var(--space-2);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
   display: flex;
-  gap: var(--space-3);
+  align-items: center;
+  gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+.client-card-footer .btn {
+  padding: 7px 12px;
+  min-height: auto;
+  font-size: var(--text-info);
+}
+
+.client-card-footer-secondary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
 }
 
 .client-card-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   cursor: pointer;
+}
+
+/* Nivel 2: todo lo secundario (plan, cupo, vencimiento, valor) agrupado
+   con menos aire entre sí que el que separa la cabecera (nivel 1) del
+   resto -- así el ojo lee dos bloques, no una lista plana de líneas. */
+.client-card-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .client-card-valor {
   margin: 2px 0 0;
-  font-size: 0.82rem;
+  font-size: var(--text-info);
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-secondary);
 }
 
 .client-card-peso {
   margin: 0;
-  font-size: 0.68rem;
+  font-size: var(--text-metadata);
   font-weight: 400;
   color: var(--color-text-tertiary);
 }
@@ -1505,7 +1657,7 @@ button[type="submit"]:hover {
 .contract-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .contract-card {
@@ -1513,10 +1665,10 @@ button[type="submit"]:hover {
   border: 1px solid var(--color-border);
   border-left: 4px solid var(--color-border-strong);
   border-radius: var(--radius-md);
-  padding: var(--space-4);
+  padding: var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .contract-card[data-quota="alto"] {
@@ -1544,7 +1696,8 @@ button[type="submit"]:hover {
 
 .contract-card-header h3 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--text-subtitle);
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -1553,7 +1706,7 @@ button[type="submit"]:hover {
 }
 
 .contract-card-meta {
-  font-size: 0.78rem;
+  font-size: var(--text-info);
   color: var(--color-text-secondary);
   margin: 0;
   display: flex;
@@ -1566,19 +1719,19 @@ button[type="submit"]:hover {
   justify-content: space-between;
   align-items: center;
   margin-top: var(--space-2);
-  padding-top: var(--space-2);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
-  font-size: 0.78rem;
+  font-size: var(--text-info);
 }
 
 .contract-card-valor {
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-secondary);
 }
 
 .contract-card-peso {
   color: var(--color-text-tertiary);
-  font-size: 0.7rem;
+  font-size: var(--text-metadata);
 }
 
 /* ---------- login ---------- */
@@ -1740,7 +1893,7 @@ form {
 
 .drawer-header h2 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--text-subtitle);
 }
 
 /* ---------- toast de estado ---------- */
@@ -1856,6 +2009,46 @@ form {
   .action-item-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  /* Experiencia móvil real (Sprint UX 4), no solo "que quepa": objetivos
+     táctiles grandes y formularios cómodos con una mano. */
+  .btn,
+  .icon-btn,
+  input,
+  select {
+    min-height: 44px;
+  }
+
+  .btn {
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .client-card-footer .btn,
+  .client-card-footer-secondary .btn-link {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .client-card-footer-secondary {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+  }
+
+  .dash-inbox-summary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dash-inbox-summary .btn {
+    margin-left: 0;
+    justify-content: center;
+  }
+
+  .contract-card-footer {
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 }
 

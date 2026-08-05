@@ -89,6 +89,10 @@
     <path d="M8 2.5v4"></path>
     <path d="M16 2.5v4"></path>
   </symbol>
+  <symbol id="icon-detail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+  </symbol>
 </svg>
 
 <div id="app-shell" hidden>
@@ -158,44 +162,53 @@
           </button>
         </div>
 
+        <!-- Flujo de lectura de arriba a abajo (Sprint UX 4): qué hacer hoy,
+             qué se renueva pronto, qué está esperando respuesta, qué cliente
+             necesita seguimiento -- y solo al final, indicadores de apoyo. -->
+
         <div class="section-block">
           <h2 class="section-title">Acciones para hoy</h2>
           <div id="dashboard-acciones" class="action-feed"></div>
         </div>
 
-        <div id="dashboard-metricas-principales" class="stat-row stat-row-money"></div>
-
         <div class="section-block">
-          <h2 class="section-title">Próximas renovaciones</h2>
+          <h2 class="section-title">Renovaciones</h2>
           <div id="dashboard-renovaciones" class="renewal-groups"></div>
         </div>
 
         <div class="section-block">
-          <h2 class="section-title">Requiere atención</h2>
+          <h2 class="section-title">Solicitudes pendientes</h2>
+          <div id="dashboard-solicitudes-resumen"></div>
+        </div>
+
+        <div class="section-block">
+          <h2 class="section-title">Clientes críticos</h2>
           <div id="dashboard-alertas" class="alert-grid"></div>
         </div>
 
-        <div class="section-block">
-          <h2 class="section-title">Oportunidades comerciales</h2>
+        <div class="section-block section-block-secondary">
+          <h2 class="section-title">Indicadores</h2>
+
+          <h3 class="section-subtitle">Métricas del mes</h3>
+          <div id="dashboard-metricas-principales" class="stat-row stat-row-money"></div>
+
+          <h3 class="section-subtitle">Oportunidades comerciales</h3>
           <div id="dashboard-oportunidades" class="alert-grid"></div>
-        </div>
 
-        <div class="section-block">
-          <h2 class="section-title">Otros indicadores</h2>
+          <h3 class="section-subtitle">Otros indicadores</h3>
           <div id="dashboard-actividad" class="stat-row stat-row-compact"></div>
-        </div>
 
-        <div class="section-block">
+          <h3 class="section-subtitle">Ranking comercial</h3>
           <div class="ranking-grid">
             <div>
               <div class="section-header-flex">
-                <h2 class="section-title">Ranking comercial — histórico</h2>
+                <h2 class="section-title">Histórico</h2>
               </div>
               <div id="ranking-comercial" class="ranking-list"></div>
             </div>
             <div>
               <div class="section-header-flex">
-                <h2 class="section-title">Ranking comercial — activos ahora</h2>
+                <h2 class="section-title">Activos ahora</h2>
               </div>
               <div id="ranking-comercial-activos" class="ranking-list"></div>
             </div>
@@ -220,13 +233,16 @@
         <form id="form-solicitud" class="quick-form">
           <div class="quick-form-row">
             <div class="quick-form-field quick-form-field-pauta">
-              <input
-                type="text"
-                id="solicitud-pauta-buscar"
-                class="pauta-buscador"
-                placeholder="Buscar cliente para vincular pauta…"
-                autocomplete="off"
-              >
+              <div class="search-input">
+                <svg class="icon-search-prefix"><use href="#icon-search"></use></svg>
+                <input
+                  type="text"
+                  id="solicitud-pauta-buscar"
+                  class="pauta-buscador"
+                  placeholder="Buscar cliente para vincular pauta…"
+                  autocomplete="off"
+                >
+              </div>
               <select id="solicitud-pauta">
                 <option value="">(sin pauta todavía — se vincula después)</option>
               </select>
@@ -284,13 +300,16 @@
           </div>
         </div>
 
-        <input
-          type="text"
-          id="clientes-buscar"
-          class="clientes-buscador"
-          placeholder="Buscar cliente por nombre…"
-          autocomplete="off"
-        >
+        <div class="search-input">
+          <svg class="icon-search-prefix"><use href="#icon-search"></use></svg>
+          <input
+            type="text"
+            id="clientes-buscar"
+            class="clientes-buscador"
+            placeholder="Buscar cliente por nombre…"
+            autocomplete="off"
+          >
+        </div>
 
         <div id="lista-clientes" class="client-grid"></div>
       </section>
@@ -306,13 +325,16 @@
           </button>
         </div>
 
-        <input
-          type="text"
-          id="contratos-buscar"
-          class="clientes-buscador"
-          placeholder="Buscar por cliente…"
-          autocomplete="off"
-        >
+        <div class="search-input">
+          <svg class="icon-search-prefix"><use href="#icon-search"></use></svg>
+          <input
+            type="text"
+            id="contratos-buscar"
+            class="clientes-buscador"
+            placeholder="Buscar por cliente…"
+            autocomplete="off"
+          >
+        </div>
 
         <div id="lista-contratos" class="contract-grid"></div>
       </section>
@@ -368,7 +390,10 @@
     <label>Notas internas (opcional)
       <textarea id="cliente-observaciones" rows="3" placeholder="Solo visible para el equipo…"></textarea>
     </label>
-    <button type="submit" id="form-cliente-submit" class="btn btn-primary">Crear cliente</button>
+    <button type="submit" id="form-cliente-submit" class="btn btn-primary">
+      <svg class="icon" id="form-cliente-submit-icon"><use href="#icon-plus"></use></svg>
+      <span id="form-cliente-submit-label">Crear cliente</span>
+    </button>
   </form>
 </aside>
 
@@ -408,7 +433,10 @@
     <label>Observaciones (opcional)
       <input type="text" id="pauta-observaciones" autocomplete="off">
     </label>
-    <button type="submit" class="btn btn-primary">Crear pauta</button>
+    <button type="submit" class="btn btn-primary">
+      <svg class="icon"><use href="#icon-plus"></use></svg>
+      Crear pauta
+    </button>
   </form>
 </aside>
 
