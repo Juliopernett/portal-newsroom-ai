@@ -31,6 +31,20 @@ class PublicationRequestLinkPauta(BaseModel):
     pauta_id: str
 
 
+class PublicationRequestUpdate(BaseModel):
+    """Request body for `PATCH /publication-requests/{id}` (Sprint UX 3.1).
+
+    A field left unset keeps its current value — a partial update, not a
+    PUT. Only `texto` and `prioridad_manual` are editable this way;
+    `pauta_id` already has its own endpoint (`link-pauta`) and `estado`
+    is never settable directly (see `PublicationRequestCreate`'s
+    docstring for why).
+    """
+
+    texto: str | None = None
+    prioridad_manual: bool | None = None
+
+
 class PublicationRequestOut(BaseModel):
     """Response body for a `PublicationRequest`."""
 

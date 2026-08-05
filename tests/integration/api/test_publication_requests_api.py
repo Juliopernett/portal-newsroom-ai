@@ -212,6 +212,66 @@ def test_link_pauta_rejects_an_unknown_pauta_id(client: TestClient) -> None:
     assert response.status_code == 400
 
 
+def test_edit_updates_texto_on_a_recibida_request(client: TestClient) -> None:
+    solicitud_id = client.post(
+        "/publication-requests", json={"texto": "Texto con un typo"}
+    ).json()["id"]
+
+    response = client.patch(
+        f"/publication-requests/{solicitud_id}", json={"texto": "Texto corregido"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["texto"] == "Texto corregido"
+    assert body["estado"] == "recibida"
+
+
+def test_edit_updates_prioridad_manual_only(client: TestClient) -> None:
+    solicitud_id = client.post(
+        "/publication-requests", json={"texto": "Anuncio"}
+    ).json()["id"]
+
+    response = client.patch(
+        f"/publication-requests/{solicitud_id}", json={"prioridad_manual": True}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["prioridad_manual"] is True
+    assert body["texto"] == "Anuncio"
+
+
+def test_edit_returns_404_when_not_found(client: TestClient) -> None:
+    response = client.patch("/publication-requests/no-existe", json={"texto": "Nuevo texto"})
+
+    assert response.status_code == 404
+
+
+def test_edit_rejects_a_published_request(client: TestClient) -> None:
+    pauta_id = _create_client_and_pauta(client)
+    solicitud_id = client.post(
+        "/publication-requests", json={"pauta_id": pauta_id, "texto": "Anuncio"}
+    ).json()["id"]
+    client.post(f"/publication-requests/{solicitud_id}/publish")
+
+    response = client.patch(
+        f"/publication-requests/{solicitud_id}", json={"texto": "Ya se publicó, muy tarde"}
+    )
+
+    assert response.status_code == 422
+
+
+def test_edit_rejects_an_empty_texto(client: TestClient) -> None:
+    solicitud_id = client.post(
+        "/publication-requests", json={"texto": "Anuncio"}
+    ).json()["id"]
+
+    response = client.patch(f"/publication-requests/{solicitud_id}", json={"texto": ""})
+
+    assert response.status_code == 422
+
+
 def test_full_flow_receive_without_pauta_link_then_publish(client: TestClient) -> None:
     """The operational gap the UX review flagged, closed end to end over HTTP."""
     pauta_id = _create_client_and_pauta(client)

@@ -7,6 +7,9 @@
 request received without a Pauta had no way to be completed from the
 interface — it exposes `link_pauta`, itself just `dataclasses.replace`
 on an existing field, no new domain rule.
+`PATCH /{request_id}` (Sprint UX 3.1) exposes `edit_solicitud` — lets an
+editor fix a typo or toggle prioridad_manual on a still-RECIBIDA request
+without recreating it.
 
 Every route requires an authenticated session — `dependencies=` at the
 `APIRouter` level, not per-function, so a route added here later is
@@ -22,11 +25,12 @@ from app.api.schemas.publication_request import (
     PublicationRequestCreate,
     PublicationRequestLinkPauta,
     PublicationRequestOut,
+    PublicationRequestUpdate,
 )
 from core.analytics import AnalyticsService
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.ports.unit_of_work import UnitOfWork
-from core.services.publication_request_service import link_pauta, mark_as_published
+from core.services.publication_request_service import edit_solicitud, link_pauta, mark_as_published
 
 router = APIRouter(
     prefix="/publication-requests",
@@ -82,6 +86,24 @@ def publish_publication_request(
     uow.publication_requests.save(publicada)
     uow.commit()
     return publicada
+
+
+@router.patch("/{request_id}", response_model=PublicationRequestOut)
+def edit_publication_request(
+    request_id: str,
+    payload: PublicationRequestUpdate,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> PublicationRequest:
+    """Correct texto/prioridad_manual on a still-RECIBIDA PublicationRequest."""
+    solicitud = uow.publication_requests.get_by_id(request_id)
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    editada = edit_solicitud(
+        solicitud, texto=payload.texto, prioridad_manual=payload.prioridad_manual
+    )
+    uow.publication_requests.save(editada)
+    uow.commit()
+    return editada
 
 
 @router.post("/{request_id}/link-pauta", response_model=PublicationRequestOut)

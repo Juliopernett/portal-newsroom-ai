@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
-from core.services.publication_request_service import link_pauta, mark_as_published
+from core.services.publication_request_service import edit_solicitud, link_pauta, mark_as_published
 
 
 def _solicitud(**overrides: object) -> PublicationRequest:
@@ -88,3 +88,57 @@ def test_link_pauta_rejects_an_empty_pauta_id() -> None:
 
     with pytest.raises(ValueError, match="pauta_id"):
         link_pauta(solicitud, "")
+
+
+def test_edit_solicitud_updates_texto() -> None:
+    solicitud = _solicitud(texto="Texto original")
+
+    resultado = edit_solicitud(solicitud, texto="Texto corregido")
+
+    assert resultado.texto == "Texto corregido"
+
+
+def test_edit_solicitud_updates_prioridad_manual() -> None:
+    solicitud = _solicitud(prioridad_manual=False)
+
+    resultado = edit_solicitud(solicitud, prioridad_manual=True)
+
+    assert resultado.prioridad_manual is True
+
+
+def test_edit_solicitud_leaves_unset_fields_untouched() -> None:
+    solicitud = _solicitud(texto="Texto original", prioridad_manual=True)
+
+    resultado = edit_solicitud(solicitud, prioridad_manual=False)
+
+    assert resultado.texto == "Texto original"
+    assert resultado.prioridad_manual is False
+
+
+def test_edit_solicitud_does_not_mutate_the_original() -> None:
+    solicitud = _solicitud(texto="Texto original")
+
+    edit_solicitud(solicitud, texto="Texto corregido")
+
+    assert solicitud.texto == "Texto original"
+
+
+def test_edit_solicitud_rejects_an_empty_texto() -> None:
+    solicitud = _solicitud()
+
+    with pytest.raises(ValueError, match="texto"):
+        edit_solicitud(solicitud, texto="")
+
+
+def test_edit_solicitud_rejects_editing_a_published_request() -> None:
+    solicitud = _solicitud(estado=PublicationRequestStatus.PUBLICADA)
+
+    with pytest.raises(ValueError, match="publicada"):
+        edit_solicitud(solicitud, texto="Intento tardío")
+
+
+def test_edit_solicitud_rejects_editing_a_cancelled_request() -> None:
+    solicitud = _solicitud(estado=PublicationRequestStatus.CANCELADA, pauta_id=None)
+
+    with pytest.raises(ValueError, match="cancelada"):
+        edit_solicitud(solicitud, texto="Intento tardío")
