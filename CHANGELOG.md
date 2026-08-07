@@ -9,6 +9,20 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **Sprint 4A, Incremento 2 — título en el formulario de solicitudes**:
+  campo `titulo` expuesto de punta a punta — `POST /publication-requests`
+  lo acepta (opcional), `PATCH /{id}` lo edita mientras la solicitud siga
+  `RECIBIDA` (misma regla que ya aplica a `texto`/`prioridad_manual`, vía
+  `edit_solicitud` ampliado), `GET` lo devuelve. UI (`app/api/static/`):
+  campo "Título (opcional)" en el formulario de creación y en el form de
+  edición inline de cada tarjeta; se muestra en negrita sobre el texto
+  cuando está presente. Verificado extremo a extremo sobre HTTP real
+  (crear con título, editarlo, confirmarlo en el listado) contra un
+  usuario de prueba local — la extensión de navegador no estaba
+  disponible en este entorno para una verificación visual interactiva.
+  Tipo de contenido queda fuera de alcance, como ya fijó
+  [ADR-006](docs/adr/ADR-006-multichannel-publication.md).
+
 - **Sprint 4A, Incremento 1 — modelo de dominio multicanal**: primer paso
   de la reestructuración de Solicitudes de Publicación hacia contenido
   reutilizable con múltiples destinos — ver
