@@ -7,7 +7,73 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Regresión real (encontrada antes de desplegar, no en producción):**
+  retirar `PublicationRequestStatus.PUBLICADA` en el Incremento 4 rompía
+  silenciosamente la columna "Publicadas" de la UI —
+  `apiFetch("/publication-requests?estado=publicada")` ahora devuelve
+  422 (ese valor ya no existe). `GET /publication-requests` gana un
+  parámetro `completa` (filtra por `fecha_cierre is not None`, el
+  reemplazo correcto) y `app.js` lo usa en vez del `estado` retirado.
+  De paso, `AnalyticsService.solicitudes_pendientes` ahora también
+  excluye una solicitud `RECIBIDA` que ya quedó completa sin pasar por
+  `aceptar` (posible desde el Incremento 4: un destino Instagram
+  confirmado directo sobre una solicitud nunca aceptada) — sin este
+  ajuste, esa solicitud se habría quedado marcada "pendiente" para
+  siempre.
+
 ### Added
+
+- **Sprint 4A, Incremento 4 — Facebook/Instagram, cuota por completitud, y
+  el cutover de `PublicationRequestStatus`** — ver
+  [ADR-006](docs/adr/ADR-006-multichannel-publication.md), Decisiones 2 y
+  3. El cambio de mayor riesgo de negocio de todo el sprint: cambia cómo
+  se calcula la cuota consumida de una `Pauta`.
+  - `PublicationRequestStatus.PUBLICADA` **retirado**. `estado` vuelve a
+    describir solo el triage de intake (`RECIBIDA`/`ACEPTADA`/
+    `CANCELADA`) — el mismo rol que `ArticleStatus` cumple para
+    `Article` (ADR-002). Si un `PublicationRequest` está "completo" ya
+    no depende de `estado`, depende enteramente de sus
+    `DestinoPublicacion` vía `esta_completa` (Incremento 1).
+  - `PautaService.publicaciones_consumidas`/`publicaciones_restantes`/
+    `cuota_agotada` ganan un parámetro `destinos` obligatorio (sin
+    default deliberadamente, para que un caller que lo olvide falle en
+    build/test en vez de reportar cuota en cero silenciosamente) y
+    cuentan por `esta_completa`, no por `estado == PUBLICADA`.
+    `AnalyticsService`/`DecisionEngineService` ganan el mismo parámetro
+    `destinos` en su constructor y lo propagan a cada llamada a
+    `PautaService`.
+  - `core.services.publication_request_service.aceptar` reemplaza a
+    `mark_as_published` — transiciona `estado` a `ACEPTADA` (mismo
+    invariante de `pauta_id` obligatorio que ya tenía `PUBLICADA`).
+  - `POST /publication-requests/{id}/publish` (el botón "Publicar" que
+    ya se usa a diario) mantiene su comportamiento visible **sin
+    cambios**: acepta la solicitud y crea/reutiliza un destino WordPress
+    marcado `PUBLICADO` — el operador no nota diferencia, mismos números
+    de cuota, mismas validaciones (`422` sin pauta).
+  - `POST /publication-requests/{id}/destinos/{destino_id}/confirmar-publicacion`
+    (Facebook/Instagram registran su `url_publicacion` aquí — obligatoria
+    para esos dos canales, la entidad la exige; WordPress solo confirma)
+    y `POST .../cancelar` (cancela un destino que nunca salió, incluido
+    uno `FALLIDO` — nunca debe quedar sin salida). Ambos recalculan
+    `esta_completa`/`fecha_cierre` sobre el conjunto completo de destinos
+    de la solicitud, no solo el que cambió.
+  - **Migración de datos** (`a1b2c3d4e5f6`, sin cambios de esquema):
+    reescribe cada fila `estado='publicada'` existente a `estado='aceptada'`
+    + un `DestinoPublicacion(canal='wordpress', estado='publicado')` nuevo
+    — la forma exacta que produce el flujo de compatibilidad de arriba,
+    así el cálculo de cuota da el mismo número antes y después. Probada
+    con datos sembrados localmente: ciclo completo `upgrade` →
+    `downgrade` → `upgrade`, verificado que la app lee los datos
+    migrados sin error y que `publicaciones_consumidas`/`restantes` no
+    cambian. `scripts/migrate_historical_data.py` (la fuente real de los
+    datos de producción) actualizado para producir esta forma
+    directamente en importaciones futuras.
+  - Tests: 100% cobertura en endpoints nuevos; suite completa reescrita
+    donde `estado=PublicationRequestStatus.PUBLICADA` se usaba como
+    atajo para "esto cuenta para la cuota" — ahora construye un
+    `DestinoPublicacion` real.
 
 - **Sprint 4A, Incremento 3 — integración real con WordPress (creación
   automática de borradores)**: ver

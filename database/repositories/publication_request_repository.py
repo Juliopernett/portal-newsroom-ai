@@ -21,10 +21,12 @@ def _to_model(solicitud: PublicationRequest) -> PublicationRequestModel:
         id=solicitud.id,
         pauta_id=solicitud.pauta_id,
         fecha_recepcion=solicitud.fecha_recepcion,
+        titulo=solicitud.titulo,
         texto=solicitud.texto,
         estado=solicitud.estado.value,
         prioridad_manual=solicitud.prioridad_manual,
         observaciones=solicitud.observaciones,
+        fecha_cierre=solicitud.fecha_cierre,
     )
 
 
@@ -37,14 +39,19 @@ def _to_domain(model: PublicationRequestModel) -> PublicationRequest:
         # `default_factory`), so re-attach it here rather than let a naive
         # datetime leak out of persistence on SQLite.
         fecha_recepcion = fecha_recepcion.replace(tzinfo=UTC)
+    fecha_cierre = model.fecha_cierre
+    if fecha_cierre is not None and fecha_cierre.tzinfo is None:
+        fecha_cierre = fecha_cierre.replace(tzinfo=UTC)
     return PublicationRequest(
         id=model.id,
         pauta_id=model.pauta_id,
         fecha_recepcion=fecha_recepcion,
+        titulo=model.titulo,
         texto=model.texto,
         estado=PublicationRequestStatus(model.estado),
         prioridad_manual=model.prioridad_manual,
         observaciones=model.observaciones,
+        fecha_cierre=fecha_cierre,
     )
 
 

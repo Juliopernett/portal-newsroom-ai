@@ -7,14 +7,23 @@ exhaustion — all computed from the entities themselves, nothing stored.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from core.entities.client import Client, ClientType
+from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
 from core.entities.pauta import Pauta
 from core.entities.publication_request import PublicationRequest
 from core.services.pauta_service import PautaService
-from core.services.publication_request_service import mark_as_published
+
+
+def _destino_publicado(solicitud: PublicationRequest) -> DestinoPublicacion:
+    return DestinoPublicacion(
+        publication_request_id=solicitud.id,
+        canal=CanalPublicacion.WORDPRESS,
+        estado=EstadoDestino.PUBLICADO,
+        fecha_publicacion=datetime(2026, 8, 1, tzinfo=UTC),
+    )
 
 
 def test_pauta_quota_and_validity_are_tracked_without_a_spreadsheet() -> None:
@@ -36,17 +45,19 @@ def test_pauta_quota_and_validity_are_tracked_without_a_spreadsheet() -> None:
     segunda = PublicationRequest(pauta_id=pauta.id, texto="Fecha del próximo concierto")
     tercera = PublicationRequest(pauta_id=pauta.id, texto="Entrevista exclusiva")
 
-    solicitudes = [mark_as_published(primera), mark_as_published(segunda), tercera]
+    solicitudes = [primera, segunda, tercera]
+    destinos = [_destino_publicado(primera), _destino_publicado(segunda)]
 
     service = PautaService(clock=lambda: date(2026, 8, 1))
-    assert service.publicaciones_restantes(pauta, solicitudes) == 8
+    assert service.publicaciones_restantes(pauta, solicitudes, destinos) == 8
 
     despues_del_vencimiento = PautaService(clock=lambda: pauta.fecha_fin + timedelta(days=1))
     assert despues_del_vencimiento.esta_vencida(pauta) is True
     assert despues_del_vencimiento.esta_vigente(pauta) is False
 
-    diez_publicadas = [
-        mark_as_published(PublicationRequest(pauta_id=pauta.id, texto=f"Solicitud {n}"))
+    diez_solicitudes = [
+        PublicationRequest(pauta_id=pauta.id, texto=f"Solicitud {n}")
         for n in range(pauta.publicaciones_contratadas)
     ]
-    assert service.cuota_agotada(pauta, diez_publicadas) is True
+    diez_destinos = [_destino_publicado(s) for s in diez_solicitudes]
+    assert service.cuota_agotada(pauta, diez_solicitudes, diez_destinos) is True

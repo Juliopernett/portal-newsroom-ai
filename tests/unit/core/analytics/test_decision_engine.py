@@ -14,6 +14,7 @@ from core.analytics.decision_view_models import (
     PatronComercialTipo,
 )
 from core.entities.client import Client, ClientType
+from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
 from core.entities.pauta import Pauta, PautaTipo
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 
@@ -55,15 +56,45 @@ def _solicitud(**overrides: object) -> PublicationRequest:
     return PublicationRequest(**defaults)
 
 
+def _destino_publicado(solicitud: PublicationRequest, **overrides: object) -> DestinoPublicacion:
+    defaults: dict[str, object] = {
+        "publication_request_id": solicitud.id,
+        "canal": CanalPublicacion.WORDPRESS,
+        "estado": EstadoDestino.PUBLICADO,
+        "fecha_publicacion": _AHORA,
+    }
+    defaults.update(overrides)
+    return DestinoPublicacion(**defaults)
+
+
+def _solicitudes_completas(
+    n: int, **overrides: object
+) -> tuple[list[PublicationRequest], list[DestinoPublicacion]]:
+    """Return `n` solicitudes plus one WORDPRESS/PUBLICADO destino each — the
+    Sprint 4A, Increment 4 replacement for `estado=PublicationRequestStatus.PUBLICADA`
+    (retired): "complete" is now `esta_completa` over a solicitud's own
+    destinos, never the solicitud's own `estado`. Defaults `estado` to
+    `ACEPTADA` — the real flow never leaves a completed solicitud at
+    `RECIBIDA`.
+    """
+    defaults: dict[str, object] = {"estado": PublicationRequestStatus.ACEPTADA}
+    defaults.update(overrides)
+    solicitudes = [_solicitud(**defaults) for _ in range(n)]
+    destinos = [_destino_publicado(s) for s in solicitudes]
+    return solicitudes, destinos
+
+
 def _service(
     clients: list[Client] | None = None,
     pautas: list[Pauta] | None = None,
     solicitudes: list[PublicationRequest] | None = None,
+    destinos: list[DestinoPublicacion] | None = None,
 ) -> DecisionEngineService:
     return DecisionEngineService(
         clients=clients or [],
         pautas=pautas or [],
         solicitudes=solicitudes or [],
+        destinos=destinos or [],
         clock=lambda: _AHORA,
     )
 
@@ -115,11 +146,10 @@ def test_riesgo_abandono_excludes_client_with_exhausted_quota() -> None:
         publicaciones_contratadas=2,
         fecha_registro=_AHORA - timedelta(days=40),
     )
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA),
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA),
-    ]
-    service = _service(clients=[cliente], pautas=[pauta], solicitudes=solicitudes)
+    solicitudes, destinos = _solicitudes_completas(2, pauta_id="p1")
+    service = _service(
+        clients=[cliente], pautas=[pauta], solicitudes=solicitudes, destinos=destinos
+    )
 
     assert service.clientes_riesgo_abandono() == []
 
@@ -310,9 +340,13 @@ def test_score_salud_cliente_is_high_for_healthy_vigente_client() -> None:
     cliente = _client(id="c1")
     pautas = [
         _pauta(id="p1", client_id="c1", fecha_inicio=date(2026, 1, 31), fecha_fin=date(2026, 3, 2)),
-        _pauta(id="p2", client_id="c1", fecha_inicio=date(2026, 3, 17), fecha_fin=date(2026, 4, 17)),
+        _pauta(
+            id="p2", client_id="c1", fecha_inicio=date(2026, 3, 17), fecha_fin=date(2026, 4, 17)
+        ),
         _pauta(id="p3", client_id="c1", fecha_inicio=date(2026, 5, 2), fecha_fin=date(2026, 6, 2)),
-        _pauta(id="p4", client_id="c1", fecha_inicio=date(2026, 6, 17), fecha_fin=date(2026, 7, 17)),
+        _pauta(
+            id="p4", client_id="c1", fecha_inicio=date(2026, 6, 17), fecha_fin=date(2026, 7, 17)
+        ),
         _pauta(
             id="p5",
             client_id="c1",
@@ -388,10 +422,10 @@ def test_clientes_consumo_alto_flags_vigente_pauta_at_90_percent_or_more() -> No
         fecha_fin=date(2026, 8, 30),
         publicaciones_contratadas=10,
     )
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(9)
-    ]
-    service = _service(clients=[cliente], pautas=[pauta], solicitudes=solicitudes)
+    solicitudes, destinos = _solicitudes_completas(9, pauta_id="p1")
+    service = _service(
+        clients=[cliente], pautas=[pauta], solicitudes=solicitudes, destinos=destinos
+    )
 
     resultado = service.clientes_consumo_alto()
 
@@ -409,10 +443,10 @@ def test_clientes_consumo_alto_excludes_fully_exhausted_pauta() -> None:
         fecha_fin=date(2026, 8, 30),
         publicaciones_contratadas=10,
     )
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(10)
-    ]
-    service = _service(clients=[cliente], pautas=[pauta], solicitudes=solicitudes)
+    solicitudes, destinos = _solicitudes_completas(10, pauta_id="p1")
+    service = _service(
+        clients=[cliente], pautas=[pauta], solicitudes=solicitudes, destinos=destinos
+    )
 
     assert service.clientes_consumo_alto() == []
 
@@ -521,12 +555,12 @@ def test_centro_alertas_orders_by_severity_then_dias() -> None:
             publicaciones_contratadas=20,
         ),
     ]
-    solicitudes = [
-        _solicitud(pauta_id="p-agotado", estado=PublicationRequestStatus.PUBLICADA),
-        _solicitud(pauta_id="p-agotado", estado=PublicationRequestStatus.PUBLICADA),
-    ]
+    solicitudes, destinos = _solicitudes_completas(2, pauta_id="p-agotado")
     service = _service(
-        clients=[cliente_agotado, cliente_vence_hoy], pautas=pautas, solicitudes=solicitudes
+        clients=[cliente_agotado, cliente_vence_hoy],
+        pautas=pautas,
+        solicitudes=solicitudes,
+        destinos=destinos,
     )
 
     alertas = service.centro_alertas()
@@ -545,11 +579,10 @@ def test_centro_alertas_does_not_repeat_a_client_across_categories() -> None:
         fecha_fin=date(2026, 8, 30),
         publicaciones_contratadas=2,
     )
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA),
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA),
-    ]
-    service = _service(clients=[cliente], pautas=[pauta], solicitudes=solicitudes)
+    solicitudes, destinos = _solicitudes_completas(2, pauta_id="p1")
+    service = _service(
+        clients=[cliente], pautas=[pauta], solicitudes=solicitudes, destinos=destinos
+    )
 
     alertas = service.centro_alertas()
 

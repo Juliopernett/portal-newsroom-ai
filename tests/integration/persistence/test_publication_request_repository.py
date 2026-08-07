@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -93,23 +93,40 @@ def test_list_all_returns_every_request(session: Session) -> None:
     pauta = _create_pauta(session)
     repository = SqlAlchemyPublicationRequestRepository(session)
     recibida = _solicitud(pauta_id=pauta.id)
-    publicada = _solicitud(pauta_id=pauta.id, estado=PublicationRequestStatus.PUBLICADA)
+    aceptada = _solicitud(pauta_id=pauta.id, estado=PublicationRequestStatus.ACEPTADA)
     repository.save(recibida)
-    repository.save(publicada)
+    repository.save(aceptada)
     session.commit()
 
     resultado = repository.list_all()
 
-    assert {solicitud.id for solicitud in resultado} == {recibida.id, publicada.id}
+    assert {solicitud.id for solicitud in resultado} == {recibida.id, aceptada.id}
+
+
+def test_save_and_get_by_id_round_trips_titulo_and_fecha_cierre(session: Session) -> None:
+    repository = SqlAlchemyPublicationRequestRepository(session)
+    solicitud = _solicitud(
+        titulo="Lanzamiento del sencillo",
+        fecha_cierre=datetime(2026, 8, 6, 15, 0, tzinfo=UTC),
+    )
+
+    repository.save(solicitud)
+    session.commit()
+
+    recuperada = repository.get_by_id(solicitud.id)
+    assert recuperada == solicitud
+    assert recuperada is not None
+    assert recuperada.titulo == "Lanzamiento del sencillo"
+    assert recuperada.fecha_cierre is not None
 
 
 def test_list_all_filters_by_estado(session: Session) -> None:
     pauta = _create_pauta(session)
     repository = SqlAlchemyPublicationRequestRepository(session)
     recibida = _solicitud(pauta_id=pauta.id)
-    publicada = _solicitud(pauta_id=pauta.id, estado=PublicationRequestStatus.PUBLICADA)
+    aceptada = _solicitud(pauta_id=pauta.id, estado=PublicationRequestStatus.ACEPTADA)
     repository.save(recibida)
-    repository.save(publicada)
+    repository.save(aceptada)
     session.commit()
 
     resultado = repository.list_all(estado=PublicationRequestStatus.RECIBIDA)

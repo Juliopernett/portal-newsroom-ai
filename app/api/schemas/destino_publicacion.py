@@ -22,6 +22,19 @@ class DestinoPublicacionCreate(BaseModel):
     canal: CanalPublicacion
 
 
+class DestinoPublicacionConfirmarPublicacion(BaseModel):
+    """Request body for `POST .../destinos/{destino_id}/confirmar-publicacion`
+    (Sprint 4A, Increment 4).
+
+    `url_publicacion` is required for `FACEBOOK`/`INSTAGRAM` (the entity
+    itself rejects `PUBLICADO` without it for those canales — see
+    `core.entities.destino_publicacion`); WordPress already has `wp_url`
+    from `crear-borrador-wordpress` and does not need one here.
+    """
+
+    url_publicacion: str | None = None
+
+
 class DestinoPublicacionOut(BaseModel):
     """Response body for a `DestinoPublicacion`."""
 

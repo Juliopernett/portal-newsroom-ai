@@ -23,7 +23,6 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from core.analytics.analytics_service import AnalyticsService
-from core.clock import now_local
 from core.analytics.decision_view_models import (
     AccionSugerida,
     AlertaInteligente,
@@ -36,7 +35,9 @@ from core.analytics.decision_view_models import (
     OportunidadComercial,
     PatronComercialTipo,
 )
+from core.clock import now_local
 from core.entities.client import Client
+from core.entities.destino_publicacion import DestinoPublicacion
 from core.entities.pauta import Pauta, PautaTipo
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.services.pauta_service import PautaService
@@ -127,6 +128,7 @@ class DecisionEngineService:
         clients: Sequence[Client],
         pautas: Sequence[Pauta],
         solicitudes: Sequence[PublicationRequest],
+        destinos: Sequence[DestinoPublicacion],
         clock: Callable[[], datetime] = lambda: now_local(),
     ) -> None:
         """`clock` is injectable so tests can control what "now" means.
@@ -136,12 +138,16 @@ class DecisionEngineService:
         `AnalyticsService` itself gives for owning its `PautaService`: a
         single knob for "now" instead of two independently-injectable
         clocks that could disagree in tests.
+
+        `destinos` (Sprint 4A, Increment 4): see `AnalyticsService.__init__`
+        — same requirement, same reason.
         """
         self._clients = clients
         self._pautas = pautas
         self._solicitudes = solicitudes
+        self._destinos = destinos
         self._clock = clock
-        self._analytics = AnalyticsService(clients, pautas, solicitudes, clock=clock)
+        self._analytics = AnalyticsService(clients, pautas, solicitudes, destinos, clock=clock)
         self._pauta_service = PautaService(clock=lambda: clock().date())
 
     # ---------- Última actividad / Riesgo de Abandono / Dormidos ----------
@@ -166,7 +172,9 @@ class DecisionEngineService:
             contrato = self._contrato_de_referencia(pautas_cliente)
             if not self._pauta_service.esta_vigente(contrato):
                 continue
-            restantes = self._pauta_service.publicaciones_restantes(contrato, self._solicitudes)
+            restantes = self._pauta_service.publicaciones_restantes(
+                contrato, self._solicitudes, self._destinos
+            )
             if restantes <= 0:
                 continue
             dias = self._dias_sin_actividad(cliente.id)
@@ -319,7 +327,9 @@ class DecisionEngineService:
             contrato = self._contrato_de_referencia(pautas_cliente)
             if not self._pauta_service.esta_vigente(contrato):
                 continue
-            consumidas = self._pauta_service.publicaciones_consumidas(contrato, self._solicitudes)
+            consumidas = self._pauta_service.publicaciones_consumidas(
+                contrato, self._solicitudes, self._destinos
+            )
             proporcion = Decimal(consumidas) / Decimal(contrato.publicaciones_contratadas)
             if not (_UMBRAL_CONSUMO_ALTO <= proporcion < Decimal("1")):
                 continue
@@ -499,7 +509,9 @@ class DecisionEngineService:
                 continue
             ids_cubiertos.add(cliente.id)
             contrato = self._contrato_de_referencia(self._pautas_de(cliente.id))
-            restantes = self._pauta_service.publicaciones_restantes(contrato, self._solicitudes)
+            restantes = self._pauta_service.publicaciones_restantes(
+                contrato, self._solicitudes, self._destinos
+            )
             alertas.append(
                 AlertaInteligente(
                     tipo=AlertaTipo.MENOS_DE_N_RESTANTES,
@@ -671,7 +683,9 @@ class DecisionEngineService:
     def _senal_cupo_restante(self, contrato: Pauta, vigente: bool) -> Decimal:
         if not vigente:
             return Decimal("0")
-        restantes = self._pauta_service.publicaciones_restantes(contrato, self._solicitudes)
+        restantes = self._pauta_service.publicaciones_restantes(
+            contrato, self._solicitudes, self._destinos
+        )
         return _clamp01(Decimal(restantes) / Decimal(contrato.publicaciones_contratadas))
 
     def _senal_dias_para_vencer(self, contrato: Pauta, vigente: bool, hoy: date) -> Decimal:
@@ -699,7 +713,9 @@ class DecisionEngineService:
         duracion_total = (contrato.fecha_fin - contrato.fecha_inicio).days
         dias_transcurridos = max(0, min(duracion_total, (hoy - contrato.fecha_inicio).days))
         avance_esperado = Decimal(dias_transcurridos) / Decimal(duracion_total)
-        consumidas = self._pauta_service.publicaciones_consumidas(contrato, self._solicitudes)
+        consumidas = self._pauta_service.publicaciones_consumidas(
+            contrato, self._solicitudes, self._destinos
+        )
         avance_real = Decimal(consumidas) / Decimal(contrato.publicaciones_contratadas)
         diferencia = avance_esperado - avance_real
         if diferencia <= 0:

@@ -22,9 +22,11 @@ def test_create_publication_request_assigns_defaults() -> None:
 
     assert solicitud.id
     assert solicitud.pauta_id is None
+    assert solicitud.titulo is None
     assert solicitud.estado == PublicationRequestStatus.RECIBIDA
     assert solicitud.prioridad_manual is False
     assert solicitud.observaciones is None
+    assert solicitud.fecha_cierre is None
     assert isinstance(solicitud.fecha_recepcion, datetime)
 
 
@@ -70,28 +72,34 @@ def test_create_publication_request_allows_missing_pauta_id(
     assert solicitud.estado == estado
 
 
-@pytest.mark.parametrize(
-    "estado", [PublicationRequestStatus.ACEPTADA, PublicationRequestStatus.PUBLICADA]
-)
-def test_create_publication_request_requires_pauta_id(estado: PublicationRequestStatus) -> None:
+def test_create_publication_request_requires_pauta_id_when_aceptada() -> None:
     with pytest.raises(ValueError, match="pauta_id"):
-        _build(estado=estado, pauta_id=None)
+        _build(estado=PublicationRequestStatus.ACEPTADA, pauta_id=None)
 
 
-@pytest.mark.parametrize(
-    "estado", [PublicationRequestStatus.ACEPTADA, PublicationRequestStatus.PUBLICADA]
-)
-def test_create_publication_request_accepts_pauta_id_for_estados_that_require_it(
-    estado: PublicationRequestStatus,
-) -> None:
-    solicitud = _build(estado=estado, pauta_id="pauta-1")
+def test_create_publication_request_accepts_pauta_id_when_aceptada() -> None:
+    solicitud = _build(estado=PublicationRequestStatus.ACEPTADA, pauta_id="pauta-1")
 
     assert solicitud.pauta_id == "pauta-1"
-    assert solicitud.estado == estado
+    assert solicitud.estado == PublicationRequestStatus.ACEPTADA
 
 
 def test_publication_request_is_immutable() -> None:
     solicitud = _build()
 
     with pytest.raises(AttributeError):
-        solicitud.estado = PublicationRequestStatus.PUBLICADA  # type: ignore[misc]
+        solicitud.estado = PublicationRequestStatus.CANCELADA  # type: ignore[misc]
+
+
+def test_create_publication_request_accepts_titulo_and_fecha_cierre() -> None:
+    fecha_cierre = datetime(2026, 8, 6, 10, 0, tzinfo=UTC)
+
+    solicitud = _build(titulo="Lanzamiento del sencillo", fecha_cierre=fecha_cierre)
+
+    assert solicitud.titulo == "Lanzamiento del sencillo"
+    assert solicitud.fecha_cierre == fecha_cierre
+
+
+def test_create_publication_request_rejects_empty_string_titulo() -> None:
+    with pytest.raises(ValueError, match="titulo"):
+        _build(titulo="")

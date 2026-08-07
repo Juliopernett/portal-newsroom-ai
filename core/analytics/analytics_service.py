@@ -31,8 +31,10 @@ from core.analytics.view_models import (
 )
 from core.clock import now_local
 from core.entities.client import Client
+from core.entities.destino_publicacion import DestinoPublicacion
 from core.entities.pauta import Pauta, PautaTipo
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
+from core.services.destino_publicacion_service import esta_completa
 from core.services.pauta_service import PautaService
 
 _CUPO_BAJO_UMBRAL = Decimal("0.2")
@@ -51,6 +53,7 @@ class AnalyticsService:
         clients: Sequence[Client],
         pautas: Sequence[Pauta],
         solicitudes: Sequence[PublicationRequest],
+        destinos: Sequence[DestinoPublicacion],
         clock: Callable[[], datetime] = lambda: now_local(),
     ) -> None:
         """`clock` is injectable so tests can control what "now" means.
@@ -59,10 +62,17 @@ class AnalyticsService:
         a date), rather than accepting an external `PautaService` — a
         single knob for "now" instead of two independently-injectable
         clocks that could disagree in tests.
+
+        `destinos` (Sprint 4A, Increment 4) is every `DestinoPublicacion`
+        in the system, not pre-filtered to `solicitudes` — same shape as
+        `solicitudes` itself, required (no default) so a caller that
+        forgets to wire it fails loudly instead of silently reporting
+        zero consumed quota everywhere.
         """
         self._clients = clients
         self._pautas = pautas
         self._solicitudes = solicitudes
+        self._destinos = destinos
         self._clock = clock
         self._pauta_service = PautaService(clock=lambda: clock().date())
 
@@ -98,7 +108,7 @@ class AnalyticsService:
         return len(self.solicitudes_pendientes())
 
     def cantidad_publicaciones_publicadas(self) -> int:
-        """Return how many `PublicationRequest`s have been `PUBLICADA`."""
+        """Return how many `PublicationRequest`s are complete (see `solicitudes_publicadas`)."""
         return len(self.solicitudes_publicadas())
 
     def ingresos_anio_actual(self) -> Decimal:
@@ -123,14 +133,12 @@ class AnalyticsService:
     def cantidad_publicaciones_publicadas_este_mes(self) -> int:
         """Return how many `PublicationRequest`s were published in the current month.
 
-        `PublicationRequest` has no separate "fecha_publicacion" — only
-        `fecha_recepcion` (when it arrived). Sprint 4B (dashboard) needs
-        "this month" and the domain has no better date to use, so this
-        reads `fecha_recepcion` on the already-`PUBLICADA` requests. For
-        historical, migrated data this reflects when the request was
-        logged as received, not necessarily the exact publish date — a
-        known limitation, not something this sprint's scope covers fixing
-        (would need a new field on `PublicationRequest`).
+        Still reads `fecha_recepcion` (when the request arrived), not
+        `DestinoPublicacion.fecha_publicacion` (Sprint 4A, Increment 4 —
+        exists per destino, not per solicitud, and a solicitud can have
+        several). Deliberately unchanged in this increment; revisiting
+        this metric to use actual per-destino publish dates is future
+        work, not part of the quota cutover.
         """
         ahora = self._clock()
         return sum(
@@ -244,7 +252,10 @@ class AnalyticsService:
             pauta.client_id
             for pauta in self._pautas
             if self._pauta_service.esta_vigente(pauta)
-            and self._pauta_service.publicaciones_restantes(pauta, self._solicitudes) < minimo
+            and self._pauta_service.publicaciones_restantes(
+                pauta, self._solicitudes, self._destinos
+            )
+            < minimo
         }
         return [cliente for cliente in self._clients if cliente.id in client_ids]
 
@@ -261,7 +272,10 @@ class AnalyticsService:
             for pauta in self._pautas
             if pauta.tipo is PautaTipo.INDIVIDUAL
             and self._pauta_service.esta_vigente(pauta)
-            and self._pauta_service.publicaciones_restantes(pauta, self._solicitudes) > 0
+            and self._pauta_service.publicaciones_restantes(
+                pauta, self._solicitudes, self._destinos
+            )
+            > 0
         }
         return [cliente for cliente in self._clients if cliente.id in client_ids]
 
@@ -296,7 +310,10 @@ class AnalyticsService:
             pauta.client_id
             for pauta in self._pautas
             if self._pauta_service.esta_vencida(pauta)
-            and self._pauta_service.publicaciones_restantes(pauta, self._solicitudes) > 0
+            and self._pauta_service.publicaciones_restantes(
+                pauta, self._solicitudes, self._destinos
+            )
+            > 0
         }
         return [cliente for cliente in self._clients if cliente.id in client_ids]
 
@@ -356,7 +373,9 @@ class AnalyticsService:
         for peso_item in self.ranking_clientes_por_peso_comercial():
             pautas_cliente = self._pautas_de(peso_item.cliente.id)
             contrato = self._contrato_de_referencia(pautas_cliente)
-            restantes = self._pauta_service.publicaciones_restantes(contrato, self._solicitudes)
+            restantes = self._pauta_service.publicaciones_restantes(
+                contrato, self._solicitudes, self._destinos
+            )
             ranking.append(
                 RankingComercialItem(
                     cliente=peso_item.cliente,
@@ -393,13 +412,30 @@ class AnalyticsService:
 
     def pautas_agotadas(self) -> list[Pauta]:
         """Return every `Pauta` with no contracted publications left."""
-        return [p for p in self._pautas if self._pauta_service.cuota_agotada(p, self._solicitudes)]
+        return [
+            p
+            for p in self._pautas
+            if self._pauta_service.cuota_agotada(p, self._solicitudes, self._destinos)
+        ]
 
     # ---------- Reportes Editoriales ----------
 
     def solicitudes_pendientes(self) -> list[PublicationRequest]:
-        """Return every `PublicationRequest` still awaiting triage (`RECIBIDA`)."""
-        return [s for s in self._solicitudes if s.estado == PublicationRequestStatus.RECIBIDA]
+        """Return every `PublicationRequest` still awaiting triage (`RECIBIDA`).
+
+        Also excludes any that are already complete (`fecha_cierre` set) —
+        reachable since Sprint 4A, Increment 4: a solicitud can become
+        `esta_completa` without ever going through `aceptar` (e.g. an
+        Instagram-only destino confirmed directly on a still-`RECIBIDA`
+        solicitud, see docs/adr/ADR-006-multichannel-publication.md).
+        Without this, such a solicitud would wrongly keep showing as
+        "pending" forever.
+        """
+        return [
+            s
+            for s in self._solicitudes
+            if s.estado == PublicationRequestStatus.RECIBIDA and s.fecha_cierre is None
+        ]
 
     def solicitudes_pendientes_priorizadas(self) -> list[PublicationRequest]:
         """Return `solicitudes_pendientes` in the order the editorial team should work them.
@@ -428,13 +464,22 @@ class AnalyticsService:
         )
 
     def solicitudes_publicadas(self) -> list[PublicationRequest]:
-        """Return every `PublicationRequest` already published."""
-        return [s for s in self._solicitudes if s.estado == PublicationRequestStatus.PUBLICADA]
+        """Return every `PublicationRequest` that is complete (Sprint 4A, Increment 4).
+
+        "Complete" is `esta_completa` over the solicitud's own
+        `DestinoPublicacion`s — `estado == PUBLICADA` was retired, see
+        `core.entities.publication_request` and ADR-006 Decision 2/3.
+        """
+        return [
+            s
+            for s in self._solicitudes
+            if esta_completa([d for d in self._destinos if d.publication_request_id == s.id])
+        ]
 
     def solicitudes_antiguas(self, horas: int = 4) -> list[PublicationRequest]:
         """Return `RECIBIDA` requests that have waited at least `horas` hours.
 
-        Only `RECIBIDA` requests qualify — one already `PUBLICADA` or
+        Only `RECIBIDA` requests qualify — one already `ACEPTADA` or
         `CANCELADA` is resolved, not "waiting".
         """
         limite = self._clock() - timedelta(hours=horas)
@@ -449,7 +494,9 @@ class AnalyticsService:
         return sum((p.valor_pagado for p in self._pautas_de(client_id)), start=Decimal("0"))
 
     def _tiene_cupo_bajo(self, pauta: Pauta) -> bool:
-        restantes = self._pauta_service.publicaciones_restantes(pauta, self._solicitudes)
+        restantes = self._pauta_service.publicaciones_restantes(
+            pauta, self._solicitudes, self._destinos
+        )
         proporcion = Decimal(restantes) / Decimal(pauta.publicaciones_contratadas)
         return proporcion < _CUPO_BAJO_UMBRAL
 
@@ -490,7 +537,8 @@ class AnalyticsService:
         if not vigentes:
             return EstadoComercial.VENCIDO
         restantes = sum(
-            self._pauta_service.publicaciones_restantes(p, self._solicitudes) for p in vigentes
+            self._pauta_service.publicaciones_restantes(p, self._solicitudes, self._destinos)
+            for p in vigentes
         )
         dias_para_vencer = min((p.fecha_fin - self._clock().date()).days for p in vigentes)
         if restantes <= 0 or dias_para_vencer <= _RENOVACION_DIAS:

@@ -8,17 +8,20 @@ round trip through SQLAlchemy.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from core.entities.client import Client, ClientType
+from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
 from core.entities.pauta import Pauta
 from core.entities.publication_request import PublicationRequest
 from core.services.pauta_service import PautaService
-from core.services.publication_request_service import mark_as_published
 from database.repositories.client_repository import SqlAlchemyClientRepository
+from database.repositories.destino_publicacion_repository import (
+    SqlAlchemyDestinoPublicacionRepository,
+)
 from database.repositories.pauta_repository import SqlAlchemyPautaRepository
 from database.repositories.publication_request_repository import (
     SqlAlchemyPublicationRequestRepository,
@@ -31,6 +34,7 @@ def test_pauta_service_computes_quota_from_persisted_publication_requests(
     clients = SqlAlchemyClientRepository(session)
     pautas = SqlAlchemyPautaRepository(session)
     solicitudes = SqlAlchemyPublicationRequestRepository(session)
+    destinos = SqlAlchemyDestinoPublicacionRepository(session)
 
     client = Client(nombre="Silvestre Dangond", tipo=ClientType.ARTISTA, telefono="+573001112233")
     clients.save(client)
@@ -48,14 +52,38 @@ def test_pauta_service_computes_quota_from_persisted_publication_requests(
     primera = PublicationRequest(pauta_id=pauta.id, texto="Anuncio de nueva canción")
     segunda = PublicationRequest(pauta_id=pauta.id, texto="Fecha del próximo concierto")
     tercera = PublicationRequest(pauta_id=pauta.id, texto="Entrevista exclusiva")
-    for solicitud in (mark_as_published(primera), mark_as_published(segunda), tercera):
+    for solicitud in (primera, segunda, tercera):
         solicitudes.save(solicitud)
+    # session.flush() (not just save()): destinos_publicacion sorts
+    # alphabetically before publication_requests, so a single commit
+    # covering both new rows would try to insert the child before the
+    # parent exists — see
+    # tests/integration/persistence/test_destino_publicacion_repository.py's
+    # _create_solicitud docstring for the full explanation.
+    session.flush()
+
+    for solicitud in (primera, segunda):
+        destinos.save(
+            DestinoPublicacion(
+                publication_request_id=solicitud.id,
+                canal=CanalPublicacion.WORDPRESS,
+                estado=EstadoDestino.PUBLICADO,
+                fecha_publicacion=datetime(2026, 8, 1, tzinfo=UTC),
+            )
+        )
     session.commit()
 
     solicitudes_de_la_pauta = solicitudes.list_by_pauta_id(pauta.id)
+    destinos_de_la_pauta = [
+        destino
+        for solicitud in solicitudes_de_la_pauta
+        for destino in destinos.list_by_publication_request_id(solicitud.id)
+    ]
     service = PautaService(clock=lambda: date(2026, 8, 1))
 
-    assert service.publicaciones_restantes(pauta, solicitudes_de_la_pauta) == 8
+    assert (
+        service.publicaciones_restantes(pauta, solicitudes_de_la_pauta, destinos_de_la_pauta) == 8
+    )
     assert service.esta_vigente(pauta) is True
 
     todas_las_pautas = pautas.list_all()

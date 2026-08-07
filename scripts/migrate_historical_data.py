@@ -26,11 +26,16 @@ user before writing this, none of them derivable from the data itself:
   `fecha_fin = fecha_inicio + 1 day`.
 
 `Pauta` never stores how much of its quota is consumed — that's always
-computed from linked `PublicationRequest` history (see
-`core.services.pauta_service.PautaService`). So the spreadsheet's
-"publicadas" column is reproduced here as that many real `PublicationRequest`
-rows in `PUBLICADA` state, not a number — otherwise `publicaciones_restantes`
-would be wrong for every migrated Pauta from day one.
+computed from linked `PublicationRequest`/`DestinoPublicacion` history
+(see `core.services.pauta_service.PautaService`). So the spreadsheet's
+"publicadas" column is reproduced here as that many real
+`PublicationRequest` rows, `estado=ACEPTADA`, each with one
+`DestinoPublicacion(canal=WORDPRESS, estado=PUBLICADO)` — the same
+compatibility shape `core.services.publication_request_service.aceptar`
+and the "Publicar" endpoint produce (Sprint 4A, Increment 4;
+`PublicationRequestStatus.PUBLICADA` is retired) — not a bare number,
+otherwise `publicaciones_restantes` would be wrong for every migrated
+Pauta from day one.
 
 The data file itself (client names, contracted amounts) is deliberately
 NOT committed to this repository — it's the operator's real business
@@ -59,6 +64,7 @@ from pathlib import Path
 from typing import Any
 
 from core.entities.client import Client, ClientType
+from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
 from core.entities.pauta import Pauta
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.ports.unit_of_work import UnitOfWork
@@ -138,10 +144,18 @@ def migrate(rows: list[dict[str, Any]], uow: UnitOfWork) -> MigrationSummary:
             solicitud = PublicationRequest(
                 pauta_id=pauta.id,
                 texto=_TEXTO_HISTORICO,
-                estado=PublicationRequestStatus.PUBLICADA,
+                estado=PublicationRequestStatus.ACEPTADA,
                 fecha_recepcion=fecha_recepcion,
+                fecha_cierre=fecha_recepcion,
             )
             uow.publication_requests.save(solicitud)
+            destino = DestinoPublicacion(
+                publication_request_id=solicitud.id,
+                canal=CanalPublicacion.WORDPRESS,
+                estado=EstadoDestino.PUBLICADO,
+                fecha_publicacion=fecha_recepcion,
+            )
+            uow.destinos_publicacion.save(destino)
             summary.publicaciones_historicas_creadas += 1
 
     return summary

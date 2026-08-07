@@ -31,6 +31,7 @@ def _decision_engine(uow: UnitOfWork) -> DecisionEngineService:
         clients=uow.clients.list_all(),
         pautas=uow.pautas.list_all(),
         solicitudes=uow.publication_requests.list_all(),
+        destinos=uow.destinos_publicacion.list_all(),
     )
 
 

@@ -44,6 +44,29 @@ def test_create_publication_request_linked_to_a_pauta(client: TestClient) -> Non
     assert response.json()["pauta_id"] == pauta_id
 
 
+def test_create_publication_request_accepts_a_titulo(client: TestClient) -> None:
+    response = client.post(
+        "/publication-requests",
+        json={"texto": "Anuncio de nueva canción", "titulo": "Lanzamiento del sencillo"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["titulo"] == "Lanzamiento del sencillo"
+
+
+def test_create_publication_request_defaults_titulo_to_none(client: TestClient) -> None:
+    response = client.post("/publication-requests", json={"texto": "Anuncio de nueva canción"})
+
+    assert response.status_code == 201
+    assert response.json()["titulo"] is None
+
+
+def test_create_publication_request_rejects_an_empty_titulo(client: TestClient) -> None:
+    response = client.post("/publication-requests", json={"texto": "Anuncio", "titulo": ""})
+
+    assert response.status_code == 422
+
+
 def test_create_publication_request_rejects_empty_texto(client: TestClient) -> None:
     response = client.post("/publication-requests", json={"texto": ""})
 
@@ -90,7 +113,7 @@ def test_full_flow_create_publish_and_check_remaining_quota(client: TestClient) 
     for solicitud_id in solicitud_ids[:2]:
         response = client.post(f"/publication-requests/{solicitud_id}/publish")
         assert response.status_code == 200
-        assert response.json()["estado"] == "publicada"
+        assert response.json()["estado"] == "aceptada"
 
     estado = client.get(f"/pautas/{pauta_id}").json()
     assert estado["publicaciones_consumidas"] == 2
@@ -108,7 +131,7 @@ def test_list_publication_requests_returns_everything_by_default(client: TestCli
 
     assert response.status_code == 200
     assert len(response.json()) == 1
-    assert response.json()[0]["estado"] == "publicada"
+    assert response.json()[0]["estado"] == "aceptada"
 
 
 def test_list_publication_requests_filters_by_estado(client: TestClient) -> None:
@@ -125,6 +148,67 @@ def test_list_publication_requests_filters_by_estado(client: TestClient) -> None
     body = response.json()
     assert len(body) == 1
     assert body[0]["texto"] == "Sigue pendiente"
+
+
+def test_list_publication_requests_filters_by_completa_true(client: TestClient) -> None:
+    pauta_id = _create_client_and_pauta(client)
+    completa_id = client.post(
+        "/publication-requests", json={"pauta_id": pauta_id, "texto": "Se publica"}
+    ).json()["id"]
+    client.post("/publication-requests", json={"pauta_id": pauta_id, "texto": "Sigue pendiente"})
+    client.post(f"/publication-requests/{completa_id}/publish")
+
+    response = client.get("/publication-requests", params={"completa": "true"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["id"] == completa_id
+    assert body[0]["fecha_cierre"] is not None
+
+
+def test_list_publication_requests_filters_by_completa_false(client: TestClient) -> None:
+    pauta_id = _create_client_and_pauta(client)
+    completa_id = client.post(
+        "/publication-requests", json={"pauta_id": pauta_id, "texto": "Se publica"}
+    ).json()["id"]
+    pendiente_id = client.post(
+        "/publication-requests", json={"pauta_id": pauta_id, "texto": "Sigue pendiente"}
+    ).json()["id"]
+    client.post(f"/publication-requests/{completa_id}/publish")
+
+    response = client.get("/publication-requests", params={"completa": "false"})
+
+    assert response.status_code == 200
+    ids = {s["id"] for s in response.json()}
+    assert ids == {pendiente_id}
+
+
+def test_list_publication_requests_finds_an_en_curso_solicitud(client: TestClient) -> None:
+    """A solicitud already ACEPTADA (via the old one-click Publicar) but with
+    another destino still pending (e.g. Instagram, added separately) must be
+    findable via estado=aceptada&completa=false — it is neither RECIBIDA nor
+    complete, so it must not vanish from the queue (Sprint 4A, Incremento 5)."""
+    pauta_id = _create_client_and_pauta(client)
+    solicitud_id = client.post(
+        "/publication-requests", json={"pauta_id": pauta_id, "texto": "Multi-destino"}
+    ).json()["id"]
+    client.post(f"/publication-requests/{solicitud_id}/destinos", json={"canal": "instagram"})
+    client.post(f"/publication-requests/{solicitud_id}/publish")
+
+    response = client.get(
+        "/publication-requests", params={"estado": "aceptada", "completa": "false"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["id"] == solicitud_id
+    assert body[0]["fecha_cierre"] is None
+
+    # Y NO debe aparecer todavía como completa.
+    completas = client.get("/publication-requests", params={"completa": "true"}).json()
+    assert completas == []
 
 
 def test_list_publication_requests_orders_recibida_by_prioridad_then_peso_comercial(
@@ -213,9 +297,9 @@ def test_link_pauta_rejects_an_unknown_pauta_id(client: TestClient) -> None:
 
 
 def test_edit_updates_texto_on_a_recibida_request(client: TestClient) -> None:
-    solicitud_id = client.post(
-        "/publication-requests", json={"texto": "Texto con un typo"}
-    ).json()["id"]
+    solicitud_id = client.post("/publication-requests", json={"texto": "Texto con un typo"}).json()[
+        "id"
+    ]
 
     response = client.patch(
         f"/publication-requests/{solicitud_id}", json={"texto": "Texto corregido"}
@@ -227,10 +311,23 @@ def test_edit_updates_texto_on_a_recibida_request(client: TestClient) -> None:
     assert body["estado"] == "recibida"
 
 
-def test_edit_updates_prioridad_manual_only(client: TestClient) -> None:
+def test_edit_updates_titulo(client: TestClient) -> None:
     solicitud_id = client.post(
-        "/publication-requests", json={"texto": "Anuncio"}
+        "/publication-requests", json={"texto": "Anuncio", "titulo": "Titulo con un typo"}
     ).json()["id"]
+
+    response = client.patch(
+        f"/publication-requests/{solicitud_id}", json={"titulo": "Titulo corregido"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["titulo"] == "Titulo corregido"
+    assert body["texto"] == "Anuncio"
+
+
+def test_edit_updates_prioridad_manual_only(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
 
     response = client.patch(
         f"/publication-requests/{solicitud_id}", json={"prioridad_manual": True}
@@ -263,9 +360,7 @@ def test_edit_rejects_a_published_request(client: TestClient) -> None:
 
 
 def test_edit_rejects_an_empty_texto(client: TestClient) -> None:
-    solicitud_id = client.post(
-        "/publication-requests", json={"texto": "Anuncio"}
-    ).json()["id"]
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
 
     response = client.patch(f"/publication-requests/{solicitud_id}", json={"texto": ""})
 
@@ -290,7 +385,7 @@ def test_full_flow_receive_without_pauta_link_then_publish(client: TestClient) -
 
     publish_response = client.post(f"/publication-requests/{solicitud_id}/publish")
     assert publish_response.status_code == 200
-    assert publish_response.json()["estado"] == "publicada"
+    assert publish_response.json()["estado"] == "aceptada"
 
     estado = client.get(f"/pautas/{pauta_id}").json()
     assert estado["publicaciones_consumidas"] == 1

@@ -8,6 +8,7 @@ from decimal import Decimal
 from core.analytics.analytics_service import AnalyticsService
 from core.analytics.view_models import EstadoComercial
 from core.entities.client import Client, ClientType
+from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
 from core.entities.pauta import Pauta
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 
@@ -48,15 +49,46 @@ def _solicitud(**overrides: object) -> PublicationRequest:
     return PublicationRequest(**defaults)
 
 
+def _destino_publicado(solicitud: PublicationRequest, **overrides: object) -> DestinoPublicacion:
+    defaults: dict[str, object] = {
+        "publication_request_id": solicitud.id,
+        "canal": CanalPublicacion.WORDPRESS,
+        "estado": EstadoDestino.PUBLICADO,
+        "fecha_publicacion": _AHORA,
+    }
+    defaults.update(overrides)
+    return DestinoPublicacion(**defaults)
+
+
+def _solicitudes_completas(
+    n: int, **overrides: object
+) -> tuple[list[PublicationRequest], list[DestinoPublicacion]]:
+    """Return `n` solicitudes plus one WORDPRESS/PUBLICADO destino each — the
+    Sprint 4A, Increment 4 replacement for `estado=PublicationRequestStatus.PUBLICADA`
+    (retired): "complete" is now `esta_completa` over a solicitud's own
+    destinos, never the solicitud's own `estado`. Defaults `estado` to
+    `ACEPTADA` — the real flow (`aceptar` then `marcar_publicado`, see
+    `app.api.routers.publication_requests.publish_publication_request`)
+    never leaves a completed solicitud at `RECIBIDA`.
+    """
+    defaults: dict[str, object] = {"estado": PublicationRequestStatus.ACEPTADA}
+    defaults.update(overrides)
+    solicitudes = [_solicitud(**defaults) for _ in range(n)]
+    destinos = [_destino_publicado(s) for s in solicitudes]
+    return solicitudes, destinos
+
+
 def _service(
     clients: list[Client] | None = None,
     pautas: list[Pauta] | None = None,
     solicitudes: list[PublicationRequest] | None = None,
+    destinos: list[DestinoPublicacion] | None = None,
 ) -> AnalyticsService:
     return AnalyticsService(
         clients=clients or [],
         pautas=pautas or [],
         solicitudes=solicitudes or [],
+        destinos=destinos or [],
         clock=lambda: _AHORA,
     )
 
@@ -104,12 +136,9 @@ def test_cantidad_pautas_vigentes_and_vencidas() -> None:
 
 
 def test_cantidad_publicaciones_pendientes_and_publicadas() -> None:
-    solicitudes = [
-        _solicitud(estado=PublicationRequestStatus.RECIBIDA),
-        _solicitud(estado=PublicationRequestStatus.PUBLICADA),
-        _solicitud(estado=PublicationRequestStatus.PUBLICADA),
-    ]
-    service = _service(solicitudes=solicitudes)
+    pendiente = _solicitud(estado=PublicationRequestStatus.RECIBIDA)
+    completas, destinos = _solicitudes_completas(2)
+    service = _service(solicitudes=[pendiente, *completas], destinos=destinos)
 
     assert service.cantidad_publicaciones_pendientes() == 1
     assert service.cantidad_publicaciones_publicadas() == 2
@@ -227,14 +256,13 @@ def test_clientes_con_cupo_agotado_returns_clients_with_an_exhausted_pauta() -> 
         _pauta(id="p1", client_id="agotado", publicaciones_contratadas=2),
         _pauta(id="p2", client_id="con-cupo", publicaciones_contratadas=2),
     ]
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA),
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA),
-        _solicitud(pauta_id="p2", estado=PublicationRequestStatus.PUBLICADA),
-    ]
+    de_p1, destinos_p1 = _solicitudes_completas(2, pauta_id="p1")
+    de_p2, destinos_p2 = _solicitudes_completas(1, pauta_id="p2")
+    solicitudes = [*de_p1, *de_p2]
+    destinos = [*destinos_p1, *destinos_p2]
 
     resultado = _service(
-        clients=[agotado, con_cupo], pautas=pautas, solicitudes=solicitudes
+        clients=[agotado, con_cupo], pautas=pautas, solicitudes=solicitudes, destinos=destinos
     ).clientes_con_cupo_agotado()
 
     assert [c.id for c in resultado] == ["agotado"]
@@ -250,12 +278,10 @@ def test_clientes_con_cupo_agotado_excludes_an_agotada_but_vencida_pauta() -> No
         fecha_fin=date(2026, 2, 1),
         publicaciones_contratadas=2,
     )
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(2)
-    ]
+    solicitudes, destinos = _solicitudes_completas(2, pauta_id="p1")
 
     resultado = _service(
-        clients=[cliente], pautas=[pauta_vencida], solicitudes=solicitudes
+        clients=[cliente], pautas=[pauta_vencida], solicitudes=solicitudes, destinos=destinos
     ).clientes_con_cupo_agotado()
 
     assert resultado == []
@@ -265,12 +291,10 @@ def test_clientes_con_cupo_bajo_uses_percentage_not_absolute_count() -> None:
     # 10 contratadas, 9 consumidas -> 1 restante -> 10% -> bajo cupo.
     bajo = _client(id="bajo")
     pautas = [_pauta(id="p1", client_id="bajo", publicaciones_contratadas=10)]
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(9)
-    ]
+    solicitudes, destinos = _solicitudes_completas(9, pauta_id="p1")
 
     resultado = _service(
-        clients=[bajo], pautas=pautas, solicitudes=solicitudes
+        clients=[bajo], pautas=pautas, solicitudes=solicitudes, destinos=destinos
     ).clientes_con_cupo_bajo()
 
     assert [c.id for c in resultado] == ["bajo"]
@@ -280,12 +304,10 @@ def test_clientes_con_cupo_bajo_excludes_exactly_20_percent_remaining() -> None:
     # 10 contratadas, 8 consumidas -> 2 restantes -> exactamente 20% -> NO es bajo cupo.
     cliente = _client(id="c1")
     pautas = [_pauta(id="p1", client_id="c1", publicaciones_contratadas=10)]
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(8)
-    ]
+    solicitudes, destinos = _solicitudes_completas(8, pauta_id="p1")
 
     resultado = _service(
-        clients=[cliente], pautas=pautas, solicitudes=solicitudes
+        clients=[cliente], pautas=pautas, solicitudes=solicitudes, destinos=destinos
     ).clientes_con_cupo_bajo()
 
     assert resultado == []
@@ -301,12 +323,10 @@ def test_clientes_con_cupo_bajo_excludes_a_low_quota_but_vencida_pauta() -> None
         fecha_fin=date(2026, 2, 1),
         publicaciones_contratadas=10,
     )
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(9)
-    ]
+    solicitudes, destinos = _solicitudes_completas(9, pauta_id="p1")
 
     resultado = _service(
-        clients=[cliente], pautas=[pauta_vencida], solicitudes=solicitudes
+        clients=[cliente], pautas=[pauta_vencida], solicitudes=solicitudes, destinos=destinos
     ).clientes_con_cupo_bajo()
 
     assert resultado == []
@@ -336,9 +356,11 @@ def test_pautas_por_vencer_delegates_to_pauta_service() -> None:
 def test_pautas_agotadas_returns_pautas_with_no_quota_left() -> None:
     agotada = _pauta(id="p1", publicaciones_contratadas=1)
     con_cupo = _pauta(id="p2", publicaciones_contratadas=5)
-    solicitudes = [_solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA)]
+    solicitudes, destinos = _solicitudes_completas(1, pauta_id="p1")
 
-    resultado = _service(pautas=[agotada, con_cupo], solicitudes=solicitudes).pautas_agotadas()
+    resultado = _service(
+        pautas=[agotada, con_cupo], solicitudes=solicitudes, destinos=destinos
+    ).pautas_agotadas()
 
     assert resultado == [agotada]
 
@@ -348,11 +370,26 @@ def test_pautas_agotadas_returns_pautas_with_no_quota_left() -> None:
 
 def test_solicitudes_pendientes_and_publicadas() -> None:
     recibida = _solicitud(id="s1", estado=PublicationRequestStatus.RECIBIDA)
-    publicada = _solicitud(id="s2", estado=PublicationRequestStatus.PUBLICADA)
-    service = _service(solicitudes=[recibida, publicada])
+    (publicada,), destinos = _solicitudes_completas(1, id="s2")
+    service = _service(solicitudes=[recibida, publicada], destinos=destinos)
 
     assert service.solicitudes_pendientes() == [recibida]
     assert service.solicitudes_publicadas() == [publicada]
+
+
+def test_solicitudes_pendientes_excludes_a_recibida_solicitud_that_is_already_completa() -> None:
+    """Sprint 4A, Incremento 5: reachable when a destino is confirmed directly
+    on a still-RECIBIDA solicitud (e.g. Instagram-only, no aceptar() call) —
+    the API sets fecha_cierre via cerrar_si_completa the moment that happens,
+    regardless of estado, so this solicitud must not keep showing up as
+    "pending" forever."""
+    recibida_completa = _solicitud(
+        id="s1", estado=PublicationRequestStatus.RECIBIDA, fecha_cierre=_AHORA
+    )
+    genuinamente_pendiente = _solicitud(id="s2", estado=PublicationRequestStatus.RECIBIDA)
+    service = _service(solicitudes=[recibida_completa, genuinamente_pendiente])
+
+    assert service.solicitudes_pendientes() == [genuinamente_pendiente]
 
 
 def test_solicitudes_antiguas_includes_requests_waiting_at_least_horas() -> None:
@@ -365,13 +402,16 @@ def test_solicitudes_antiguas_includes_requests_waiting_at_least_horas() -> None
 
 
 def test_solicitudes_antiguas_excludes_non_recibida_requests() -> None:
-    antigua_publicada = _solicitud(
+    (antigua_completa,), destinos = _solicitudes_completas(
+        1,
         fecha_recepcion=datetime(2026, 8, 1, 1, 0, tzinfo=UTC),
-        estado=PublicationRequestStatus.PUBLICADA,
+        estado=PublicationRequestStatus.ACEPTADA,
         pauta_id="pauta-1",
     )
 
-    resultado = _service(solicitudes=[antigua_publicada]).solicitudes_antiguas(horas=4)
+    resultado = _service(solicitudes=[antigua_completa], destinos=destinos).solicitudes_antiguas(
+        horas=4
+    )
 
     assert resultado == []
 
@@ -380,15 +420,11 @@ def test_solicitudes_antiguas_excludes_non_recibida_requests() -> None:
 
 
 def test_cantidad_publicaciones_publicadas_este_mes_counts_only_the_current_month() -> None:
-    este_mes = _solicitud(
-        id="s1",
-        estado=PublicationRequestStatus.PUBLICADA,
-        fecha_recepcion=datetime(2026, 8, 1, 9, 0, tzinfo=UTC),
+    (este_mes,), destinos_este_mes = _solicitudes_completas(
+        1, id="s1", fecha_recepcion=datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
     )
-    mes_pasado = _solicitud(
-        id="s2",
-        estado=PublicationRequestStatus.PUBLICADA,
-        fecha_recepcion=datetime(2026, 7, 31, 23, 59, tzinfo=UTC),
+    (mes_pasado,), destinos_mes_pasado = _solicitudes_completas(
+        1, id="s2", fecha_recepcion=datetime(2026, 7, 31, 23, 59, tzinfo=UTC)
     )
     no_publicada = _solicitud(
         id="s3",
@@ -396,7 +432,10 @@ def test_cantidad_publicaciones_publicadas_este_mes_counts_only_the_current_mont
         fecha_recepcion=datetime(2026, 8, 1, 9, 0, tzinfo=UTC),
     )
 
-    service = _service(solicitudes=[este_mes, mes_pasado, no_publicada])
+    service = _service(
+        solicitudes=[este_mes, mes_pasado, no_publicada],
+        destinos=[*destinos_este_mes, *destinos_mes_pasado],
+    )
 
     assert service.cantidad_publicaciones_publicadas_este_mes() == 1
 
@@ -420,12 +459,10 @@ def test_clientes_con_menos_de_n_publicaciones_restantes_uses_an_absolute_count(
     # 10 contratadas, 8 publicadas -> 2 restantes -> bajo el minimo de 3.
     pocas = _client(id="pocas")
     pautas = [_pauta(id="p1", client_id="pocas", publicaciones_contratadas=10)]
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(8)
-    ]
+    solicitudes, destinos = _solicitudes_completas(8, pauta_id="p1")
 
     resultado = _service(
-        clients=[pocas], pautas=pautas, solicitudes=solicitudes
+        clients=[pocas], pautas=pautas, solicitudes=solicitudes, destinos=destinos
     ).clientes_con_menos_de_n_publicaciones_restantes(minimo=3)
 
     assert [c.id for c in resultado] == ["pocas"]
@@ -435,12 +472,10 @@ def test_clientes_con_menos_de_n_publicaciones_restantes_excludes_exactly_the_mi
     # 10 contratadas, 7 publicadas -> 3 restantes -> no es "menos de 3".
     cliente = _client(id="c1")
     pautas = [_pauta(id="p1", client_id="c1", publicaciones_contratadas=10)]
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(7)
-    ]
+    solicitudes, destinos = _solicitudes_completas(7, pauta_id="p1")
 
     resultado = _service(
-        clients=[cliente], pautas=pautas, solicitudes=solicitudes
+        clients=[cliente], pautas=pautas, solicitudes=solicitudes, destinos=destinos
     ).clientes_con_menos_de_n_publicaciones_restantes(minimo=3)
 
     assert resultado == []
@@ -456,12 +491,10 @@ def test_clientes_con_menos_de_n_publicaciones_restantes_excludes_a_vencida_paut
         fecha_fin=date(2026, 2, 1),
         publicaciones_contratadas=10,
     )
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(9)
-    ]
+    solicitudes, destinos = _solicitudes_completas(9, pauta_id="p1")
 
     resultado = _service(
-        clients=[cliente], pautas=[pauta_vencida], solicitudes=solicitudes
+        clients=[cliente], pautas=[pauta_vencida], solicitudes=solicitudes, destinos=destinos
     ).clientes_con_menos_de_n_publicaciones_restantes(minimo=3)
 
     assert resultado == []
@@ -494,12 +527,13 @@ def test_clientes_con_publicaciones_individuales_pendientes_filters_by_tipo_y_sa
             publicaciones_contratadas=8,
         ),
     ]
-    solicitudes = [_solicitud(pauta_id="p2", estado=PublicationRequestStatus.PUBLICADA)]
+    solicitudes, destinos = _solicitudes_completas(1, pauta_id="p2")
 
     resultado = _service(
         clients=[individual_con_saldo, individual_agotado, paquete],
         pautas=pautas,
         solicitudes=solicitudes,
+        destinos=destinos,
     ).clientes_con_publicaciones_individuales_pendientes()
 
     assert [c.id for c in resultado] == ["individual"]
@@ -559,10 +593,13 @@ def test_clientes_con_publicaciones_sin_usar_returns_only_vencidas_con_saldo() -
             publicaciones_contratadas=8,
         ),
     ]
-    solicitudes = [_solicitud(pauta_id="p2", estado=PublicationRequestStatus.PUBLICADA)]
+    solicitudes, destinos = _solicitudes_completas(1, pauta_id="p2")
 
     resultado = _service(
-        clients=[dejo_saldo, vencida_sin_saldo, vigente], pautas=pautas, solicitudes=solicitudes
+        clients=[dejo_saldo, vencida_sin_saldo, vigente],
+        pautas=pautas,
+        solicitudes=solicitudes,
+        destinos=destinos,
     ).clientes_con_publicaciones_sin_usar()
 
     assert [c.id for c in resultado] == ["dejo-saldo"]
@@ -608,9 +645,7 @@ def test_clientes_premium_returns_only_semestral_and_anual() -> None:
         ),
     ]
 
-    resultado = _service(
-        clients=[mensual, semestral, anual], pautas=pautas
-    ).clientes_premium()
+    resultado = _service(clients=[mensual, semestral, anual], pautas=pautas).clientes_premium()
 
     assert {c.id for c in resultado} == {"semestral", "anual"}
 
@@ -639,9 +674,9 @@ def test_ranking_comercial_uses_only_the_current_contract_not_a_sum() -> None:
             valor_pagado=Decimal("50"),
         ),
     ]
-    solicitudes = [_solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA)]
+    solicitudes, destinos = _solicitudes_completas(1, pauta_id="p1")
 
-    service = _service(clients=[cliente], pautas=pautas, solicitudes=solicitudes)
+    service = _service(clients=[cliente], pautas=pautas, solicitudes=solicitudes, destinos=destinos)
     ranking = service.ranking_comercial()
 
     assert len(ranking) == 1
@@ -767,12 +802,10 @@ def test_estado_comercial_is_renovacion_when_quota_is_exhausted() -> None:
             publicaciones_contratadas=2,
         )
     ]
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(2)
-    ]
+    solicitudes, destinos = _solicitudes_completas(2, pauta_id="p1")
 
     ranking = _service(
-        clients=[_client(id="c1")], pautas=pautas, solicitudes=solicitudes
+        clients=[_client(id="c1")], pautas=pautas, solicitudes=solicitudes, destinos=destinos
     ).ranking_comercial()
 
     assert ranking[0].estado_comercial == EstadoComercial.RENOVACION
@@ -803,12 +836,10 @@ def test_estado_comercial_is_atencion_when_restantes_is_low_but_not_urgent() -> 
             publicaciones_contratadas=10,
         )
     ]
-    solicitudes = [
-        _solicitud(pauta_id="p1", estado=PublicationRequestStatus.PUBLICADA) for _ in range(7)
-    ]  # 3 restantes
+    solicitudes, destinos = _solicitudes_completas(7, pauta_id="p1")  # 3 restantes
 
     ranking = _service(
-        clients=[_client(id="c1")], pautas=pautas, solicitudes=solicitudes
+        clients=[_client(id="c1")], pautas=pautas, solicitudes=solicitudes, destinos=destinos
     ).ranking_comercial()
 
     assert ranking[0].estado_comercial == EstadoComercial.ATENCION
@@ -846,12 +877,13 @@ def test_estado_comercial_ignores_leftover_quota_from_a_vencida_pauta() -> None:
         fecha_fin=date(2026, 12, 1),
         publicaciones_contratadas=2,
     )
-    solicitudes = [_solicitud(pauta_id="p2", estado=PublicationRequestStatus.PUBLICADA)]
+    solicitudes, destinos = _solicitudes_completas(1, pauta_id="p2")
 
     ranking = _service(
         clients=[_client(id="c1")],
         pautas=[vencida_con_saldo, vigente_casi_agotada],
         solicitudes=solicitudes,
+        destinos=destinos,
     ).ranking_comercial()
 
     item = ranking[0]
@@ -879,15 +911,9 @@ def test_solicitudes_pendientes_priorizadas_matches_the_business_example() -> No
             prioridad_manual=True,
             fecha_recepcion=datetime(2026, 8, 1, 10, 30, tzinfo=UTC),
         ),
-        _solicitud(
-            id="B", pauta_id="pb", fecha_recepcion=datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
-        ),
-        _solicitud(
-            id="C", pauta_id="pc", fecha_recepcion=datetime(2026, 8, 1, 8, 30, tzinfo=UTC)
-        ),
-        _solicitud(
-            id="D", pauta_id="pd", fecha_recepcion=datetime(2026, 8, 1, 8, 0, tzinfo=UTC)
-        ),
+        _solicitud(id="B", pauta_id="pb", fecha_recepcion=datetime(2026, 8, 1, 9, 0, tzinfo=UTC)),
+        _solicitud(id="C", pauta_id="pc", fecha_recepcion=datetime(2026, 8, 1, 8, 30, tzinfo=UTC)),
+        _solicitud(id="D", pauta_id="pd", fecha_recepcion=datetime(2026, 8, 1, 8, 0, tzinfo=UTC)),
     ]
 
     service = _service(pautas=pautas, solicitudes=solicitudes)
@@ -916,8 +942,12 @@ def test_solicitudes_pendientes_priorizadas_treats_an_unlinked_solicitud_as_zero
 
 def test_solicitudes_pendientes_priorizadas_excludes_non_recibida() -> None:
     recibida = _solicitud(id="r", estado=PublicationRequestStatus.RECIBIDA)
-    publicada = _solicitud(id="p", estado=PublicationRequestStatus.PUBLICADA)
+    (aceptada,), destinos = _solicitudes_completas(
+        1, id="p", estado=PublicationRequestStatus.ACEPTADA
+    )
 
-    resultado = _service(solicitudes=[recibida, publicada]).solicitudes_pendientes_priorizadas()
+    resultado = _service(
+        solicitudes=[recibida, aceptada], destinos=destinos
+    ).solicitudes_pendientes_priorizadas()
 
     assert [s.id for s in resultado] == ["r"]

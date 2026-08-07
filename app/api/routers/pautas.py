@@ -25,6 +25,15 @@ router = APIRouter(prefix="/pautas", tags=["pautas"], dependencies=[Depends(get_
 
 def _to_out(pauta: Pauta, uow: UnitOfWork) -> PautaOut:
     solicitudes = uow.publication_requests.list_by_pauta_id(pauta.id)
+    # Sprint 4A, Increment 4: destinos scoped per-solicitud, not
+    # uow.destinos_publicacion.list_all() — this runs once per Pauta from
+    # list_pautas' loop, and fetching every destino in the system on each
+    # iteration would be far more wasteful than these targeted queries.
+    destinos = [
+        destino
+        for solicitud in solicitudes
+        for destino in uow.destinos_publicacion.list_by_publication_request_id(solicitud.id)
+    ]
     service = PautaService()
     return PautaOut(
         id=pauta.id,
@@ -36,11 +45,11 @@ def _to_out(pauta: Pauta, uow: UnitOfWork) -> PautaOut:
         fecha_pago=pauta.fecha_pago,
         fecha_registro=pauta.fecha_registro,
         observaciones=pauta.observaciones,
-        publicaciones_consumidas=service.publicaciones_consumidas(pauta, solicitudes),
-        publicaciones_restantes=service.publicaciones_restantes(pauta, solicitudes),
+        publicaciones_consumidas=service.publicaciones_consumidas(pauta, solicitudes, destinos),
+        publicaciones_restantes=service.publicaciones_restantes(pauta, solicitudes, destinos),
         vigente=service.esta_vigente(pauta),
         vencida=service.esta_vencida(pauta),
-        cuota_agotada=service.cuota_agotada(pauta, solicitudes),
+        cuota_agotada=service.cuota_agotada(pauta, solicitudes, destinos),
         peso_comercial=pauta.peso_comercial,
         tipo=pauta.tipo,
     )

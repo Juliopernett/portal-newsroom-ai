@@ -1,11 +1,19 @@
-"""Unit tests for mark_as_published and link_pauta."""
+"""Unit tests for aceptar and link_pauta."""
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
+from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
-from core.services.publication_request_service import edit_solicitud, link_pauta, mark_as_published
+from core.services.publication_request_service import (
+    aceptar,
+    cerrar_si_completa,
+    edit_solicitud,
+    link_pauta,
+)
 
 
 def _solicitud(**overrides: object) -> PublicationRequest:
@@ -17,26 +25,26 @@ def _solicitud(**overrides: object) -> PublicationRequest:
     return PublicationRequest(**defaults)
 
 
-def test_mark_as_published_transitions_status_to_publicada() -> None:
+def test_aceptar_transitions_status_to_aceptada() -> None:
     solicitud = _solicitud()
 
-    resultado = mark_as_published(solicitud)
+    resultado = aceptar(solicitud)
 
-    assert resultado.estado == PublicationRequestStatus.PUBLICADA
+    assert resultado.estado == PublicationRequestStatus.ACEPTADA
 
 
-def test_mark_as_published_does_not_mutate_the_original() -> None:
+def test_aceptar_does_not_mutate_the_original() -> None:
     solicitud = _solicitud()
 
-    mark_as_published(solicitud)
+    aceptar(solicitud)
 
     assert solicitud.estado == PublicationRequestStatus.RECIBIDA
 
 
-def test_mark_as_published_preserves_the_rest_of_the_fields() -> None:
+def test_aceptar_preserves_the_rest_of_the_fields() -> None:
     solicitud = _solicitud(texto="No cambiar este texto", prioridad_manual=True)
 
-    resultado = mark_as_published(solicitud)
+    resultado = aceptar(solicitud)
 
     assert resultado.id == solicitud.id
     assert resultado.pauta_id == solicitud.pauta_id
@@ -44,11 +52,11 @@ def test_mark_as_published_preserves_the_rest_of_the_fields() -> None:
     assert resultado.prioridad_manual is True
 
 
-def test_mark_as_published_raises_when_pauta_id_is_missing() -> None:
+def test_aceptar_raises_when_pauta_id_is_missing() -> None:
     solicitud = _solicitud(pauta_id=None)
 
     with pytest.raises(ValueError, match="pauta_id"):
-        mark_as_published(solicitud)
+        aceptar(solicitud)
 
 
 def test_link_pauta_sets_the_pauta_id() -> None:
@@ -98,6 +106,22 @@ def test_edit_solicitud_updates_texto() -> None:
     assert resultado.texto == "Texto corregido"
 
 
+def test_edit_solicitud_updates_titulo() -> None:
+    solicitud = _solicitud(titulo="Titulo original")
+
+    resultado = edit_solicitud(solicitud, titulo="Titulo corregido")
+
+    assert resultado.titulo == "Titulo corregido"
+
+
+def test_edit_solicitud_leaves_titulo_untouched_when_not_provided() -> None:
+    solicitud = _solicitud(titulo="Titulo original")
+
+    resultado = edit_solicitud(solicitud, texto="Otro texto")
+
+    assert resultado.titulo == "Titulo original"
+
+
 def test_edit_solicitud_updates_prioridad_manual() -> None:
     solicitud = _solicitud(prioridad_manual=False)
 
@@ -130,10 +154,10 @@ def test_edit_solicitud_rejects_an_empty_texto() -> None:
         edit_solicitud(solicitud, texto="")
 
 
-def test_edit_solicitud_rejects_editing_a_published_request() -> None:
-    solicitud = _solicitud(estado=PublicationRequestStatus.PUBLICADA)
+def test_edit_solicitud_rejects_editing_an_aceptada_request() -> None:
+    solicitud = _solicitud(estado=PublicationRequestStatus.ACEPTADA)
 
-    with pytest.raises(ValueError, match="publicada"):
+    with pytest.raises(ValueError, match="aceptada"):
         edit_solicitud(solicitud, texto="Intento tardío")
 
 
@@ -142,3 +166,67 @@ def test_edit_solicitud_rejects_editing_a_cancelled_request() -> None:
 
     with pytest.raises(ValueError, match="cancelada"):
         edit_solicitud(solicitud, texto="Intento tardío")
+
+
+def _destino(**overrides: object) -> DestinoPublicacion:
+    defaults: dict[str, object] = {
+        "publication_request_id": "solicitud-1",
+        "canal": CanalPublicacion.WORDPRESS,
+    }
+    defaults.update(overrides)
+    return DestinoPublicacion(**defaults)
+
+
+def test_cerrar_si_completa_sets_fecha_cierre_when_complete() -> None:
+    solicitud = _solicitud()
+    destinos = [
+        _destino(estado=EstadoDestino.PUBLICADO, fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC))
+    ]
+
+    resultado = cerrar_si_completa(solicitud, destinos)
+
+    assert resultado.fecha_cierre is not None
+
+
+def test_cerrar_si_completa_accepts_explicit_fecha_cierre() -> None:
+    solicitud = _solicitud()
+    destinos = [
+        _destino(estado=EstadoDestino.PUBLICADO, fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC))
+    ]
+    fecha_cierre = datetime(2026, 8, 6, 15, 0, tzinfo=UTC)
+
+    resultado = cerrar_si_completa(solicitud, destinos, fecha_cierre=fecha_cierre)
+
+    assert resultado.fecha_cierre == fecha_cierre
+
+
+def test_cerrar_si_completa_leaves_solicitud_unchanged_when_not_complete() -> None:
+    solicitud = _solicitud()
+    destinos = [_destino(estado=EstadoDestino.PENDIENTE)]
+
+    resultado = cerrar_si_completa(solicitud, destinos)
+
+    assert resultado.fecha_cierre is None
+
+
+def test_cerrar_si_completa_does_not_mutate_the_original() -> None:
+    solicitud = _solicitud()
+    destinos = [
+        _destino(estado=EstadoDestino.PUBLICADO, fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC))
+    ]
+
+    cerrar_si_completa(solicitud, destinos)
+
+    assert solicitud.fecha_cierre is None
+
+
+def test_cerrar_si_completa_is_idempotent_once_already_closed() -> None:
+    fecha_original = datetime(2026, 8, 6, 9, 0, tzinfo=UTC)
+    solicitud = _solicitud(fecha_cierre=fecha_original)
+    destinos = [_destino(estado=EstadoDestino.PENDIENTE)]
+
+    resultado = cerrar_si_completa(
+        solicitud, destinos, fecha_cierre=datetime(2026, 8, 7, tzinfo=UTC)
+    )
+
+    assert resultado.fecha_cierre == fecha_original

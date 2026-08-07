@@ -28,6 +28,7 @@ def _analytics(uow: UnitOfWork) -> AnalyticsService:
         clients=uow.clients.list_all(),
         pautas=uow.pautas.list_all(),
         solicitudes=uow.publication_requests.list_all(),
+        destinos=uow.destinos_publicacion.list_all(),
     )
 
 
@@ -71,8 +72,7 @@ def get_alertas(uow: UnitOfWork = Depends(get_unit_of_work)) -> DashboardAlertas
             ClientOut.model_validate(c) for c in analytics.clientes_con_contrato_por_renovar(dias=7)
         ],
         solicitudes_antiguas=[
-            PublicationRequestOut.model_validate(s)
-            for s in analytics.solicitudes_antiguas(horas=4)
+            PublicationRequestOut.model_validate(s) for s in analytics.solicitudes_antiguas(horas=4)
         ],
         clientes_publicaciones_sin_usar=[
             ClientOut.model_validate(c) for c in analytics.clientes_con_publicaciones_sin_usar()
