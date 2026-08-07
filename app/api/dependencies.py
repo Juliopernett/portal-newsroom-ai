@@ -15,8 +15,11 @@ from datetime import UTC, datetime
 
 from fastapi import Cookie, Depends, HTTPException, status
 
+from agents.wordpress.client import WordPressCMSPublisher
+from config.settings import get_settings
 from core.entities.session import Session as SessionEntity
 from core.entities.user import User
+from core.ports.cms_publisher import CMSPublisher
 from core.ports.password_hasher import PasswordHasher
 from core.ports.unit_of_work import UnitOfWork
 from database.engine import get_session_factory
@@ -41,6 +44,17 @@ def get_unit_of_work() -> Iterator[UnitOfWork]:
 def get_password_hasher() -> PasswordHasher:
     """Return the password hasher used to check credentials at login."""
     return Argon2IdPasswordHasher()
+
+
+def get_cms_publisher() -> CMSPublisher:
+    """Return the CMS publisher used to create WordPress drafts.
+
+    Raises `agents.wordpress.client.WordPressConfigurationError` (handled
+    in `app.api.errors`, translated to a 503) when
+    `WORDPRESS_SITE_URL`/`WORDPRESS_USERNAME`/`WORDPRESS_APP_PASSWORD`
+    are not set in `.env` — Sprint 4A, Increment 3.
+    """
+    return WordPressCMSPublisher(get_settings())
 
 
 def hash_session_token(token: str) -> str:

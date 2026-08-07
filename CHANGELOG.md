@@ -9,6 +9,42 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **Sprint 4A, Incremento 3 — integración real con WordPress (creación
+  automática de borradores)**: ver
+  [ADR-006](docs/adr/ADR-006-multichannel-publication.md), Decisión 4.
+  - `agents/wordpress/client.py` (`WordPressCMSPublisher`): primer
+    adaptador real de `core.ports.cms_publisher.CMSPublisher` —
+    autentica con un Application Password de WordPress (nunca la
+    contraseña de la cuenta) vía HTTP Basic Auth contra
+    `/wp-json/wp/v2/posts`, siempre con `status=draft`. Nunca publica —
+    docs/PROJECT_RULES.md regla 1.
+  - `CMSPublisher.create_draft` cambia su tipo de retorno de `str` a
+    `CMSDraftResult` (`post_id` + `url`) — corrección a ADR-006 (decía
+    "sin modificarlo"), sin riesgo real porque ningún adaptador existía
+    todavía.
+  - `core.services.wordpress_publication_service`: `construir_contenido_wordpress`
+    (arma `{title, content}` desde una `PublicationRequest`, usando
+    `titulo` o los primeros 60 caracteres de `texto` si no hay título) y
+    `crear_borrador` (llama al `CMSPublisher` inyectado, adjunta
+    `wp_post_id`/`wp_url` al `DestinoPublicacion` sin cambiar su
+    `estado` — crear un borrador no es lo mismo que publicar).
+  - API: `POST /publication-requests/{id}/destinos` (crear un destino),
+    `GET .../destinos` (listar), `POST
+    .../destinos/{destino_id}/crear-borrador-wordpress` (dispara la
+    creación real del borrador). Nuevos manejadores de excepción:
+    `WordPressConfigurationError` → 503 (credenciales no configuradas),
+    `requests.RequestException` → 502 (WordPress inalcanzable o
+    rechazó la solicitud).
+  - `WORDPRESS_SITE_URL`/`WORDPRESS_USERNAME`/`WORDPRESS_APP_PASSWORD`
+    ya estaban declaradas en `config/settings.py` y `.env.example` desde
+    el sprint de Foundation (para "el futuro agente WordPress") — este
+    incremento es el primero en usarlas de verdad.
+  - Tests: 100% cobertura en todo el código nuevo. Los tests de API
+    fuerzan explícitamente un `Settings()` sin configurar en el caso
+    503 (nunca dependen del `.env` real del entorno) precisamente para
+    que correr la suite no pueda disparar una llamada real contra un
+    sitio WordPress de producción.
+
 - **Sprint 4A, Incremento 2 — título en el formulario de solicitudes**:
   campo `titulo` expuesto de punta a punta — `POST /publication-requests`
   lo acepta (opcional), `PATCH /{id}` lo edita mientras la solicitud siga

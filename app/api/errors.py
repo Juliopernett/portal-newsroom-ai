@@ -8,9 +8,12 @@ opaque 500 instead of a response the caller can actually act on.
 
 from __future__ import annotations
 
+import requests
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
+
+from agents.wordpress.client import WordPressConfigurationError
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -28,3 +31,17 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=400,
             content={"detail": "Referenced entity does not exist or violates a constraint"},
         )
+
+    @app.exception_handler(WordPressConfigurationError)
+    async def handle_wordpress_configuration_error(
+        _request: Request, exc: WordPressConfigurationError
+    ) -> JSONResponse:
+        """WordPress credentials are not set in `.env` yet (Sprint 4A, Increment 3)."""
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+    @app.exception_handler(requests.RequestException)
+    async def handle_wordpress_request_error(
+        _request: Request, exc: requests.RequestException
+    ) -> JSONResponse:
+        """The real WordPress site rejected the request or was unreachable."""
+        return JSONResponse(status_code=502, content={"detail": f"WordPress request failed: {exc}"})
