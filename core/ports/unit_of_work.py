@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from types import TracebackType
 
 from core.ports.client_repository import ClientRepository
+from core.ports.destino_publicacion_repository import DestinoPublicacionRepository
 from core.ports.pauta_repository import PautaRepository
 from core.ports.publication_request_repository import PublicationRequestRepository
 from core.ports.session_repository import SessionRepository
@@ -24,16 +25,17 @@ class UnitOfWork(ABC):
 
     Concrete adapters (`database.unit_of_work.SqlAlchemyUnitOfWork`) open a
     transaction on `__enter__` and expose `clients`/`pautas`/
-    `publication_requests`/`users`/`sessions` bound to it. Exiting the
-    `with` block always rolls back unless `commit()` was called explicitly
-    first — the same discipline regardless of what happened inside the
-    block, so callers never have to remember to clean up after an
-    exception.
+    `publication_requests`/`destinos_publicacion`/`users`/`sessions` bound
+    to it. Exiting the `with` block always rolls back unless `commit()`
+    was called explicitly first — the same discipline regardless of what
+    happened inside the block, so callers never have to remember to clean
+    up after an exception.
     """
 
     clients: ClientRepository
     pautas: PautaRepository
     publication_requests: PublicationRequestRepository
+    destinos_publicacion: DestinoPublicacionRepository
     users: UserRepository
     sessions: SessionRepository
 

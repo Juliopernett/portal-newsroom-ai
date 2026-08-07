@@ -7,6 +7,57 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added
+
+- **Sprint 4A, Incremento 1 — modelo de dominio multicanal**: primer paso
+  de la reestructuración de Solicitudes de Publicación hacia contenido
+  reutilizable con múltiples destinos — ver
+  [ADR-006](docs/adr/ADR-006-multichannel-publication.md) para el diseño
+  completo y `docs/product/DOMAIN_MODEL.md` para el modelo actualizado.
+  Puramente aditivo: ningún endpoint, servicio o comportamiento existente
+  cambia — el botón "Publicar" y el cálculo de cuota de `PautaService`
+  siguen funcionando exactamente igual que antes de este incremento.
+  - `core.entities.destino_publicacion.DestinoPublicacion` (+
+    `CanalPublicacion`: `WORDPRESS`/`FACEBOOK`/`INSTAGRAM`, `EstadoDestino`:
+    `PENDIENTE`/`PUBLICADO`/`FALLIDO`/`CANCELADO`) — una fila por
+    `(solicitud, canal)`, cada una con su propio ciclo de vida.
+  - `core.services.destino_publicacion_service`: `marcar_publicado`,
+    `marcar_fallido`, `cancelar` (transiciones inmutables) y
+    `esta_completa` — la condición derivada, nunca almacenada, que
+    determina si una solicitud terminó de distribuirse en todos sus
+    destinos.
+  - `PublicationRequest` gana `titulo` y `fecha_cierre` (ambos
+    opcionales, sin uso todavío por ningún endpoint) y
+    `core.services.publication_request_service.cerrar_si_completa`, que
+    asigna `fecha_cierre` una sola vez, la primera vez que
+    `esta_completa` es verdadero — mismo patrón de timestamp de
+    auditoría que `Pauta.fecha_registro`.
+  - **`PublicationRequestStatus` NO se reduce en este incremento** —
+    `PUBLICADA` se mantiene, a diferencia de lo previsto originalmente en
+    ADR-006 Decisión 5: retirarla ahora habría roto
+    `PautaService.publicaciones_consumidas` y, en cascada,
+    `AnalyticsService`, `decision_engine` y las rutas de dashboard/
+    insights (30 archivos referencian estos conceptos) sin la validación
+    contra datos reales que la propia Decisión 3 del ADR exige antes de
+    ese cambio. Ese cutover queda confirmado para el Incremento 4, no
+    este.
+  - Persistencia: `DestinoPublicacionModel` (tabla nueva
+    `destinos_publicacion`, FK a `publication_requests` y a `users`),
+    `SqlAlchemyDestinoPublicacionRepository`,
+    `core.ports.destino_publicacion_repository.DestinoPublicacionRepository`;
+    `UnitOfWork` gana `destinos_publicacion`. Migración
+    `15f24c0ea8ef` (aditiva: agrega `titulo`/`fecha_cierre` nullable a
+    `publication_requests`, crea `destinos_publicacion`), verificada con
+    un ciclo completo `upgrade` → `downgrade` → `upgrade` y `alembic
+    check` sin drift.
+  - Mismo hallazgo de orden de inserción que ya documentó el Login MVP
+    (`sessions`/`users`): `destinos_publicacion` ordena alfabéticamente
+    antes que `publication_requests`, así que guardar ambas filas nuevas
+    en un solo `commit()` sin `flush()` intermedio falla por FK — resuelto
+    en los fixtures de test de la misma forma, sin afectar código de
+    producción.
+  - Cobertura 100% en todo el código nuevo/modificado de este incremento.
+
 ### Fixed
 
 - **Primer deploy real a Railway, 2 fallos encontrados y corregidos en el camino:**

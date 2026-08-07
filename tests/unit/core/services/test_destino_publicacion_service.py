@@ -1,0 +1,171 @@
+"""Unit tests for destino_publicacion_service."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+import pytest
+
+from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
+from core.services.destino_publicacion_service import (
+    cancelar,
+    esta_completa,
+    marcar_fallido,
+    marcar_publicado,
+)
+
+
+def _destino(**overrides: object) -> DestinoPublicacion:
+    defaults: dict[str, object] = {
+        "publication_request_id": "solicitud-1",
+        "canal": CanalPublicacion.WORDPRESS,
+    }
+    defaults.update(overrides)
+    return DestinoPublicacion(**defaults)
+
+
+def test_marcar_publicado_transitions_status() -> None:
+    destino = _destino()
+
+    resultado = marcar_publicado(destino, registrado_por_user_id="user-1")
+
+    assert resultado.estado == EstadoDestino.PUBLICADO
+    assert resultado.registrado_por_user_id == "user-1"
+    assert isinstance(resultado.fecha_publicacion, datetime)
+
+
+def test_marcar_publicado_does_not_mutate_the_original() -> None:
+    destino = _destino()
+
+    marcar_publicado(destino)
+
+    assert destino.estado == EstadoDestino.PENDIENTE
+
+
+def test_marcar_publicado_accepts_explicit_fecha_publicacion() -> None:
+    destino = _destino()
+    fecha = datetime(2026, 8, 6, 12, 0, tzinfo=UTC)
+
+    resultado = marcar_publicado(destino, fecha_publicacion=fecha)
+
+    assert resultado.fecha_publicacion == fecha
+
+
+def test_marcar_publicado_sets_wordpress_fields() -> None:
+    destino = _destino(canal=CanalPublicacion.WORDPRESS)
+
+    resultado = marcar_publicado(destino, wp_post_id="42", wp_url="https://example.com/?p=42")
+
+    assert resultado.wp_post_id == "42"
+    assert resultado.wp_url == "https://example.com/?p=42"
+
+
+def test_marcar_publicado_sets_url_publicacion_for_social_channel() -> None:
+    destino = _destino(canal=CanalPublicacion.FACEBOOK)
+
+    resultado = marcar_publicado(destino, url_publicacion="https://facebook.com/post/1")
+
+    assert resultado.url_publicacion == "https://facebook.com/post/1"
+
+
+def test_marcar_publicado_allows_retry_from_fallido() -> None:
+    destino = _destino(estado=EstadoDestino.FALLIDO, ultimo_error="timeout")
+
+    resultado = marcar_publicado(destino)
+
+    assert resultado.estado == EstadoDestino.PUBLICADO
+
+
+@pytest.mark.parametrize(
+    "estado",
+    [EstadoDestino.CANCELADO],
+)
+def test_marcar_publicado_rejects_terminal_destino(estado: EstadoDestino) -> None:
+    destino = _destino(estado=estado)
+
+    with pytest.raises(ValueError, match="terminal"):
+        marcar_publicado(destino)
+
+
+def test_marcar_publicado_rejects_already_published_destino() -> None:
+    destino = _destino(
+        estado=EstadoDestino.PUBLICADO, fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC)
+    )
+
+    with pytest.raises(ValueError, match="terminal"):
+        marcar_publicado(destino)
+
+
+def test_marcar_fallido_transitions_status_and_records_error() -> None:
+    destino = _destino()
+
+    resultado = marcar_fallido(destino, error="WordPress no respondió")
+
+    assert resultado.estado == EstadoDestino.FALLIDO
+    assert resultado.ultimo_error == "WordPress no respondió"
+
+
+def test_marcar_fallido_rejects_terminal_destino() -> None:
+    destino = _destino(estado=EstadoDestino.CANCELADO)
+
+    with pytest.raises(ValueError, match="terminal"):
+        marcar_fallido(destino, error="no importa")
+
+
+def test_cancelar_transitions_status() -> None:
+    destino = _destino()
+
+    resultado = cancelar(destino)
+
+    assert resultado.estado == EstadoDestino.CANCELADO
+
+
+def test_cancelar_allows_cancelling_a_failed_destino() -> None:
+    destino = _destino(estado=EstadoDestino.FALLIDO, ultimo_error="timeout")
+
+    resultado = cancelar(destino)
+
+    assert resultado.estado == EstadoDestino.CANCELADO
+
+
+def test_cancelar_rejects_an_already_published_destino() -> None:
+    destino = _destino(
+        estado=EstadoDestino.PUBLICADO, fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC)
+    )
+
+    with pytest.raises(ValueError, match="publicado"):
+        cancelar(destino)
+
+
+def test_esta_completa_is_false_with_no_destinos() -> None:
+    assert esta_completa([]) is False
+
+
+def test_esta_completa_is_false_when_a_destino_is_still_pending() -> None:
+    destinos = [
+        _destino(canal=CanalPublicacion.WORDPRESS, estado=EstadoDestino.PENDIENTE),
+    ]
+
+    assert esta_completa(destinos) is False
+
+
+def test_esta_completa_is_false_when_all_destinos_are_cancelled() -> None:
+    destinos = [
+        _destino(canal=CanalPublicacion.WORDPRESS, estado=EstadoDestino.CANCELADO),
+        _destino(canal=CanalPublicacion.FACEBOOK, estado=EstadoDestino.CANCELADO),
+    ]
+
+    assert esta_completa(destinos) is False
+
+
+def test_esta_completa_is_true_when_all_terminal_and_one_published() -> None:
+    destinos = [
+        _destino(
+            canal=CanalPublicacion.WORDPRESS,
+            estado=EstadoDestino.PUBLICADO,
+            fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC),
+        ),
+        _destino(canal=CanalPublicacion.INSTAGRAM, estado=EstadoDestino.CANCELADO),
+    ]
+
+    assert esta_completa(destinos) is True

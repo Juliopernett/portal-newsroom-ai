@@ -13,6 +13,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from core.ports.unit_of_work import UnitOfWork
 from database.repositories.client_repository import SqlAlchemyClientRepository
+from database.repositories.destino_publicacion_repository import (
+    SqlAlchemyDestinoPublicacionRepository,
+)
 from database.repositories.pauta_repository import SqlAlchemyPautaRepository
 from database.repositories.publication_request_repository import (
     SqlAlchemyPublicationRequestRepository,
@@ -22,7 +25,8 @@ from database.repositories.user_repository import SqlAlchemyUserRepository
 
 
 class SqlAlchemyUnitOfWork(UnitOfWork):
-    """Groups `Client`/`Pauta`/`PublicationRequest`/`User`/`Session` repos in one transaction."""
+    """Groups `Client`/`Pauta`/`PublicationRequest`/`DestinoPublicacion`/`User`/`Session`
+    repos in one transaction."""
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
@@ -33,6 +37,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.clients = SqlAlchemyClientRepository(self._session)
         self.pautas = SqlAlchemyPautaRepository(self._session)
         self.publication_requests = SqlAlchemyPublicationRequestRepository(self._session)
+        self.destinos_publicacion = SqlAlchemyDestinoPublicacionRepository(self._session)
         self.users = SqlAlchemyUserRepository(self._session)
         self.sessions = SqlAlchemySessionRepository(self._session)
         return self

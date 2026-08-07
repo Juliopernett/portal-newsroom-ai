@@ -6,7 +6,10 @@ from `core.entities.publication_request.PublicationRequest` — see
 `database.repositories.publication_request_repository`.
 
 `pauta_id` is nullable — mirrors the domain adjustment from Sprint 3B.1: a
-request can exist before anyone links it to a `Pauta`.
+request can exist before anyone links it to a `Pauta`. `titulo` and
+`fecha_cierre` are Sprint 4A additions (ADR-006, Increment 1), both
+nullable — see `core.entities.publication_request` for why neither is
+required at this layer yet.
 """
 
 from __future__ import annotations
@@ -29,7 +32,9 @@ class PublicationRequestModel(Base):
         String(36), ForeignKey("pautas.id"), nullable=True, index=True
     )
     fecha_recepcion: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    titulo: Mapped[str | None] = mapped_column(String, nullable=True)
     texto: Mapped[str] = mapped_column(String, nullable=False)
     estado: Mapped[str] = mapped_column(String(20), nullable=False)
     prioridad_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     observaciones: Mapped[str | None] = mapped_column(String, nullable=True)
+    fecha_cierre: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

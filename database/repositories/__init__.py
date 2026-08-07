@@ -9,6 +9,9 @@ opens one itself, see `database.unit_of_work.SqlAlchemyUnitOfWork`.
 from __future__ import annotations
 
 from database.repositories.client_repository import SqlAlchemyClientRepository
+from database.repositories.destino_publicacion_repository import (
+    SqlAlchemyDestinoPublicacionRepository,
+)
 from database.repositories.pauta_repository import SqlAlchemyPautaRepository
 from database.repositories.publication_request_repository import (
     SqlAlchemyPublicationRequestRepository,
@@ -18,6 +21,7 @@ from database.repositories.user_repository import SqlAlchemyUserRepository
 
 __all__ = [
     "SqlAlchemyClientRepository",
+    "SqlAlchemyDestinoPublicacionRepository",
     "SqlAlchemyPautaRepository",
     "SqlAlchemyPublicationRequestRepository",
     "SqlAlchemySessionRepository",
