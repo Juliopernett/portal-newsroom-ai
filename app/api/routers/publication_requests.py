@@ -37,6 +37,15 @@ Generación automática (se arma en el momento en que se pide); el envío
 al cliente sigue siendo manual, no hay integración de envío en este
 sprint.
 
+`/{request_id}/media` (Incremento 7 — see
+docs/adr/ADR-007-media-assets.md) exposes `MediaAsset` CRUD scoped to
+one solicitud: `POST` uploads a file (`multipart/form-data`, rejected
+with 409 once the solicitud is `completa` — see Decision 4), `GET`
+lists metadata only, `GET .../{media_id}/contenido` streams the actual
+bytes back (authenticated — never a public URL, see Decision 2), and
+`DELETE` removes one manually before the automatic purge
+(`scripts/purgar_media_expirados.py`) reaches it.
+
 Every route requires an authenticated session — `dependencies=` at the
 `APIRouter` level, not per-function, so a route added here later is
 protected automatically instead of by remembering to add it.
@@ -44,14 +53,23 @@ protected automatically instead of by remembering to add it.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from uuid import uuid4
 
-from app.api.dependencies import get_cms_publisher, get_current_user, get_unit_of_work
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import Response
+
+from app.api.dependencies import (
+    get_cms_publisher,
+    get_current_user,
+    get_media_storage,
+    get_unit_of_work,
+)
 from app.api.schemas.destino_publicacion import (
     DestinoPublicacionConfirmarPublicacion,
     DestinoPublicacionCreate,
     DestinoPublicacionOut,
 )
+from app.api.schemas.media_asset import MediaAssetOut
 from app.api.schemas.publication_request import (
     PublicationRequestCreate,
     PublicationRequestLinkPauta,
@@ -59,13 +77,21 @@ from app.api.schemas.publication_request import (
     PublicationRequestUpdate,
 )
 from app.api.schemas.reporte import ReporteSolicitudOut
+from config.settings import get_settings
 from core.analytics import AnalyticsService
 from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion
+from core.entities.media_asset import MediaAsset
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.entities.user import User
 from core.ports.cms_publisher import CMSPublisher
+from core.ports.media_storage import MediaStorage
 from core.ports.unit_of_work import UnitOfWork
 from core.services.destino_publicacion_service import cancelar, marcar_publicado
+from core.services.media_asset_service import (
+    construir_storage_key,
+    determinar_tipo,
+    validar_tamano,
+)
 from core.services.publication_request_service import (
     aceptar,
     cerrar_si_completa,
@@ -359,3 +385,102 @@ def obtener_reporte(
         if pauta is not None:
             cliente = uow.clients.get_by_id(pauta.client_id)
     return construir_reporte(solicitud, destinos, cliente)
+
+
+@router.post("/{request_id}/media", response_model=MediaAssetOut, status_code=201)
+async def subir_media(
+    request_id: str,
+    archivo: UploadFile = File(...),
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    current_user: User = Depends(get_current_user),
+    media_storage: MediaStorage = Depends(get_media_storage),
+) -> MediaAsset:
+    """Attach a file (imagen o video) to a PublicationRequest (Incremento 7).
+
+    Rejects (409) once the solicitud is `completa` — no reason to attach
+    material to something already resolved on every destino, and it keeps
+    `scripts/purgar_media_expirados.py`'s job well-defined. `tipo` is
+    derived from `archivo.content_type`, never trusted from the client as
+    a separate field.
+    """
+    solicitud = uow.publication_requests.get_by_id(request_id)
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    if solicitud.fecha_cierre is not None:
+        raise HTTPException(
+            status_code=409, detail="PublicationRequest is already completa — cannot attach media"
+        )
+    settings = get_settings()
+    tipo = determinar_tipo(archivo.content_type or "")
+    contenido = await archivo.read()
+    validar_tamano(
+        tipo,
+        len(contenido),
+        max_bytes_imagen=settings.media_max_bytes_imagen,
+        max_bytes_video=settings.media_max_bytes_video,
+    )
+    media_id = str(uuid4())
+    media = MediaAsset(
+        id=media_id,
+        publication_request_id=request_id,
+        tipo=tipo,
+        nombre_archivo=archivo.filename or "archivo",
+        content_type=archivo.content_type or "",
+        tamano_bytes=len(contenido),
+        storage_key=construir_storage_key(request_id, media_id),
+        subido_por_user_id=current_user.id,
+    )
+    media_storage.guardar(media.storage_key, contenido)
+    uow.media_assets.save(media)
+    uow.commit()
+    return media
+
+
+@router.get("/{request_id}/media", response_model=list[MediaAssetOut])
+def list_media(request_id: str, uow: UnitOfWork = Depends(get_unit_of_work)) -> list[MediaAsset]:
+    """Return every media asset attached to a PublicationRequest (metadata only)."""
+    solicitud = uow.publication_requests.get_by_id(request_id)
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    return uow.media_assets.list_by_publication_request_id(request_id)
+
+
+@router.get("/{request_id}/media/{media_id}/contenido")
+def descargar_media(
+    request_id: str,
+    media_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    media_storage: MediaStorage = Depends(get_media_storage),
+) -> Response:
+    """Stream a MediaAsset's raw file content — authenticated, never a public URL."""
+    media = uow.media_assets.get_by_id(media_id)
+    if media is None or media.publication_request_id != request_id:
+        raise HTTPException(status_code=404, detail="MediaAsset not found")
+    try:
+        contenido = media_storage.leer(media.storage_key)
+    except FileNotFoundError as exc:
+        # The DB row survived but the underlying file did not (manual disk
+        # cleanup, volume reset, ...) — a 404 is more actionable than an
+        # opaque 500 for what is still "this content isn't there".
+        raise HTTPException(status_code=404, detail="MediaAsset content not found") from exc
+    return Response(
+        content=contenido,
+        media_type=media.content_type,
+        headers={"Content-Disposition": f'inline; filename="{media.nombre_archivo}"'},
+    )
+
+
+@router.delete("/{request_id}/media/{media_id}", status_code=204)
+def eliminar_media(
+    request_id: str,
+    media_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    media_storage: MediaStorage = Depends(get_media_storage),
+) -> None:
+    """Manually delete a MediaAsset before the automatic purge reaches it."""
+    media = uow.media_assets.get_by_id(media_id)
+    if media is None or media.publication_request_id != request_id:
+        raise HTTPException(status_code=404, detail="MediaAsset not found")
+    media_storage.eliminar(media.storage_key)
+    uow.media_assets.delete(media_id)
+    uow.commit()

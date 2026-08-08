@@ -12,6 +12,7 @@ from database.repositories.client_repository import SqlAlchemyClientRepository
 from database.repositories.destino_publicacion_repository import (
     SqlAlchemyDestinoPublicacionRepository,
 )
+from database.repositories.media_asset_repository import SqlAlchemyMediaAssetRepository
 from database.repositories.pauta_repository import SqlAlchemyPautaRepository
 from database.repositories.publication_request_repository import (
     SqlAlchemyPublicationRequestRepository,
@@ -22,6 +23,7 @@ from database.repositories.user_repository import SqlAlchemyUserRepository
 __all__ = [
     "SqlAlchemyClientRepository",
     "SqlAlchemyDestinoPublicacionRepository",
+    "SqlAlchemyMediaAssetRepository",
     "SqlAlchemyPautaRepository",
     "SqlAlchemyPublicationRequestRepository",
     "SqlAlchemySessionRepository",

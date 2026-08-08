@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from core.entities.client import Client, ClientType
 from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion
+from core.entities.media_asset import MediaAsset, MediaAssetType
 from core.entities.publication_request import PublicationRequest
 from database.unit_of_work import SqlAlchemyUnitOfWork
 
@@ -82,3 +83,31 @@ def test_destinos_publicacion_is_wired_into_the_same_transaction(
 
     with SqlAlchemyUnitOfWork(session_factory) as uow:
         assert uow.destinos_publicacion.get_by_id(destino.id) == destino
+
+
+def test_media_assets_is_wired_into_the_same_transaction(
+    session_factory: sessionmaker[Session],
+) -> None:
+    """Same two-block shape as test_destinos_publicacion_is_wired_into_the_same_transaction
+    — `media_assets` sorts alphabetically before `publication_requests` too,
+    same FK-ordering pitfall."""
+    solicitud = PublicationRequest(texto="Solicitud de ejemplo")
+    media = MediaAsset(
+        publication_request_id=solicitud.id,
+        tipo=MediaAssetType.IMAGEN,
+        nombre_archivo="foto.jpg",
+        content_type="image/jpeg",
+        tamano_bytes=1024,
+        storage_key="solicitud-1/foto.jpg",
+    )
+
+    with SqlAlchemyUnitOfWork(session_factory) as uow:
+        uow.publication_requests.save(solicitud)
+        uow.commit()
+
+    with SqlAlchemyUnitOfWork(session_factory) as uow:
+        uow.media_assets.save(media)
+        uow.commit()
+
+    with SqlAlchemyUnitOfWork(session_factory) as uow:
+        assert uow.media_assets.get_by_id(media.id) == media

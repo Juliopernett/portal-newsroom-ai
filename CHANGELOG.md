@@ -25,6 +25,48 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **Sprint 4A, Incremento 7 — MediaAsset (adjuntos de imagen/video)** —
+  ver [ADR-007](docs/adr/ADR-007-media-assets.md). Cierra el rollout de
+  Sprint 4A. `MediaAsset` pasa de Value Object conceptual (Sprint 3A) a
+  entidad hija con tabla propia, mismo tratamiento que `DestinoPublicacion`
+  recibió en ADR-006 — necesitaba identidad propia para poder purgar/
+  borrar un archivo puntual.
+  - Nuevo puerto `MediaStorage` (`guardar`/`leer`/`eliminar`), adaptador
+    `LocalDiskMediaStorage` sobre un Railway Volume — elegido sobre S3/R2
+    para no requerir cuenta/credenciales nuevas en este incremento; la
+    política de retención acota el tamaño acumulado. Swapear a S3/R2 más
+    adelante es un adaptador nuevo detrás del mismo puerto, sin tocar
+    dominio ni API.
+  - `POST/GET/DELETE /publication-requests/{id}/media` y
+    `GET .../{media_id}/contenido` (descarga autenticada, streaming — no
+    hay URL pública). Subir un archivo se rechaza con 409 una vez la
+    solicitud está `completa`; `tipo` (imagen/video) se deriva siempre de
+    `content_type`, nunca se confía en un campo separado del cliente.
+    Límites por defecto: 10 MB imagen, 200 MB video (`Settings`,
+    ajustables).
+  - Purga automática: `scripts/purgar_media_expirados.py` (mismo patrón
+    operativo que `create_user.py`/`migrate_historical_data.py` — un
+    script explícito, no un scheduler dentro del proceso FastAPI) borra
+    archivo + fila 7 días (ajustable) después de `fecha_cierre`. Soporta
+    `--dry-run`. Idempotente.
+  - UI: botón "Media" en cualquier tarjeta (mismo criterio que "Ver
+    reporte" — útil en cualquier momento de avance, no solo publicada),
+    panel con lista de adjuntos (tipo, nombre, peso, enlace "Ver",
+    "Eliminar") y formulario de subida — oculto una vez la solicitud está
+    completa, para no toparse con el 409 del backend.
+  - Tests: 100% cobertura en entidad, servicio de dominio, adaptador de
+    storage, repositorio y script de purga; suite de integración cubre
+    subida (imagen/video, 404, tipo no soportado, límite de tamaño
+    excedido, 409 sobre solicitud completa), listado, descarga (incluido
+    el caso "fila en DB pero archivo ya no está en disco" → 404 en vez de
+    500), y borrado. Verificado también de forma interactiva en Chrome
+    real: abrir/cerrar el panel, subir, descargar (el navegador renderizó
+    el PNG real servido por el endpoint), eliminar — con un error real
+    encontrado y corregido en el camino (la migración de `media_assets`
+    no se había aplicado todavía a la base de datos local de desarrollo).
+    Nueva dependencia de producción: `python-multipart` (requerida por
+    FastAPI para `multipart/form-data`).
+
 - **Sprint 4A, Incremento 6 — Reportes automáticos para clientes**: cada
   `PublicationRequest` gana un endpoint de solo lectura,
   `GET /publication-requests/{id}/reporte`, que arma en el momento un

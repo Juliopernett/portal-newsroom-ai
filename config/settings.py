@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     wordpress_username: str | None = None
     wordpress_app_password: str | None = None
 
+    # --- Media storage (MediaAsset — see docs/adr/ADR-007-media-assets.md) ---
+    # `media_storage_dir` points at a Railway Volume in production; a
+    # plain local directory otherwise (see `agents/storage/local_disk.py`).
+    media_storage_dir: Path = BASE_DIR / "database" / "media"
+    media_max_bytes_imagen: int = 10 * 1024 * 1024  # 10 MB
+    media_max_bytes_video: int = 200 * 1024 * 1024  # 200 MB
+    media_retention_dias: int = 7
+
     # --- Telegram (used by the future Telegram agent) ---
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None

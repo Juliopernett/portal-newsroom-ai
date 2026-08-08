@@ -15,11 +15,13 @@ from datetime import UTC, datetime
 
 from fastapi import Cookie, Depends, HTTPException, status
 
+from agents.storage.local_disk import LocalDiskMediaStorage
 from agents.wordpress.client import WordPressCMSPublisher
 from config.settings import get_settings
 from core.entities.session import Session as SessionEntity
 from core.entities.user import User
 from core.ports.cms_publisher import CMSPublisher
+from core.ports.media_storage import MediaStorage
 from core.ports.password_hasher import PasswordHasher
 from core.ports.unit_of_work import UnitOfWork
 from database.engine import get_session_factory
@@ -55,6 +57,16 @@ def get_cms_publisher() -> CMSPublisher:
     are not set in `.env` — Sprint 4A, Increment 3.
     """
     return WordPressCMSPublisher(get_settings())
+
+
+def get_media_storage() -> MediaStorage:
+    """Return the storage backend used to save/read/delete MediaAsset files.
+
+    Sprint 4A, Increment 7 (see docs/adr/ADR-007-media-assets.md). A
+    Railway Volume in production, a plain local directory otherwise — see
+    `agents.storage.local_disk.LocalDiskMediaStorage`.
+    """
+    return LocalDiskMediaStorage(get_settings().media_storage_dir)
 
 
 def hash_session_token(token: str) -> str:

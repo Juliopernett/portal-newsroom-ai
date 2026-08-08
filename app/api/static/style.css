@@ -1155,6 +1155,12 @@ button[type="submit"]:hover {
   resize: vertical;
 }
 
+.quick-form-titulo {
+  flex: 0 1 220px;
+  min-width: 0;
+  align-self: center;
+}
+
 .kanban {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1211,6 +1217,10 @@ button[type="submit"]:hover {
 }
 
 .kanban-card.is-editing {
+  border-left-color: var(--color-accent);
+}
+
+.kanban-card.is-en-curso {
   border-left-color: var(--color-accent);
 }
 
@@ -1278,6 +1288,14 @@ button[type="submit"]:hover {
   margin: 0 0 6px;
 }
 
+.kanban-card-titulo {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
 .kanban-card-texto {
   font-size: 0.82rem;
   color: var(--color-text-secondary);
@@ -1321,6 +1339,138 @@ button[type="submit"]:hover {
   padding: 5px 10px;
   min-height: auto;
   font-size: 0.78rem;
+}
+
+/* ---------- Destinos multicanal (Sprint 4A, Incremento 5) ---------- */
+
+.destinos-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--color-border);
+}
+
+.destinos-panel-empty {
+  font-size: 0.76rem;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  margin: 0;
+}
+
+.destino-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.78rem;
+}
+
+.destino-row-canal {
+  font-weight: 600;
+  min-width: 5.5rem;
+}
+
+.destino-row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.destino-row-actions .btn {
+  padding: 4px 8px;
+  min-height: auto;
+  font-size: 0.74rem;
+}
+
+.destino-row-link {
+  font-size: 0.74rem;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.destino-row-url {
+  font-size: 0.76rem;
+  padding: 4px 6px;
+  min-height: auto;
+  min-width: 11rem;
+  flex: 1;
+}
+
+.destino-row-agregar {
+  margin-top: 2px;
+}
+
+.destino-row-agregar select {
+  font-size: 0.78rem;
+  padding: 4px 6px;
+  min-height: auto;
+  flex: 1;
+  min-width: 0;
+}
+
+.destino-row-agregar .btn {
+  padding: 5px 10px;
+  min-height: auto;
+  font-size: 0.78rem;
+}
+
+/* ---------- Reporte automático (Sprint 4A, Incremento 6) ---------- */
+
+.reporte-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--color-border);
+}
+
+.reporte-panel-linea {
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.reporte-panel-sin-enlace {
+  font-size: 0.74rem;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+.reporte-panel .btn-copiar-reporte {
+  align-self: flex-start;
+  padding: 5px 10px;
+  min-height: auto;
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+/* ---------- MediaAsset (Sprint 4A, Incremento 7) ---------- */
+/* Reutiliza .reporte-panel (mismo look de panel con borde punteado
+   arriba) y .destino-row/.destino-row-actions/.destino-row-link/
+   .destino-row-agregar (misma fila con acciones a la derecha) -- solo
+   agrega lo que es específico de un adjunto: nombre de archivo y peso. */
+
+.media-row-nombre {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 12rem;
+}
+
+.media-row-tamano {
+  font-size: 0.74rem;
+  color: var(--color-text-tertiary);
+}
+
+.media-file-input {
+  font-size: 0.76rem;
+  flex: 1;
+  min-width: 0;
 }
 
 /* ---------- Inbox Editorial (Sprint UX 3.1) ---------- */
@@ -2226,6 +2376,11 @@ form {
 
   .quick-form-checkbox {
     align-self: flex-start;
+  }
+
+  .quick-form-titulo {
+    flex: none;
+    align-self: stretch;
   }
 
   .status {

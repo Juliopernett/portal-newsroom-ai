@@ -141,6 +141,12 @@ function formatMoneda(valor) {
   return "$" + Number(valor).toLocaleString("es-CO", { maximumFractionDigits: 0 });
 }
 
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function horasEnEspera(fechaRecepcionIso) {
   return (Date.now() - new Date(fechaRecepcionIso).getTime()) / 3_600_000;
 }
@@ -347,6 +353,34 @@ function setupGlobalClicks() {
       verTextoBtn.textContent = parrafo.classList.contains("is-truncated")
         ? "Ver texto completo"
         : "Ocultar";
+      return;
+    }
+    const reporteToggleBtn = event.target.closest("[data-reporte-toggle]");
+    if (reporteToggleBtn) {
+      toggleReportePanel(reporteToggleBtn.dataset.reporteToggle);
+      return;
+    }
+    const copiarReporteBtn = event.target.closest("[data-copiar-reporte]");
+    if (copiarReporteBtn) {
+      copiarReporte(copiarReporteBtn.dataset.copiarReporte);
+      return;
+    }
+    const mediaToggleBtn = event.target.closest("[data-media-toggle]");
+    if (mediaToggleBtn) {
+      toggleMediaPanel(mediaToggleBtn.dataset.mediaToggle);
+      return;
+    }
+    const subirMediaBtn = event.target.closest(".btn-subir-media");
+    if (subirMediaBtn) {
+      const input = document.querySelector(
+        `.media-file-input[data-id="${subirMediaBtn.dataset.id}"]`
+      );
+      subirMedia(subirMediaBtn.dataset.id, input ? input.files[0] : null);
+      return;
+    }
+    const eliminarMediaBtn = event.target.closest(".btn-eliminar-media");
+    if (eliminarMediaBtn) {
+      eliminarMedia(eliminarMediaBtn.dataset.id, eliminarMediaBtn.dataset.mediaId);
       return;
     }
     const openBtn = event.target.closest("[data-open-drawer]");
@@ -876,6 +910,56 @@ function abrirFichaCliente(clientId) {
 
 let editingSolicitudId = null;
 
+// ---------- Solicitudes: Destinos multicanal (Sprint 4A, Incremento 5) ----------
+// El picker de canales se limita a los tres ya automatizados/soportados
+// (WordPress crea borrador solo; Facebook/Instagram registran enlace a
+// mano) -- TikTok/YouTube ya existen en el modelo (CanalPublicacion) pero
+// deliberadamente no aparecen acá todavía, a pedido explícito del negocio.
+const CANALES_DESTINO = [
+  { value: "wordpress", label: "WordPress" },
+  { value: "facebook", label: "Facebook" },
+  { value: "instagram", label: "Instagram" },
+];
+
+const DESTINO_ESTADO_LABELS = {
+  pendiente: "Pendiente",
+  publicado: "Publicado",
+  fallido: "Falló",
+  cancelado: "Cancelado",
+};
+
+const DESTINO_ESTADO_BADGE = {
+  pendiente: "badge-neutral",
+  publicado: "badge-saludable",
+  fallido: "badge-critico",
+  cancelado: "badge-neutral",
+};
+
+// Qué tarjeta tiene el panel de destinos abierto (una a la vez, mismo
+// patrón que editingSolicitudId) y una cache por solicitud para no volver
+// a pedir la lista al backend en cada re-render de la columna.
+let destinosAbiertoId = null;
+const destinosCache = new Map();
+
+// Sprint 4A, Incremento 6 (Reportes automáticos): mismo patrón de
+// abierto/cache que destinosAbiertoId/destinosCache, pero independiente --
+// una tarjeta puede tener el panel de destinos y el de reporte abiertos a
+// la vez, son cosas distintas. Disponible en ambas columnas (pendientes y
+// publicadas), por eso su wiring vive en el click delegado en document
+// (setupGlobalClicks), no en el querySelectorAll por columna que usan los
+// botones de destinos.
+let reporteAbiertoId = null;
+const reporteCache = new Map();
+
+// Sprint 4A, Incremento 7 (MediaAsset): mismo patrón abierto/cache que
+// reporteAbiertoId/reporteCache -- también disponible en ambas columnas
+// (revisar qué se adjuntó sigue siendo útil sobre una solicitud ya
+// publicada), wiring por click delegado en document.
+let mediaAbiertoId = null;
+const mediaCache = new Map();
+
+const MEDIA_TIPO_LABELS = { imagen: "Imagen", video: "Video" };
+
 // Explica por qué una solicitud pendiente quedó en esa posición — mismo
 // criterio que ordena la cola en el backend (AnalyticsService.
 // solicitudes_pendientes_priorizadas), solo que acá se formatea en texto
@@ -939,6 +1023,7 @@ function renderKanbanCardEditForm(solicitud) {
         <span class="kanban-card-cliente">Editando solicitud…</span>
       </div>
       <form class="kanban-card-edit-form" data-id="${solicitud.id}">
+        <input type="text" class="kanban-card-edit-titulo" placeholder="Título (opcional)" value="${solicitud.titulo ?? ""}">
         <textarea class="kanban-card-edit-texto" rows="3" required>${solicitud.texto}</textarea>
         <label class="checkbox">
           <input type="checkbox" class="kanban-card-edit-prioridad" ${solicitud.prioridad_manual ? "checked" : ""}>
@@ -956,25 +1041,214 @@ function renderKanbanCardEditForm(solicitud) {
     </div>`;
 }
 
+// Opciones del <select> para agregar un destino nuevo -- excluye canales
+// que la solicitud ya tiene (en cualquier estado, incluido cancelado; si
+// de verdad hace falta repetir un canal cancelado, no es el caso común
+// que esta UI necesita cubrir hoy).
+function destinoCanalOptionsHtml(destinosExistentes) {
+  const usados = new Set(destinosExistentes.map((d) => d.canal));
+  return CANALES_DESTINO.filter((c) => !usados.has(c.value))
+    .map((c) => `<option value="${c.value}">${c.label}</option>`)
+    .join("");
+}
+
+function renderDestinoRow(solicitud, destino) {
+  const canalLabel = CANALES_DESTINO.find((c) => c.value === destino.canal)?.label ?? destino.canal;
+  const badgeClase = DESTINO_ESTADO_BADGE[destino.estado] ?? "badge-neutral";
+  const estadoLabel = DESTINO_ESTADO_LABELS[destino.estado] ?? destino.estado;
+
+  let accionesHtml = "";
+  if (destino.estado === "publicado") {
+    const url = destino.canal === "wordpress" ? destino.wp_url : destino.url_publicacion;
+    accionesHtml = url
+      ? `<a class="destino-row-link" href="${url}" target="_blank" rel="noopener">Ver publicación</a>`
+      : "";
+  } else if (destino.canal === "wordpress") {
+    accionesHtml = destino.wp_url
+      ? `<a class="destino-row-link" href="${destino.wp_url}" target="_blank" rel="noopener">Ver borrador</a>
+         <button type="button" class="btn btn-primary btn-confirmar-destino" data-id="${solicitud.id}" data-destino-id="${destino.id}">
+           Confirmar publicado
+         </button>`
+      : `<button type="button" class="btn btn-secondary btn-crear-borrador" data-id="${solicitud.id}" data-destino-id="${destino.id}">
+           Crear borrador
+         </button>`;
+    if (destino.estado !== "cancelado") {
+      accionesHtml += `
+         <button type="button" class="btn btn-secondary btn-cancelar-destino" data-id="${solicitud.id}" data-destino-id="${destino.id}">
+           Cancelar
+         </button>`;
+    }
+  } else {
+    // Facebook / Instagram: sin automatización todavía -- el operador
+    // pega el enlace a mano (ver ADR-006).
+    accionesHtml = `
+         <input type="url" class="destino-row-url" placeholder="Enlace de la publicación" data-destino-id="${destino.id}">
+         <button type="button" class="btn btn-primary btn-confirmar-destino" data-id="${solicitud.id}" data-destino-id="${destino.id}">
+           Confirmar
+         </button>
+         <button type="button" class="btn btn-secondary btn-cancelar-destino" data-id="${solicitud.id}" data-destino-id="${destino.id}">
+           Cancelar
+         </button>`;
+  }
+
+  return `
+    <div class="destino-row">
+      <span class="destino-row-canal">${canalLabel}</span>
+      <span class="badge ${badgeClase}">${estadoLabel}</span>
+      <div class="destino-row-actions">${accionesHtml}</div>
+    </div>`;
+}
+
+function renderDestinosPanel(solicitud) {
+  const destinos = destinosCache.get(solicitud.id) || [];
+  const filasHtml = destinos.length
+    ? destinos.map((d) => renderDestinoRow(solicitud, d)).join("")
+    : `<p class="destinos-panel-empty">Sin destinos todavía.</p>`;
+  const opciones = destinoCanalOptionsHtml(destinos);
+  const agregarHtml = opciones
+    ? `<div class="destino-row destino-row-agregar">
+         <select class="destino-select" data-id="${solicitud.id}">
+           <option value="">Agregar destino…</option>
+           ${opciones}
+         </select>
+         <button type="button" class="btn btn-secondary btn-agregar-destino" data-id="${solicitud.id}">
+           <svg class="icon"><use href="#icon-plus"></use></svg>Agregar
+         </button>
+       </div>`
+    : "";
+  return `<div class="destinos-panel">${filasHtml}${agregarHtml}</div>`;
+}
+
+// Texto plano para "Copiar reporte" -- generación automática, envío manual
+// (Sprint 4A, Incremento 6): el sistema arma el texto, compartirlo con el
+// cliente sigue siendo una acción humana (copiar y pegar en WhatsApp/email,
+// no hay integración de envío). Mismos datos que renderReportePanel, en
+// formato de texto en vez de HTML.
+function formatoReporteTexto(reporte) {
+  const lineas = [
+    reporte.titulo ? `Reporte: ${reporte.titulo}` : "Reporte de publicación",
+    `Cliente: ${reporte.cliente_nombre ?? "(sin vincular)"}`,
+    `Estado: ${reporte.completa ? "Completa" : "En curso"}`,
+    `Pauta consumida: ${reporte.pauta_consumida ? "Sí" : "No"}`,
+    "",
+    "Destinos:",
+  ];
+  if (!reporte.destinos.length) {
+    lineas.push("  (sin destinos todavía)");
+  }
+  for (const destino of reporte.destinos) {
+    const canalLabel = CANALES_DESTINO.find((c) => c.value === destino.canal)?.label ?? destino.canal;
+    const estadoLabel = DESTINO_ESTADO_LABELS[destino.estado] ?? destino.estado;
+    let linea = `  - ${canalLabel}: ${estadoLabel}`;
+    if (destino.enlace) linea += ` — ${destino.enlace}`;
+    if (destino.fecha_publicacion) linea += ` (${formatFechaHoraNegocio(destino.fecha_publicacion)})`;
+    lineas.push(linea);
+  }
+  return lineas.join("\n");
+}
+
+function renderReportePanel(solicitud) {
+  const reporte = reporteCache.get(solicitud.id);
+  if (!reporte) return "";
+
+  const filasHtml = reporte.destinos.length
+    ? reporte.destinos
+        .map((destino) => {
+          const canalLabel =
+            CANALES_DESTINO.find((c) => c.value === destino.canal)?.label ?? destino.canal;
+          const badgeClase = DESTINO_ESTADO_BADGE[destino.estado] ?? "badge-neutral";
+          const estadoLabel = DESTINO_ESTADO_LABELS[destino.estado] ?? destino.estado;
+          const enlaceHtml = destino.enlace
+            ? `<a class="destino-row-link" href="${destino.enlace}" target="_blank" rel="noopener">Ver publicación</a>`
+            : `<span class="reporte-panel-sin-enlace">Sin enlace todavía</span>`;
+          return `
+            <div class="destino-row">
+              <span class="destino-row-canal">${canalLabel}</span>
+              <span class="badge ${badgeClase}">${estadoLabel}</span>
+              <div class="destino-row-actions">${enlaceHtml}</div>
+            </div>`;
+        })
+        .join("")
+    : `<p class="destinos-panel-empty">Sin destinos todavía.</p>`;
+
+  return `
+    <div class="reporte-panel">
+      <p class="reporte-panel-linea"><strong>Cliente:</strong> ${reporte.cliente_nombre ?? "(sin vincular)"}</p>
+      <p class="reporte-panel-linea"><strong>Pauta consumida:</strong> ${reporte.pauta_consumida ? "Sí" : "No"}</p>
+      ${filasHtml}
+      <button type="button" class="btn btn-secondary btn-copiar-reporte" data-copiar-reporte="${solicitud.id}">
+        <svg class="icon"><use href="#icon-detail"></use></svg>Copiar reporte
+      </button>
+    </div>`;
+}
+
+function renderMediaRow(solicitud, media) {
+  const tipoLabel = MEDIA_TIPO_LABELS[media.tipo] ?? media.tipo;
+  const href = `/publication-requests/${solicitud.id}/media/${media.id}/contenido`;
+  return `
+    <div class="destino-row">
+      <span class="destino-row-canal">${tipoLabel}</span>
+      <span class="media-row-nombre">${media.nombre_archivo}</span>
+      <span class="media-row-tamano">${formatBytes(media.tamano_bytes)}</span>
+      <div class="destino-row-actions">
+        <a class="destino-row-link" href="${href}" target="_blank" rel="noopener">Ver</a>
+        <button type="button" class="btn btn-secondary btn-eliminar-media" data-id="${solicitud.id}" data-media-id="${media.id}">
+          Eliminar
+        </button>
+      </div>
+    </div>`;
+}
+
+// Sin formulario de subir una vez la solicitud está completa -- el
+// backend lo rechaza con 409 (ver ADR-007 Decisión 4); ocultarlo evita
+// que el operador tope con ese error sin entender por qué.
+function renderMediaPanel(solicitud, esPublicada) {
+  const media = mediaCache.get(solicitud.id) || [];
+  const filasHtml = media.length
+    ? media.map((m) => renderMediaRow(solicitud, m)).join("")
+    : `<p class="destinos-panel-empty">Sin archivos adjuntos todavía.</p>`;
+  const subirHtml = esPublicada
+    ? ""
+    : `<div class="destino-row destino-row-agregar">
+         <input type="file" class="media-file-input" accept="image/*,video/*" data-id="${solicitud.id}">
+         <button type="button" class="btn btn-secondary btn-subir-media" data-id="${solicitud.id}">
+           <svg class="icon"><use href="#icon-image"></use></svg>Subir
+         </button>
+       </div>`;
+  return `<div class="reporte-panel">${filasHtml}${subirHtml}</div>`;
+}
+
 function renderKanbanCard(solicitud, esPublicada) {
   if (!esPublicada && solicitud.id === editingSolicitudId) {
     return renderKanbanCardEditForm(solicitud);
   }
 
+  // Sprint 4A, Incremento 5 (UI de destinos): una solicitud ya ACEPTADA
+  // pero todavía no completa (le falta confirmar algún destino) sigue
+  // viviendo en la columna "pendientes" -- ver loadSolicitudes() -- pero
+  // ya no tiene sentido ofrecerle Publicar/Vincular pauta/Editar (esas
+  // acciones son de triage, y el triage ya pasó). Solo queda gestionar
+  // sus destinos.
+  const esRecibida = !esPublicada && solicitud.estado === "recibida";
+  const esEnCurso = !esPublicada && solicitud.estado === "aceptada";
+
   const pauta = solicitud.pauta_id ? pautasById.get(solicitud.pauta_id) : null;
   const client = pauta ? clientsById.get(pauta.client_id) : null;
   const nombreCliente = client ? client.nombre : "(sin vincular)";
   const horas = horasEnEspera(solicitud.fecha_recepcion);
-  const esperandoMucho = !esPublicada && horas >= STALE_REQUEST_HOURS;
+  const esperandoMucho = esRecibida && horas >= STALE_REQUEST_HOURS;
   const hora = formatFechaHoraNegocio(solicitud.fecha_recepcion);
-  const tituloOrden = esPublicada ? "" : ` title="${razonOrdenSolicitud(solicitud, pauta)}"`;
-  const score = esPublicada ? null : scoreSolicitud(solicitud, pauta, horas);
+  const tituloOrden = esRecibida ? ` title="${razonOrdenSolicitud(solicitud, pauta)}"` : "";
+  const score = esRecibida ? scoreSolicitud(solicitud, pauta, horas) : null;
 
   const tags = [];
-  if (!esPublicada) {
+  if (esRecibida) {
     tags.push(
       `<span class="kanban-card-chip${esperandoMucho ? " kanban-card-chip-urgent" : ""}">⏱ ${formatHoras(horas)}</span>`
     );
+  }
+  if (esEnCurso) {
+    tags.push(`<span class="kanban-card-chip">🚀 En curso</span>`);
   }
   if (pauta) {
     tags.push(`<span class="kanban-card-chip">${PAUTA_TIPO_LABELS[pauta.tipo] ?? pauta.tipo}</span>`);
@@ -987,7 +1261,7 @@ function renderKanbanCard(solicitud, esPublicada) {
   }
 
   let accionHtml = "";
-  if (!esPublicada) {
+  if (esRecibida) {
     accionHtml = solicitud.pauta_id
       ? `<button type="button" class="btn btn-primary btn-publicar" data-id="${solicitud.id}">
            <svg class="icon"><use href="#icon-check"></use></svg>Publicar
@@ -1004,8 +1278,39 @@ function renderKanbanCard(solicitud, esPublicada) {
            <svg class="icon"><use href="#icon-edit"></use></svg>Editar
          </button>`;
   }
+  if (!esPublicada) {
+    const destinosAbiertos = destinosAbiertoId === solicitud.id;
+    accionHtml += `
+         <button type="button" class="btn btn-secondary btn-destinos-toggle" data-id="${solicitud.id}">
+           <svg class="icon"><use href="#icon-inbox"></use></svg>${destinosAbiertos ? "Ocultar destinos" : "Destinos"}
+         </button>`;
+  }
+  // Sprint 4A, Incremento 6: disponible en cualquier tarjeta (pendiente,
+  // en curso o publicada) -- una solicitud puede tener destinos y quedar
+  // parcialmente completa mucho antes de aparecer en "Publicadas" (ver
+  // ADR-006), y el reporte sigue siendo útil para revisar ese avance.
+  const reporteAbierto = reporteAbiertoId === solicitud.id;
+  accionHtml += `
+       <button type="button" class="btn btn-secondary" data-reporte-toggle="${solicitud.id}">
+         <svg class="icon"><use href="#icon-detail"></use></svg>${reporteAbierto ? "Ocultar reporte" : "Ver reporte"}
+       </button>`;
+  // Sprint 4A, Incremento 7 (MediaAsset): mismo criterio que el reporte --
+  // disponible en cualquier tarjeta, revisar/adjuntar material sigue
+  // siendo útil aunque la solicitud ya esté publicada (solo la subida se
+  // oculta ahí, ver renderMediaPanel).
+  const mediaAbierto = mediaAbiertoId === solicitud.id;
+  accionHtml += `
+       <button type="button" class="btn btn-secondary" data-media-toggle="${solicitud.id}">
+         <svg class="icon"><use href="#icon-image"></use></svg>${mediaAbierto ? "Ocultar media" : "Media"}
+       </button>`;
 
-  const claseExtra = esPublicada ? "is-publicada" : esperandoMucho ? "is-urgent" : "";
+  const claseExtra = esPublicada
+    ? "is-publicada"
+    : esEnCurso
+      ? "is-en-curso"
+      : esperandoMucho
+        ? "is-urgent"
+        : "";
   // Publicadas: solo un resumen corto por defecto, el texto completo queda
   // a un clic ("Ver texto completo") — pedido explícito del Sprint UX 3
   // para que la columna de publicadas no compita en espacio con la cola.
@@ -1013,6 +1318,15 @@ function renderKanbanCard(solicitud, esPublicada) {
     ? `<p class="kanban-card-texto is-truncated">${solicitud.texto}</p>
        <button type="button" class="kanban-card-ver">Ver texto completo</button>`
     : `<p class="kanban-card-texto">${solicitud.texto}</p>`;
+  const tituloHtml = solicitud.titulo
+    ? `<p class="kanban-card-titulo">${solicitud.titulo}</p>`
+    : "";
+  const destinosPanelHtml =
+    !esPublicada && destinosAbiertoId === solicitud.id ? renderDestinosPanel(solicitud) : "";
+  const reportePanelHtml =
+    reporteAbiertoId === solicitud.id ? renderReportePanel(solicitud) : "";
+  const mediaPanelHtml =
+    mediaAbiertoId === solicitud.id ? renderMediaPanel(solicitud, esPublicada) : "";
 
   return `
     <div class="kanban-card ${claseExtra}"${tituloOrden}>
@@ -1024,9 +1338,13 @@ function renderKanbanCard(solicitud, esPublicada) {
         <span class="kanban-card-time">${hora}</span>
       </div>
       ${tags.length ? `<div class="kanban-card-tags">${tags.join("")}</div>` : ""}
-      ${!esPublicada ? `<p class="kanban-card-priority-reason">${motivoPrioridadCorto(solicitud, pauta)}</p>` : ""}
+      ${esRecibida ? `<p class="kanban-card-priority-reason">${motivoPrioridadCorto(solicitud, pauta)}</p>` : ""}
+      ${tituloHtml}
       ${textoHtml}
       ${accionHtml ? `<div class="kanban-card-footer">${accionHtml}</div>` : ""}
+      ${destinosPanelHtml}
+      ${reportePanelHtml}
+      ${mediaPanelHtml}
     </div>`;
 }
 
@@ -1169,19 +1487,48 @@ function renderKanbanPendientesColumn() {
       event.preventDefault();
       guardarEdicionSolicitud(
         form.dataset.id,
+        form.querySelector(".kanban-card-edit-titulo").value,
         form.querySelector(".kanban-card-edit-texto").value,
         form.querySelector(".kanban-card-edit-prioridad").checked
       );
     });
   }
+  for (const btn of pendEl.querySelectorAll(".btn-destinos-toggle")) {
+    btn.addEventListener("click", () => toggleDestinosPanel(btn.dataset.id));
+  }
+  for (const btn of pendEl.querySelectorAll(".btn-agregar-destino")) {
+    btn.addEventListener("click", () => {
+      const select = pendEl.querySelector(`.destino-select[data-id="${btn.dataset.id}"]`);
+      agregarDestino(btn.dataset.id, select.value);
+    });
+  }
+  for (const btn of pendEl.querySelectorAll(".btn-crear-borrador")) {
+    btn.addEventListener("click", () => crearBorradorWordpress(btn.dataset.id, btn.dataset.destinoId));
+  }
+  for (const btn of pendEl.querySelectorAll(".btn-confirmar-destino")) {
+    btn.addEventListener("click", () => {
+      const input = pendEl.querySelector(`.destino-row-url[data-destino-id="${btn.dataset.destinoId}"]`);
+      confirmarDestino(btn.dataset.id, btn.dataset.destinoId, input ? input.value.trim() : null);
+    });
+  }
+  for (const btn of pendEl.querySelectorAll(".btn-cancelar-destino")) {
+    btn.addEventListener("click", () => cancelarDestino(btn.dataset.id, btn.dataset.destinoId));
+  }
 }
 
-async function guardarEdicionSolicitud(id, texto, prioridadManual) {
+async function guardarEdicionSolicitud(id, titulo, texto, prioridadManual) {
   try {
+    const body = { texto, prioridad_manual: prioridadManual };
+    // titulo solo se envía si tiene contenido -- omitido, el backend lo deja
+    // sin cambios (edit_solicitud no soporta "borrar" el título, ver su
+    // docstring); mandar "" causaría un 422 (PublicationRequest lo rechaza).
+    if (titulo.trim()) {
+      body.titulo = titulo.trim();
+    }
     await apiFetch(`/publication-requests/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ texto, prioridad_manual: prioridadManual }),
+      body: JSON.stringify(body),
     });
     showStatus("Solicitud actualizada.", false);
     editingSolicitudId = null;
@@ -1196,14 +1543,23 @@ async function loadSolicitudes() {
   // > peso comercial > fecha de recepción) — ver
   // AnalyticsService.solicitudes_pendientes_priorizadas. No se reordena
   // acá; hacerlo pisaría esa regla con una versión más pobre (solo fecha).
-  const [pendientes, publicadas] = await Promise.all([
+  //
+  // "Publicada" ya no es un estado (Sprint 4A, Incremento 4 — ver
+  // core.entities.publication_request) — una solicitud está completa
+  // cuando fecha_cierre no es null, sin importar su estado. Y una
+  // solicitud ya ACEPTADA pero todavía no completa ("en curso": le falta
+  // confirmar algún destino) sigue viviendo en la cola de trabajo, no
+  // debe desaparecer ni duplicarse en "Publicadas" -- por eso son tres
+  // pedidos, no dos.
+  const [recibidas, enCurso, publicadas] = await Promise.all([
     apiFetch("/publication-requests?estado=recibida"),
-    apiFetch("/publication-requests?estado=publicada"),
+    apiFetch("/publication-requests?estado=aceptada&completa=false"),
+    apiFetch("/publication-requests?completa=true"),
   ]);
-  publicadas.sort((a, b) => b.fecha_recepcion.localeCompare(a.fecha_recepcion));
+  publicadas.sort((a, b) => b.fecha_cierre.localeCompare(a.fecha_cierre));
+  const pendientes = [...recibidas, ...enCurso];
   solicitudesPendientesTodas = pendientes;
   solicitudesPublicadasTodas = publicadas;
-  const publicadasRecientes = publicadas.slice(0, 30);
 
   renderMetricasSolicitudes(pendientes, publicadas);
 
@@ -1211,19 +1567,28 @@ async function loadSolicitudes() {
   document.getElementById("kanban-count-publicadas").textContent = publicadas.length;
 
   renderKanbanPendientesColumn();
+  renderKanbanPublicadasColumn();
 
+  renderActividadReciente();
+}
+
+// Separado de loadSolicitudes (mismo motivo que renderKanbanPendientesColumn:
+// Sprint 4A, Incremento 6) para poder redibujar solo esta columna al
+// abrir/cerrar un panel de reporte, sin volver a pedirle nada al backend --
+// usa el mismo top-30 ya calculado en solicitudesPublicadasTodas.
+function renderKanbanPublicadasColumn() {
   const pubEl = document.getElementById("kanban-publicadas");
+  const publicadasRecientes = solicitudesPublicadasTodas.slice(0, 30);
   pubEl.innerHTML = publicadasRecientes.length
     ? publicadasRecientes.map((s) => renderKanbanCard(s, true)).join("")
     : renderEmptyState("📭", "Todavía no hay publicaciones.");
-
-  renderActividadReciente();
 }
 
 async function publicarSolicitud(id) {
   try {
     await apiFetch(`/publication-requests/${id}/publish`, { method: "POST" });
     showStatus("Solicitud publicada.", false);
+    await invalidarReporte(id);
     await Promise.all([loadSolicitudes(), loadClientesYPautas(), loadDashboard(), loadAlertas()]);
   } catch (error) {
     showStatus(error.message, true);
@@ -1243,6 +1608,218 @@ async function vincularPauta(id, pautaId) {
     });
     showStatus("Pauta vinculada. Ya se puede publicar.", false);
     await loadSolicitudes();
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+async function toggleDestinosPanel(id) {
+  if (destinosAbiertoId === id) {
+    destinosAbiertoId = null;
+    renderKanbanPendientesColumn();
+    return;
+  }
+  destinosAbiertoId = id;
+  if (!destinosCache.has(id)) {
+    try {
+      destinosCache.set(id, await apiFetch(`/publication-requests/${id}/destinos`));
+    } catch (error) {
+      showStatus(error.message, true);
+      destinosAbiertoId = null;
+      return;
+    }
+  }
+  renderKanbanPendientesColumn();
+}
+
+// Igual que toggleDestinosPanel, pero redibuja ambas columnas -- a
+// diferencia de destinos, el botón "Ver reporte" aparece tanto en
+// pendientes como en publicadas (ver renderKanbanCard), y no sabemos de
+// antemano en cuál de las dos vive la tarjeta que se acaba de tocar.
+async function toggleReportePanel(id) {
+  if (reporteAbiertoId === id) {
+    reporteAbiertoId = null;
+    renderKanbanPendientesColumn();
+    renderKanbanPublicadasColumn();
+    return;
+  }
+  reporteAbiertoId = id;
+  if (!reporteCache.has(id)) {
+    try {
+      reporteCache.set(id, await apiFetch(`/publication-requests/${id}/reporte`));
+    } catch (error) {
+      showStatus(error.message, true);
+      reporteAbiertoId = null;
+      return;
+    }
+  }
+  renderKanbanPendientesColumn();
+  renderKanbanPublicadasColumn();
+}
+
+async function copiarReporte(id) {
+  const reporte = reporteCache.get(id);
+  if (!reporte) return;
+  try {
+    await navigator.clipboard.writeText(formatoReporteTexto(reporte));
+    showStatus("Reporte copiado al portapapeles.", false);
+  } catch {
+    showStatus("No se pudo copiar el reporte. Copia el texto a mano.", true);
+  }
+}
+
+// Mismo patrón abrir/cerrar que toggleReportePanel -- ambas columnas,
+// mismo motivo (ver el comentario junto a mediaAbiertoId).
+async function toggleMediaPanel(id) {
+  if (mediaAbiertoId === id) {
+    mediaAbiertoId = null;
+    renderKanbanPendientesColumn();
+    renderKanbanPublicadasColumn();
+    return;
+  }
+  mediaAbiertoId = id;
+  if (!mediaCache.has(id)) {
+    try {
+      mediaCache.set(id, await apiFetch(`/publication-requests/${id}/media`));
+    } catch (error) {
+      showStatus(error.message, true);
+      mediaAbiertoId = null;
+      return;
+    }
+  }
+  renderKanbanPendientesColumn();
+  renderKanbanPublicadasColumn();
+}
+
+async function refrescarMediaSolo(id) {
+  mediaCache.set(id, await apiFetch(`/publication-requests/${id}/media`));
+  renderKanbanPendientesColumn();
+  renderKanbanPublicadasColumn();
+}
+
+async function subirMedia(id, file) {
+  if (!file) {
+    showStatus("Elige un archivo antes de subir.", true);
+    return;
+  }
+  const formData = new FormData();
+  formData.append("archivo", file);
+  try {
+    // Sin header Content-Type a mano -- el navegador arma el boundary
+    // multipart correcto solo cuando el body es un FormData y ese header
+    // se deja sin tocar.
+    await apiFetch(`/publication-requests/${id}/media`, { method: "POST", body: formData });
+    showStatus("Archivo subido.", false);
+    await refrescarMediaSolo(id);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+async function eliminarMedia(id, mediaId) {
+  try {
+    await apiFetch(`/publication-requests/${id}/media/${mediaId}`, { method: "DELETE" });
+    showStatus("Archivo eliminado.", false);
+    await refrescarMediaSolo(id);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+// Refresco liviano tras agregar un destino o crear un borrador de
+// WordPress -- ninguna de las dos cambia esta_completa, así que no hace
+// falta releer dashboard/pautas, solo la lista de destinos de esta tarjeta.
+async function refrescarDestinosSolo(id) {
+  destinosCache.set(id, await apiFetch(`/publication-requests/${id}/destinos`));
+  await invalidarReporte(id);
+  renderKanbanPendientesColumn();
+}
+
+// El reporte (completa, pauta_consumida, destinos) se deriva de los mismos
+// datos que cualquier acción de destinos puede cambiar -- agregar, crear
+// borrador, confirmar, cancelar, publicar. Sin esto, un reporte ya abierto
+// se queda mostrando el estado de antes del cambio (visto en verificación
+// manual: confirmar Facebook no actualizaba "Pendiente"/"Sin enlace" del
+// panel ya abierto). Si el panel está abierto para esta solicitud, se
+// refresca de una vez; si no, simplemente se descarta -- toggleReportePanel
+// ya sabe pedirlo de nuevo la próxima vez que se abra.
+async function invalidarReporte(id) {
+  reporteCache.delete(id);
+  if (reporteAbiertoId !== id) return;
+  try {
+    reporteCache.set(id, await apiFetch(`/publication-requests/${id}/reporte`));
+  } catch {
+    reporteAbiertoId = null;
+  }
+}
+
+// Refresco completo tras confirmar o cancelar un destino -- cualquiera de
+// las dos puede completar la solicitud (esta_completa) y mover la cuota
+// de la Pauta, así que sí hace falta releer todo lo que depende de eso.
+async function refrescarTrasCambioDeCompletitud(id) {
+  try {
+    destinosCache.set(id, await apiFetch(`/publication-requests/${id}/destinos`));
+  } catch {
+    // La solicitud pudo haber quedado completa y salir de la cola --
+    // seguir sin la cache actualizada no es un error, loadSolicitudes()
+    // de todas formas va a redibujar todo desde cero.
+    destinosCache.delete(id);
+  }
+  await invalidarReporte(id);
+  await Promise.all([loadSolicitudes(), loadClientesYPautas(), loadDashboard(), loadAlertas()]);
+}
+
+async function agregarDestino(id, canal) {
+  if (!canal) {
+    showStatus("Elige un canal antes de agregar.", true);
+    return;
+  }
+  try {
+    await apiFetch(`/publication-requests/${id}/destinos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ canal }),
+    });
+    showStatus("Destino agregado.", false);
+    await refrescarDestinosSolo(id);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+async function crearBorradorWordpress(id, destinoId) {
+  try {
+    await apiFetch(`/publication-requests/${id}/destinos/${destinoId}/crear-borrador-wordpress`, {
+      method: "POST",
+    });
+    showStatus("Borrador creado en WordPress.", false);
+    await refrescarDestinosSolo(id);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+async function confirmarDestino(id, destinoId, urlPublicacion) {
+  try {
+    await apiFetch(`/publication-requests/${id}/destinos/${destinoId}/confirmar-publicacion`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(urlPublicacion ? { url_publicacion: urlPublicacion } : {}),
+    });
+    showStatus("Destino confirmado.", false);
+    await refrescarTrasCambioDeCompletitud(id);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+async function cancelarDestino(id, destinoId) {
+  try {
+    await apiFetch(`/publication-requests/${id}/destinos/${destinoId}/cancelar`, {
+      method: "POST",
+    });
+    showStatus("Destino cancelado.", false);
+    await refrescarTrasCambioDeCompletitud(id);
   } catch (error) {
     showStatus(error.message, true);
   }
@@ -1931,8 +2508,10 @@ function setupFormSolicitud() {
   document.getElementById("form-solicitud").addEventListener("submit", async (event) => {
     event.preventDefault();
     const pautaId = document.getElementById("solicitud-pauta").value;
+    const titulo = document.getElementById("solicitud-titulo").value.trim();
     const payload = {
       pauta_id: pautaId || null,
+      titulo: titulo || null,
       texto: document.getElementById("solicitud-texto").value,
       prioridad_manual: document.getElementById("solicitud-prioridad").checked,
     };

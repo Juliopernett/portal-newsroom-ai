@@ -156,27 +156,142 @@ Una unidad de trabajo asignada a un `Editor` sobre un `Article` concreto
 ### PublicationRequest
 
 *Diseñada en Sprint 3A — ver
-[docs/adr/ADR-003-publication-inbox.md](../adr/ADR-003-publication-inbox.md)
-para la decisión completa.*
+[docs/adr/ADR-003-publication-inbox.md](../adr/ADR-003-publication-inbox.md).
+Implementada en Sprint 3B con una forma más simple que la diseñada allí;
+ampliada en Sprint 4A. Ver
+[ADR-006](../adr/ADR-006-multichannel-publication.md) para la
+reconciliación completa.*
 
-La entidad de convergencia de cualquier canal de entrada de contenido:
-WhatsApp, Radar, entrada manual, y a futuro Email. Reemplaza a
-`NewsCandidate` como el punto de entrada al pipeline editorial (`Extractor`
-en adelante) — `NewsCandidate` sigue existiendo, pero como concepto interno
-de Discovery, mapeado a un `PublicationRequest` por un adaptador, nunca
-consumido directamente por el resto del pipeline.
+La solicitud comercial recibida de un `Client` (hoy siempre por WhatsApp,
+copiada a mano por un operador — no existe todavía un canal automatizado).
+Es la unidad de contenido reutilizable del pilar comercial: nace vinculada
+opcionalmente a una `Pauta`, y desde Sprint 4A se distribuye a uno o
+varios `DestinoPublicacion` (ver esa entidad debajo) en vez de representar
+una sola publicación en un canal implícito.
 
-Incluye contexto comercial desde su diseño (`is_commercial`, `client_id`,
-`campaign_id`, `commercial_contact_id`, `priority`,
-`requested_publish_at`) aunque no exista todavía en código — ver
-[docs/architecture/publication-inbox.md](../architecture/publication-inbox.md)
-para la tabla completa de atributos.
+**Forma real en código** (Sprint 3B.1 + Sprint 4A — no la diseñada en
+ADR-003): `id`, `pauta_id` (opcional mientras `estado` es
+`RECIBIDA`/`CANCELADA`, obligatorio en `ACEPTADA`), `fecha_recepcion`,
+`titulo` (Incremento 2, opcional — expuesto en el formulario de creación
+y edición), `texto`, `estado` (`PublicationRequestStatus`: `RECIBIDA`,
+`ACEPTADA`, `CANCELADA` — `PUBLICADA` retirado en el Incremento 4, ver
+abajo), `prioridad_manual`, `observaciones`, `fecha_cierre` (timestamp de
+auditoría asignado una sola vez cuando la solicitud queda completa,
+mismo patrón que `Pauta.fecha_registro`; escrito por
+`cerrar_si_completa`, llamado desde el Incremento 4 en adelante).
 
-### MediaAsset (Value Object)
+**El cutover (Incremento 4) ya se hizo.** `PublicationRequestStatus`
+quedó reducido a triage puro (`RECIBIDA`/`ACEPTADA`/`CANCELADA`) — la
+complejidad de "qué tan publicada está" vive enteramente en
+`DestinoPublicacion` vía `esta_completa`, el mismo rol que
+`ArticleStatus`/`PublicationStatus` ya cumplen para `Article` (ADR-002).
+`core.services.publication_request_service.aceptar` reemplaza al
+retirado `mark_as_published`; el botón "Publicar" (`POST
+/publication-requests/{id}/publish`) mantiene su comportamiento visible
+sin cambios — acepta la solicitud y crea/reutiliza un destino WordPress
+marcado `PUBLICADO`, así los números de cuota no cambian para el uso
+diario existente. `PautaService.publicaciones_consumidas` cuenta por
+`esta_completa`, no por `estado`. Una migración de datos
+(`a1b2c3d4e5f6`) reescribió cada fila `estado='publicada'` existente a
+`aceptada` + un `DestinoPublicacion` de compatibilidad — ver
+[ADR-006](../adr/ADR-006-multichannel-publication.md), Decisiones 2–3, y
+`CHANGELOG.md`, sección `[Unreleased]`.
 
-Un adjunto de un `PublicationRequest` (imagen, video, documento) — un
-mensaje de WhatsApp suele traer varios. `type`, `url_or_path`,
-`mime_type`, `caption`.
+**Nota de divergencia con ADR-003:** el diseño original incluía `origin`,
+`is_commercial`, `client_id`/`campaign_id`/`commercial_contact_id`
+directos, `priority`, `requested_publish_at` y un estado de cinco valores
+(`RECEIVED`/`IN_REVIEW`/`ACCEPTED`/`REJECTED`/`DUPLICATE`). Ninguno de
+esos campos se construyó así — Sprint 3B implementó la forma simple de
+arriba (`CHANGELOG.md`, sección `[Unreleased]`, nota "Domain Adjustment").
+Esta sección queda corregida para Sprint 4A únicamente en lo que toca a
+`PublicationRequest`/`MediaAsset`; `CommercialContact`, `Contract`,
+`Plan`, `Campaign` y `Alert` siguen sin construirse y su reconciliación
+documental sigue pendiente, tal como ya señalaba el CHANGELOG. En
+particular, `Pauta` (mencionada arriba y en `DestinoPublicacion` debajo)
+es la entidad que Sprint 3B construyó realmente en lugar de
+`Contract`/`Plan`/`Campaign` — `core/entities/pauta.py`, sin sección
+propia todavía en este documento; añadirle una queda dentro de esa misma
+reconciliación pendiente, no de este ADR.
+
+### DestinoPublicacion
+
+*Diseñada en Sprint 4A — ver
+[ADR-006](../adr/ADR-006-multichannel-publication.md).*
+
+El registro de que un `PublicationRequest` fue distribuido — o se intentó
+distribuir — en un canal concreto: WordPress, Facebook o Instagram hoy;
+TikTok, YouTube, X o Threads a futuro sin cambiar esta forma. Un mismo
+`PublicationRequest` genera **varios** `DestinoPublicacion`, uno por canal
+elegido, cada uno con su propio estado — el mismo rol que
+`Publication`/`PublicationStatus` cumplen para `Article` (ver arriba y
+ADR-002), aplicado ahora al pilar comercial en vez del editorial. No se
+fusiona con la `Publication` conceptual de `Article`: ADR-003 ya
+estableció que orgánico y comercial nunca convergen en una entidad
+compartida.
+
+| Atributo | Responsabilidad |
+|---|---|
+| `canal` | `CanalPublicacion`: `WORDPRESS`, `FACEBOOK`, `INSTAGRAM` |
+| `estado` | `PENDIENTE`, `PUBLICADO`, `FALLIDO`, `CANCELADO` |
+| `wp_post_id` / `wp_url` | Solo si `canal=WORDPRESS`, llenados automáticamente por `CMSPublisher.create_draft` |
+| `url_publicacion` | Solo si `canal` es Facebook/Instagram — el enlace pegado a mano |
+| `registrado_por_user_id` | Quién confirmó la publicación o registró el enlace |
+| `fecha_publicacion` | Cuándo quedó realmente publicado ese destino |
+| `ultimo_error` | Motivo si `FALLIDO` — cancelable a mano para no bloquear el cierre de la solicitud |
+
+Un `PublicationRequest` está **completo** (`esta_completa`, condición
+derivada, nunca un campo almacenado — misma disciplina que
+`PautaService.publicaciones_consumidas`) cuando todos sus
+`DestinoPublicacion` están en estado terminal (`PUBLICADO` o
+`CANCELADO`) y al menos uno terminó `PUBLICADO`. Ese es el momento en
+que se consume, una sola vez, la cuota de la `Pauta` vinculada, y en que
+se asigna `PublicationRequest.fecha_cierre` — conectado end-to-end desde
+el Incremento 4: `POST .../destinos/{id}/confirmar-publicacion` (registra
+la publicación de un destino — `url_publicacion` obligatoria para
+Facebook/Instagram) y `POST .../destinos/{id}/cancelar` recalculan
+`esta_completa` sobre el conjunto completo de destinos de la solicitud
+cada vez.
+
+### MediaAsset
+
+**Corrección respecto al diseño original (Sprint 3A):** se documentaba
+como Value Object (`type`, `url_or_path`, `mime_type`, `caption`), sin
+identidad propia. Diseñar el almacenamiento y la purga reales
+([ADR-007](../adr/ADR-007-media-assets.md)) reveló que sí necesita
+identidad — mismo argumento que ya resolvió `DestinoPublicacion` en
+ADR-006: un value object no sostiene un ciclo de vida con acciones
+externas (guardar el archivo real, borrarlo). Es una entidad hija por
+`(solicitud, archivo)`, con su propia tabla y repositorio.
+
+Un adjunto de un `PublicationRequest` — imagen o video (audio
+deliberadamente fuera de alcance). Un `PublicationRequest` tiene 0..N
+`MediaAsset`.
+
+| Atributo | Responsabilidad |
+|---|---|
+| `id` | Identidad propia — necesaria para borrado individual |
+| `publication_request_id` | El padre |
+| `tipo` | `MediaAssetType`: `IMAGEN`, `VIDEO` |
+| `nombre_archivo` | Nombre original tal como se subió — solo para mostrar, nunca para construir la ruta de almacenamiento |
+| `content_type` | MIME real detectado en la subida |
+| `tamano_bytes` | Para listar/mostrar y para que la purga reporte espacio liberado |
+| `storage_key` | Clave opaca para el puerto `MediaStorage` — el dominio nunca arma rutas de disco a mano |
+| `fecha_subida` | Cuándo se adjuntó |
+| `subido_por_user_id` | Quién lo adjuntó |
+
+Sin estados propios — a diferencia de `DestinoPublicacion`, no hay flujo
+de confirmación; existe desde que se sube hasta que se purga o se borra
+a mano. Se purga automáticamente `MEDIA_RETENTION_DIAS` (7 por defecto)
+días después de que su `PublicationRequest` queda completa
+(`fecha_cierre` no es `None`) — mientras la solicitud sigue abierta,
+nunca se purga sin importar cuánto tiempo lleve pendiente. Almacenamiento
+real: adaptador sobre un Railway Volume (`LocalDiskMediaStorage`) detrás
+del puerto `MediaStorage`, elegido para no requerir una cuenta/
+credenciales de almacenamiento externas en este incremento — swapear a
+S3/R2 más adelante es un adaptador nuevo, no un cambio de dominio ni de
+API. Ver [ADR-007](../adr/ADR-007-media-assets.md) para el detalle
+completo (proveedor, límites de tamaño, superficie HTTP, script de
+purga).
 
 ### Client
 
@@ -298,7 +413,9 @@ import directo entre bounded contexts — ver
 | `SocialAccount` | ⬜ Conceptual, no implementada | — |
 | `AIProvider` (entidad de negocio) | ⬜ Conceptual — existe el `Protocol` técnico homónimo en `core/ports/ai_provider.py`, no la entidad de negocio | — |
 | `NotificationChannel` (entidad de negocio) | ⬜ Conceptual — existe el `Protocol` técnico `core.ports.notifier.Notifier`, no la entidad de negocio | — |
-| `PublicationRequest` / `MediaAsset` | ⬜ Diseñada (Sprint 3A) — ver [ADR-003](../adr/ADR-003-publication-inbox.md) — implementación planeada Sprint 3D | — |
+| `PublicationRequest` | ✅ Implementada — forma real difiere del diseño de [ADR-003](../adr/ADR-003-publication-inbox.md); reconciliada y ampliada en Sprint 4A, ver [ADR-006](../adr/ADR-006-multichannel-publication.md) | `core/entities/publication_request.py` |
+| `DestinoPublicacion` | ✅ Implementada (Sprint 4A) — conectada a la API y a `PautaService` desde el Incremento 4, ver [ADR-006](../adr/ADR-006-multichannel-publication.md) | `core/entities/destino_publicacion.py` |
+| `MediaAsset` | ✅ Implementada (Sprint 4A, Incremento 7) — ver [ADR-007](../adr/ADR-007-media-assets.md) | `core/entities/media_asset.py` |
 | `Client` / `CommercialContact` / `Contract` / `Plan` / `Campaign` | ⬜ Diseñadas (Sprint 3A) — ver [ADR-004](../adr/ADR-004-commercial-manager.md) — implementación planeada Sprint 3B | — |
 | `PublicationRegistryEntry` / `Alert` | ⬜ Diseñadas (Sprint 3A) — implementación planeada Sprint 3G | — |
 

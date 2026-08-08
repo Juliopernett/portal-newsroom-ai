@@ -22,6 +22,11 @@ database/*.sqlite3
 *.db
 *.sqlite3
 
+# --- MediaAsset local storage (Sprint 4A, Incremento 7 — ver ADR-007) ---
+# Solo el directorio en sí, no un Volume real: en producción, Railway lo
+# monta aparte; en local es basura de desarrollo, igual que *.db.
+database/media/
+
 # --- Logs ---
 logs/*.log
 logs/*.log.*
