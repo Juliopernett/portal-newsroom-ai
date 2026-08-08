@@ -25,6 +25,40 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **Sprint 4A, Incremento 5 — UI de gestión de destinos**: hasta ahora
+  todo el trabajo de los Incrementos 3-4 solo era accesible por API.
+  Cada tarjeta de una solicitud no completa gana un botón "Destinos"
+  que despliega un panel con sus `DestinoPublicacion` (canal, estado,
+  acciones) y un selector para agregar uno nuevo — deliberadamente
+  limitado a WordPress/Facebook/Instagram en el `<select>` (a pedido del
+  negocio: TikTok/YouTube ya existen en `CanalPublicacion` pero no se
+  muestran todavía). Por destino: WordPress ofrece "Crear borrador" →
+  "Confirmar publicado"; Facebook/Instagram piden pegar el enlace y
+  confirmar; cualquiera no publicado se puede cancelar.
+  - Una solicitud puede ahora quedar completa **sin pasar por el botón
+    "Publicar"** — por ejemplo, contenido que solo va a Instagram nunca
+    necesita `aceptar()` ni un destino WordPress. La cola de trabajo
+    ("Pendientes") pasó de ser "todo lo `RECIBIDA`" a tres pedidos
+    combinados: `estado=recibida` (orden de prioridad, sin cambios),
+    `estado=aceptada&completa=false` ("en curso" — ya aceptada, algún
+    destino todavía pendiente, antes desaparecía de la vista) y
+    `completa=true` ("Publicadas"). Una tarjeta "en curso" ya no ofrece
+    Publicar/Vincular/Editar (el triage ya pasó), solo el panel de
+    destinos.
+  - Verificado dos veces: primero de extremo a extremo por HTTP directo
+    (login → cliente → pauta → solicitud → agregar destino Instagram →
+    confirmar sin enlace → 422 → confirmar con enlace → 200 → aparece en
+    `completa=true`, no en pendientes ni en curso), y después de forma
+    interactiva en Chrome real (extensión conectada tras reconectar
+    sesión): creación de solicitud, apertura del panel "Destinos",
+    selector limitado a WordPress/Facebook/Instagram, agregar Instagram,
+    confirmar sin enlace (rechazado visiblemente), confirmar con enlace
+    — la tarjeta se movió sola de "Cola de trabajo" a "Publicadas", con
+    el borde verde y las métricas del dashboard actualizadas en vivo.
+  - Tests: 100% cobertura en el filtro `completa` nuevo y en el ajuste
+    de `solicitudes_pendientes`; sin cambios de comportamiento en nada
+    que ya funcionaba (suite completa sigue en verde).
+
 - **Sprint 4A, Incremento 4 — Facebook/Instagram, cuota por completitud, y
   el cutover de `PublicationRequestStatus`** — ver
   [ADR-006](docs/adr/ADR-006-multichannel-publication.md), Decisiones 2 y
