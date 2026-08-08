@@ -30,6 +30,13 @@ two recompute `esta_completa` across the solicitud's destinos and stamp
 `fecha_cierre` the first time it becomes true — see
 `core.services.publication_request_service.cerrar_si_completa`.
 
+`GET /{request_id}/reporte` (Incremento 6) exposes
+`core.services.reporte_service.construir_reporte` — enlaces por
+plataforma, fecha de publicación, estado y si consumió cuota de Pauta.
+Generación automática (se arma en el momento en que se pide); el envío
+al cliente sigue siendo manual, no hay integración de envío en este
+sprint.
+
 Every route requires an authenticated session — `dependencies=` at the
 `APIRouter` level, not per-function, so a route added here later is
 protected automatically instead of by remembering to add it.
@@ -51,6 +58,7 @@ from app.api.schemas.publication_request import (
     PublicationRequestOut,
     PublicationRequestUpdate,
 )
+from app.api.schemas.reporte import ReporteSolicitudOut
 from core.analytics import AnalyticsService
 from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
@@ -64,6 +72,7 @@ from core.services.publication_request_service import (
     edit_solicitud,
     link_pauta,
 )
+from core.services.reporte_service import ReporteSolicitud, construir_reporte
 from core.services.wordpress_publication_service import crear_borrador
 
 router = APIRouter(
@@ -326,3 +335,27 @@ def cancelar_destino(
     uow.publication_requests.save(cerrada)
     uow.commit()
     return cancelado
+
+
+@router.get("/{request_id}/reporte", response_model=ReporteSolicitudOut)
+def obtener_reporte(
+    request_id: str, uow: UnitOfWork = Depends(get_unit_of_work)
+) -> ReporteSolicitud:
+    """Return `request_id`'s report: enlaces por plataforma, fecha de
+    publicación, estado y si consumió cuota de Pauta (Sprint 4A, Incremento 6).
+
+    Generación automática — se arma en el momento en que se pide, nunca
+    se guarda. El cliente (nombre) solo se resuelve cuando la solicitud
+    tiene `pauta_id`; sin Pauta vinculada el reporte igual se arma, solo
+    que sin `cliente_nombre`.
+    """
+    solicitud = uow.publication_requests.get_by_id(request_id)
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    destinos = uow.destinos_publicacion.list_by_publication_request_id(request_id)
+    cliente = None
+    if solicitud.pauta_id is not None:
+        pauta = uow.pautas.get_by_id(solicitud.pauta_id)
+        if pauta is not None:
+            cliente = uow.clients.get_by_id(pauta.client_id)
+    return construir_reporte(solicitud, destinos, cliente)

@@ -25,6 +25,46 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **Sprint 4A, Incremento 6 — Reportes automáticos para clientes**: cada
+  `PublicationRequest` gana un endpoint de solo lectura,
+  `GET /publication-requests/{id}/reporte`, que arma en el momento un
+  reporte con enlaces por destino, fecha de publicación, estado y si la
+  pauta fue consumida — generación automática, envío manual (compartirlo
+  con el cliente sigue siendo una acción humana, no hay integración de
+  envío).
+  - `core/services/reporte_service.py` (`construir_reporte`) es una
+    función pura, sin acceso a repositorios ni red — recibe la
+    `PublicationRequest`, sus `DestinoPublicacion` y un `Client | None`
+    ya resueltos, y solo da forma a lo que ya le entregaron, la misma
+    disciplina que `AnalyticsService` ya sigue.
+  - `completa` y `pauta_consumida` se calculan por separado
+    deliberadamente: una solicitud puede quedar `completa` (vía
+    `esta_completa` sobre sus propios destinos) sin tener nunca una
+    `Pauta` vinculada — por ejemplo, una solicitud solo-Instagram — ese
+    caso está completo pero no consume cuota, porque no hay `Pauta` de la
+    cual consumirla.
+  - Tests: 100% cobertura en `reporte_service.py` y el nuevo schema
+    `ReporteSolicitudOut`; 5 tests de integración cubren 404, una
+    solicitud simple sin destinos, el caso solo-Instagram completo sin
+    pauta consumida, el caso con cliente y pauta vía `/publish`, y un
+    caso multi-destino no completo con un destino aún pendiente sin
+    enlace. Suite completa (`pytest -q`) sigue en verde, sin
+    regresiones.
+  - UI: botón "Ver reporte" en cualquier tarjeta (pendiente, en curso o
+    publicada) — a diferencia del panel de destinos, el reporte es útil
+    en cualquier momento de avance, no solo cuando la solicitud ya
+    completó. Panel de solo lectura (cliente, pauta consumida, un renglón
+    por destino con su enlace) más un botón "Copiar reporte" que arma un
+    bloque de texto para pegar a mano en WhatsApp/email — mismo criterio
+    "generación automática, envío manual" del endpoint.
+    - Encontrado en verificación interactiva (Chrome real): el panel ya
+      abierto se quedaba mostrando el estado *antes* del cambio al
+      confirmar/cancelar un destino o publicar, porque la cache del
+      reporte no se invalidaba junto con la de destinos. Corregido —
+      cualquier acción que pueda mover `completa`/`pauta_consumida`
+      (agregar destino, crear borrador, confirmar, cancelar, publicar)
+      ahora también refresca el reporte si está abierto.
+
 - **Sprint 4A, Incremento 5 — UI de gestión de destinos**: hasta ahora
   todo el trabajo de los Incrementos 3-4 solo era accesible por API.
   Cada tarjeta de una solicitud no completa gana un botón "Destinos"
