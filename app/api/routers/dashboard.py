@@ -13,9 +13,14 @@ from fastapi import APIRouter, Depends
 
 from app.api.dependencies import get_current_user, get_unit_of_work
 from app.api.schemas.client import ClientOut
-from app.api.schemas.dashboard import DashboardAlertasOut, DashboardResumenOut, RankingComercialOut
+from app.api.schemas.dashboard import (
+    DashboardAlertasOut,
+    DashboardResumenOut,
+    RankingComercialOut,
+    RentabilidadMensualOut,
+)
 from app.api.schemas.publication_request import PublicationRequestOut
-from core.analytics import AnalyticsService
+from core.analytics import AnalyticsService, rentabilidad_mensual
 from core.ports.unit_of_work import UnitOfWork
 
 router = APIRouter(
@@ -99,3 +104,14 @@ def get_ranking(uow: UnitOfWork = Depends(get_unit_of_work)) -> list[RankingCome
         )
         for item in analytics.ranking_comercial()
     ]
+
+
+@router.get("/rentabilidad", response_model=list[RentabilidadMensualOut])
+def get_rentabilidad(uow: UnitOfWork = Depends(get_unit_of_work)):
+    """Return the last 12 calendar months, oldest first — ingresos, gastos, rentabilidad.
+
+    Not built through `AnalyticsService`/`_analytics` — see
+    `core.analytics.rentabilidad_service`'s module docstring for why
+    `gastos` stays out of that class's constructor.
+    """
+    return rentabilidad_mensual(uow.pautas.list_all(), uow.gastos.list_all())

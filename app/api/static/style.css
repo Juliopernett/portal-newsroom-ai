@@ -1048,6 +1048,200 @@ button[type="submit"]:hover {
   color: var(--color-text-secondary);
 }
 
+/* ---------- gráficas (Dashboard) ---------- */
+/*
+   SVG generado en JS (renderChartIngresosGastos/renderChartRentabilidad,
+   app.js) -- sin librería de gráficas: mismo criterio "sin framework, sin
+   CDN" que el resto de esta hoja. Paleta validada con
+   scripts/validate_palette.js del skill dataviz (par Ingresos/Gastos
+   #3b5998/#c2410c y par Rentabilidad #059669/#dc2626, ambos PASS en modo
+   claro -- esta app no tiene modo oscuro, ver :root) -- reutiliza
+   --color-accent/--color-orange/--color-success/--color-danger, ya
+   validados y ya usados en el resto de la UI, en vez de inventar tokens
+   nuevos solo para las gráficas.
+*/
+
+.chart-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.chart-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.chart-card-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.chart-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.chart-legend-swatch[data-serie="ingresos"] {
+  background: var(--color-accent);
+}
+
+.chart-legend-swatch[data-serie="gastos"] {
+  background: var(--color-orange);
+}
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart-bar {
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.chart-bar:hover {
+  opacity: 0.8;
+}
+
+.chart-gridline {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.chart-baseline {
+  stroke: var(--color-border-strong);
+  stroke-width: 1;
+}
+
+.chart-axis-label {
+  fill: var(--color-text-tertiary);
+  font-size: 10px;
+  font-family: var(--font-sans);
+}
+
+.chart-empty {
+  color: var(--color-text-tertiary);
+  font-size: 0.82rem;
+  text-align: center;
+  padding: var(--space-5) 0;
+}
+
+.chart-tooltip {
+  position: fixed;
+  z-index: 80;
+  background: var(--color-text);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.76rem;
+  pointer-events: none;
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+}
+
+.chart-tooltip[hidden] {
+  display: none;
+}
+
+.chart-tooltip-value {
+  font-weight: 700;
+}
+
+.chart-tooltip-label {
+  color: rgba(255, 255, 255, 0.7);
+  margin-left: 4px;
+}
+
+/* ---------- rentabilidad mensual (Dashboard) ---------- */
+
+/* flex-wrap en cada nivel en vez de una grilla de columnas fijas -- así
+   se apila sola en mobile sin necesitar un @media aparte (ver auditoría
+   de UX móvil, 2026-08-14: una grilla de columnas fijas es exactamente
+   lo que se rompe en pantallas angostas si nadie la colapsa a mano). */
+.rentabilidad-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rentabilidad-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+.rentabilidad-row-mes {
+  font-weight: 600;
+  font-size: 0.85rem;
+  min-width: 110px;
+}
+
+.rentabilidad-row-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.rentabilidad-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 90px;
+}
+
+.rentabilidad-stat-label {
+  font-size: var(--text-metadata);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rentabilidad-stat-value {
+  font-size: var(--text-info);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.rentabilidad-stat-resultado[data-positive="true"] .rentabilidad-stat-value {
+  color: var(--color-success);
+}
+
+.rentabilidad-stat-resultado[data-positive="false"] .rentabilidad-stat-value {
+  color: var(--color-danger);
+}
+
 /* ---------- badges de estado ---------- */
 
 .badge {
@@ -2165,6 +2359,56 @@ button[type="submit"]:hover {
   font-size: var(--text-metadata);
 }
 
+/* ---------- gastos ---------- */
+
+.gasto-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* flex-wrap, no columnas de grilla fijas -- mismo motivo que
+   .rentabilidad-row más arriba: se apila sola en mobile. */
+.gasto-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+.gasto-row-descripcion {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gasto-row-fecha {
+  color: var(--color-text-secondary);
+  font-size: var(--text-info);
+  flex-shrink: 0;
+}
+
+.gasto-row-valor {
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.gasto-row-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 /* ---------- login ---------- */
 
 body.login-active {
@@ -2488,7 +2732,8 @@ form {
   .action-item-actions .btn,
   .destino-row-actions .btn,
   .destino-row-agregar .btn,
-  .reporte-panel .btn-copiar-reporte {
+  .reporte-panel .btn-copiar-reporte,
+  .gasto-row-actions .btn-link {
     min-height: 44px;
   }
 

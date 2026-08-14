@@ -19,7 +19,15 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.errors import register_exception_handlers
-from app.api.routers import auth, clients, dashboard, insights, pautas, publication_requests
+from app.api.routers import (
+    auth,
+    clients,
+    dashboard,
+    gastos,
+    insights,
+    pautas,
+    publication_requests,
+)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -30,6 +38,7 @@ register_exception_handlers(app)
 app.include_router(auth.router)
 app.include_router(clients.router)
 app.include_router(dashboard.router)
+app.include_router(gastos.router)
 app.include_router(insights.router)
 app.include_router(pautas.router)
 app.include_router(publication_requests.router)

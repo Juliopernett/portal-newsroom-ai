@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.api.schemas.client import ClientOut
 from app.api.schemas.publication_request import PublicationRequestOut
@@ -80,3 +80,15 @@ class RankingComercialOut(BaseModel):
     fecha_vencimiento: date
     vigente: bool
     estado_comercial: EstadoComercial
+
+
+class RentabilidadMensualOut(BaseModel):
+    """One row of `GET /dashboard/rentabilidad` — mirrors `RentabilidadMensualItem`."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    anio: int
+    mes: int
+    ingresos: Decimal
+    gastos: Decimal
+    rentabilidad: Decimal

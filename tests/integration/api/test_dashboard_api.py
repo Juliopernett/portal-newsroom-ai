@@ -9,6 +9,8 @@ confirm the routes are wired, protected, and serialize what
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from fastapi.testclient import TestClient
 
 
@@ -206,3 +208,40 @@ def test_ranking_excludes_clients_without_a_pauta(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_rentabilidad_returns_twelve_months(client: TestClient) -> None:
+    response = client.get("/dashboard/rentabilidad")
+
+    assert response.status_code == 200
+    assert len(response.json()) == 12
+
+
+def test_rentabilidad_includes_ingresos_and_gastos_for_the_current_month(
+    client: TestClient,
+) -> None:
+    hoy = date.today()
+    fecha = hoy.isoformat()
+    fecha_fin = (hoy + timedelta(days=30)).isoformat()
+    client_id = _create_client(client)
+    _create_pauta(
+        client,
+        client_id,
+        fecha_inicio=fecha,
+        fecha_fin=fecha_fin,
+        fecha_pago=fecha,
+        valor_pagado="100000.00",
+    )
+    client.post(
+        "/gastos", json={"descripcion": "Gasto de prueba", "valor": "30000.00", "fecha": fecha}
+    )
+
+    response = client.get("/dashboard/rentabilidad")
+
+    body = response.json()
+    mes_actual = next(
+        item for item in body if item["anio"] == hoy.year and item["mes"] == hoy.month
+    )
+    assert mes_actual["ingresos"] == "100000.00"
+    assert mes_actual["gastos"] == "30000.00"
+    assert mes_actual["rentabilidad"] == "70000.00"

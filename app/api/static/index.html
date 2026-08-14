@@ -127,6 +127,10 @@
         <svg class="nav-item-icon"><use href="#icon-contract"></use></svg>
         <span>Contratos</span>
       </button>
+      <button type="button" class="nav-item" data-tab="gastos">
+        <svg class="nav-item-icon"><use href="#icon-money"></use></svg>
+        <span>Gastos</span>
+      </button>
     </nav>
     <div class="sidebar-footer">
       <button type="button" id="btn-logout" class="nav-item">
@@ -205,6 +209,26 @@
               <div id="ranking-comercial" class="ranking-list"></div>
             </div>
           </div>
+
+          <h3 class="section-subtitle">Rentabilidad mensual</h3>
+          <p class="page-subtitle">Últimos 12 meses — ingresos cobrados menos gastos registrados</p>
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <h4 class="chart-card-title">Ingresos vs. gastos</h4>
+              <div class="chart-legend">
+                <span class="chart-legend-item"><span class="chart-legend-swatch" data-serie="ingresos"></span>Ingresos</span>
+                <span class="chart-legend-item"><span class="chart-legend-swatch" data-serie="gastos"></span>Gastos</span>
+              </div>
+            </div>
+            <div id="chart-ingresos-gastos"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <h4 class="chart-card-title">Rentabilidad</h4>
+            </div>
+            <div id="chart-rentabilidad"></div>
+          </div>
+          <div id="rentabilidad-mensual" class="rentabilidad-list"></div>
         </div>
       </section>
 
@@ -400,6 +424,37 @@
 
         <div id="lista-contratos" class="contract-grid"></div>
       </section>
+
+      <section id="tab-gastos" class="tab-panel">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Gastos</h1>
+            <p class="page-subtitle">Gastos operativos — alimentan la rentabilidad mensual del Dashboard</p>
+          </div>
+          <div class="page-header-actions">
+            <button type="button" class="btn btn-secondary" data-open-drawer="drawer-gasto">
+              <svg class="icon"><use href="#icon-plus"></use></svg>
+              Nuevo gasto
+            </button>
+            <button type="button" id="refrescar-gastos" class="icon-btn" aria-label="Actualizar">
+              <svg class="icon"><use href="#icon-refresh"></use></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="search-input">
+          <svg class="icon-search-prefix"><use href="#icon-search"></use></svg>
+          <input
+            type="text"
+            id="gastos-buscar"
+            class="clientes-buscador"
+            placeholder="Buscar por descripción…"
+            autocomplete="off"
+          >
+        </div>
+
+        <div id="lista-gastos" class="gasto-list"></div>
+      </section>
     </main>
   </div>
 </div>
@@ -502,6 +557,30 @@
   </form>
 </aside>
 
+<aside id="drawer-gasto" class="drawer" hidden aria-hidden="true">
+  <div class="drawer-header">
+    <h2 id="drawer-gasto-titulo">Nuevo gasto</h2>
+    <button type="button" class="icon-btn" data-close-drawer aria-label="Cerrar">
+      <svg class="icon"><use href="#icon-close"></use></svg>
+    </button>
+  </div>
+  <form id="form-gasto" class="drawer-form">
+    <label>Descripción
+      <input type="text" id="gasto-descripcion" autocomplete="off" required>
+    </label>
+    <label>Valor
+      <input type="number" id="gasto-valor" min="0" step="0.01" required>
+    </label>
+    <label>Fecha
+      <input type="date" id="gasto-fecha" required>
+    </label>
+    <button type="submit" id="form-gasto-submit" class="btn btn-primary">
+      <svg class="icon" id="form-gasto-submit-icon"><use href="#icon-plus"></use></svg>
+      <span id="form-gasto-submit-label">Registrar gasto</span>
+    </button>
+  </form>
+</aside>
+
 <aside id="drawer-ficha" class="drawer drawer-ficha" hidden aria-hidden="true">
   <div class="drawer-header">
     <h2 id="drawer-ficha-titulo">Ficha del cliente</h2>
@@ -511,6 +590,8 @@
   </div>
   <div id="ficha-content" class="ficha-content"></div>
 </aside>
+
+<div id="chart-tooltip" class="chart-tooltip" hidden></div>
 
 <script src="app.js"></script>
 </body>

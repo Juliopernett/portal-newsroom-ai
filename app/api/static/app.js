@@ -58,6 +58,9 @@ let clientesFiltro = "";
 let contratosFiltro = "";
 let editingClientId = null;
 let editingPautaId = null;
+let editingGastoId = null;
+let gastosFiltro = "";
+let gastosTodas = [];
 // Listas completas (sin el recorte de 30 que usa el kanban de "Publicadas")
 // -- la ficha de cliente necesita el historial completo, no solo lo último.
 let solicitudesPendientesTodas = [];
@@ -228,6 +231,7 @@ function setupFormLogin() {
       await loadSolicitudes();
       await loadDashboard();
       await loadAlertas();
+      await loadGastos();
     } catch (error) {
       showStatus(error.message, true);
     }
@@ -253,6 +257,7 @@ const TAB_TITLES = {
   solicitudes: "Solicitudes",
   clientes: "Clientes",
   contratos: "Contratos activos",
+  gastos: "Gastos",
 };
 
 function activateTab(name) {
@@ -384,6 +389,11 @@ function setupGlobalClicks() {
       eliminarMedia(eliminarMediaBtn.dataset.id, eliminarMediaBtn.dataset.mediaId);
       return;
     }
+    const eliminarGastoBtn = event.target.closest("[data-eliminar-gasto]");
+    if (eliminarGastoBtn) {
+      eliminarGasto(eliminarGastoBtn.dataset.eliminarGasto);
+      return;
+    }
     const openBtn = event.target.closest("[data-open-drawer]");
     if (openBtn) {
       // Solo un drawer visible a la vez -- sin esto, abrir "Editar" o
@@ -394,8 +404,12 @@ function setupGlobalClicks() {
         startEditCliente(openBtn.dataset.editClient);
       } else if (openBtn.dataset.editPauta) {
         startEditPauta(openBtn.dataset.editPauta);
+      } else if (openBtn.dataset.editGasto) {
+        startEditGasto(openBtn.dataset.editGasto);
       } else if (openBtn.dataset.openDrawer === "drawer-cliente") {
         resetFormClienteDrawer();
+      } else if (openBtn.dataset.openDrawer === "drawer-gasto") {
+        resetFormGastoDrawer();
       } else if (openBtn.dataset.openDrawer === "drawer-pauta") {
         resetFormPautaDrawer();
         // Si "Nueva pauta"/"Renovar pauta" se abrió desde la ficha de un
@@ -748,6 +762,62 @@ function renderListaContratos() {
   el.innerHTML = contratos.length
     ? contratos.map(renderContractCard).join("")
     : renderEmptyState("📄", contratosFiltro.trim() ? "No se encontraron contratos con ese criterio." : "No hay contratos vigentes en este momento.");
+}
+
+// ---------- Gastos ----------
+//
+// Alimenta el reporte de rentabilidad mensual del Dashboard (ingresos -
+// gastos, ver core.analytics.rentabilidad_service) -- sin agrupar por
+// categoría ni recurrencia porque el dato real que maneja el negocio hoy
+// (una lista de "PAGOS" en Excel/WhatsApp) es solo descripción + valor +
+// fecha, igual que core.entities.gasto.Gasto.
+
+async function loadGastos() {
+  gastosTodas = await apiFetch("/gastos");
+  renderListaGastos();
+}
+
+function gastosFiltrados() {
+  const termino = gastosFiltro.trim().toLowerCase();
+  const ordenados = [...gastosTodas].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  if (!termino) return ordenados;
+  return ordenados.filter((g) => g.descripcion.toLowerCase().includes(termino));
+}
+
+function renderGastoRow(gasto) {
+  return `
+    <div class="gasto-row">
+      <span class="gasto-row-descripcion">${gasto.descripcion}</span>
+      <span class="gasto-row-fecha">${formatFecha(gasto.fecha)}</span>
+      <span class="gasto-row-valor">${formatMoneda(gasto.valor)}</span>
+      <span class="gasto-row-actions">
+        <button type="button" class="btn-link" data-open-drawer="drawer-gasto" data-edit-gasto="${gasto.id}">
+          <svg class="icon"><use href="#icon-edit"></use></svg>Editar
+        </button>
+        <button type="button" class="btn-link" data-eliminar-gasto="${gasto.id}">
+          <svg class="icon"><use href="#icon-close"></use></svg>Eliminar
+        </button>
+      </span>
+    </div>`;
+}
+
+function renderListaGastos() {
+  const el = document.getElementById("lista-gastos");
+  if (!el) return;
+  const gastos = gastosFiltrados();
+  el.innerHTML = gastos.length
+    ? gastos.map(renderGastoRow).join("")
+    : renderEmptyState("💵", gastosFiltro.trim() ? "No se encontraron gastos con ese criterio." : "Todavía no hay gastos registrados.");
+}
+
+async function eliminarGasto(id) {
+  try {
+    await apiFetch(`/gastos/${id}`, { method: "DELETE" });
+    showStatus("Gasto eliminado.", false);
+    await Promise.all([loadGastos(), loadDashboard()]);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
 }
 
 // ---------- Ficha completa del cliente (CRM) ----------
@@ -2188,11 +2258,247 @@ function renderRankingComercial(ranking, elementId = "ranking-comercial", vacioM
     .join("");
 }
 
+const MESES_LABELS = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+
+const MESES_ABREV = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+// ---------- Gráficas del Dashboard (SVG generado a mano) ----------
+//
+// Sin librería de gráficas -- mismo criterio "sin framework, sin CDN" que
+// el resto de esta app (ver style.css). Paleta y specs de marca (barras
+// ≤24px, extremo redondeado 4px cuadrado en la base, grilla en gris
+// recesivo, tooltip por barra) siguiendo el skill dataviz; colores
+// reutilizados de las variables ya existentes y ya validadas con
+// scripts/validate_palette.js (ver comentario en style.css).
+
+const CHART_VIEW_WIDTH = 960;
+const CHART_VIEW_HEIGHT = 260;
+const CHART_MARGIN = { top: 8, right: 8, bottom: 28, left: 56 };
+const CHART_MAX_BAR_WIDTH = 24;
+const CHART_BAR_RADIUS = 4;
+
+// Redondea `value` hacia arriba al siguiente "número limpio" (1/2/5 x
+// 10^n) -- así el eje Y siempre termina en una marca legible (100.000,
+// 200.000, 500.000...) en vez de un tope arbitrario como el máximo exacto
+// de los datos.
+function nicMaxEje(value) {
+  if (value <= 0) return 100;
+  const exponente = Math.floor(Math.log10(value));
+  const base = Math.pow(10, exponente);
+  const fraccion = value / base;
+  let nice;
+  if (fraccion <= 1) nice = 1;
+  else if (fraccion <= 2) nice = 2;
+  else if (fraccion <= 5) nice = 5;
+  else nice = 10;
+  return nice * base;
+}
+
+// Path de un rectángulo con esquinas redondeadas solo en el extremo lejano
+// a la base (arriba si crece hacia arriba, abajo si crece hacia abajo) --
+// "4px redondeado en el extremo, cuadrado en la base" (ver marks-and-anatomy
+// del skill dataviz). `radius` se recorta al alto real para barras muy
+// chicas, para no dibujar una curva más grande que la propia barra.
+function rectRedondeadoPath(x, y, width, height, radius, directionUp) {
+  const r = Math.max(0, Math.min(radius, height, width / 2));
+  if (directionUp) {
+    return `M${x},${y + height} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height} Z`;
+  }
+  return `M${x},${y} L${x + width},${y} L${x + width},${y + height - r} Q${x + width},${y + height} ${x + width - r},${y + height} L${x + r},${y + height} Q${x},${y + height} ${x},${y + height - r} Z`;
+}
+
+function chartEjeXLabel(item) {
+  return `${MESES_ABREV[item.mes - 1]}'${String(item.anio).slice(2)}`;
+}
+
+// Grilla horizontal + etiquetas del eje Y -- 4 marcas limpias entre 0 y
+// `maxVal`, gris recesivo (un paso fuera de la superficie, nunca punteado
+// -- ver marks-and-anatomy.md).
+function chartGridlinesSvg(maxVal, plotTop, plotHeight, plotLeft, plotRight) {
+  const pasos = 4;
+  let svg = "";
+  for (let i = 0; i <= pasos; i++) {
+    const valor = (maxVal / pasos) * i;
+    const y = plotTop + plotHeight - (valor / maxVal) * plotHeight;
+    svg += `<line class="chart-gridline" x1="${plotLeft}" y1="${y}" x2="${plotRight}" y2="${y}"></line>`;
+    svg += `<text class="chart-axis-label" x="${plotLeft - 8}" y="${y + 3}" text-anchor="end">${formatMoneda(valor)}</text>`;
+  }
+  return svg;
+}
+
+// Ingresos vs. gastos -- barras agrupadas, ambas series siempre ≥0, mismo
+// eje. Dos series con identidad fija (nunca ciclada) -- azul = ingresos,
+// naranja = gastos, en ese orden en cada grupo.
+function renderChartIngresosGastos(rentabilidad) {
+  const el = document.getElementById("chart-ingresos-gastos");
+  if (!rentabilidad.length) {
+    el.innerHTML = `<p class="chart-empty">Todavía no hay datos para graficar.</p>`;
+    return;
+  }
+  const plotLeft = CHART_MARGIN.left;
+  const plotRight = CHART_VIEW_WIDTH - CHART_MARGIN.right;
+  const plotTop = CHART_MARGIN.top;
+  const plotHeight = CHART_VIEW_HEIGHT - CHART_MARGIN.top - CHART_MARGIN.bottom;
+  const plotWidth = plotRight - plotLeft;
+  const maxVal = nicMaxEje(Math.max(...rentabilidad.map((i) => Math.max(Number(i.ingresos), Number(i.gastos)))));
+  const slotWidth = plotWidth / rentabilidad.length;
+  const barGap = 4;
+  const barWidth = Math.min(CHART_MAX_BAR_WIDTH, (slotWidth - 16 - barGap) / 2);
+  const groupWidth = barWidth * 2 + barGap;
+
+  let bars = "";
+  let labels = "";
+  rentabilidad.forEach((item, i) => {
+    const slotX = plotLeft + i * slotWidth;
+    const groupX = slotX + (slotWidth - groupWidth) / 2;
+    const mesLabel = chartEjeXLabel(item);
+    labels += `<text class="chart-axis-label" x="${slotX + slotWidth / 2}" y="${CHART_VIEW_HEIGHT - CHART_MARGIN.bottom + 16}" text-anchor="middle">${mesLabel}</text>`;
+
+    const hIngresos = (Number(item.ingresos) / maxVal) * plotHeight;
+    const yIngresos = plotTop + plotHeight - hIngresos;
+    bars += `<path class="chart-bar" fill="var(--color-accent)" d="${rectRedondeadoPath(groupX, yIngresos, barWidth, hIngresos, CHART_BAR_RADIUS, true)}"
+      data-chart-bar data-mes="${mesLabel}" data-serie="Ingresos" data-valor="${formatMoneda(item.ingresos)}"></path>`;
+
+    const hGastos = (Number(item.gastos) / maxVal) * plotHeight;
+    const yGastos = plotTop + plotHeight - hGastos;
+    bars += `<path class="chart-bar" fill="var(--color-orange)" d="${rectRedondeadoPath(groupX + barWidth + barGap, yGastos, barWidth, hGastos, CHART_BAR_RADIUS, true)}"
+      data-chart-bar data-mes="${mesLabel}" data-serie="Gastos" data-valor="${formatMoneda(item.gastos)}"></path>`;
+  });
+
+  el.innerHTML = `
+    <svg class="chart-svg" viewBox="0 0 ${CHART_VIEW_WIDTH} ${CHART_VIEW_HEIGHT}" role="img" aria-label="Ingresos y gastos por mes">
+      ${chartGridlinesSvg(maxVal, plotTop, plotHeight, plotLeft, plotRight)}
+      ${bars}
+      ${labels}
+    </svg>`;
+}
+
+// Rentabilidad -- una sola serie, color por signo (nunca color solo: la
+// posición sobre/bajo la línea base ya redunda la señal). Verde/rojo son
+// colores de estado (bueno/crítico), no identidad categórica -- por eso
+// esta gráfica no lleva leyenda, a diferencia de la de arriba.
+function renderChartRentabilidad(rentabilidad) {
+  const el = document.getElementById("chart-rentabilidad");
+  if (!rentabilidad.length) {
+    el.innerHTML = `<p class="chart-empty">Todavía no hay datos para graficar.</p>`;
+    return;
+  }
+  const plotLeft = CHART_MARGIN.left;
+  const plotRight = CHART_VIEW_WIDTH - CHART_MARGIN.right;
+  const plotTop = CHART_MARGIN.top;
+  const plotHeight = CHART_VIEW_HEIGHT - CHART_MARGIN.top - CHART_MARGIN.bottom;
+  const plotWidth = plotRight - plotLeft;
+  const maxAbs = Math.max(...rentabilidad.map((i) => Math.abs(Number(i.rentabilidad))));
+  const maxVal = nicMaxEje(maxAbs || 100);
+  const baselineY = plotTop + plotHeight / 2;
+  const halfHeight = plotHeight / 2;
+  const slotWidth = plotWidth / rentabilidad.length;
+  const barWidth = Math.min(CHART_MAX_BAR_WIDTH, slotWidth - 16);
+
+  let bars = "";
+  let labels = "";
+  rentabilidad.forEach((item, i) => {
+    const slotX = plotLeft + i * slotWidth;
+    const barX = slotX + (slotWidth - barWidth) / 2;
+    const mesLabel = chartEjeXLabel(item);
+    labels += `<text class="chart-axis-label" x="${slotX + slotWidth / 2}" y="${CHART_VIEW_HEIGHT - CHART_MARGIN.bottom + 16}" text-anchor="middle">${mesLabel}</text>`;
+
+    const valor = Number(item.rentabilidad);
+    const esPositiva = valor >= 0;
+    const h = (Math.abs(valor) / maxVal) * halfHeight;
+    const y = esPositiva ? baselineY - h : baselineY;
+    const color = esPositiva ? "var(--color-success)" : "var(--color-danger)";
+    bars += `<path class="chart-bar" fill="${color}" d="${rectRedondeadoPath(barX, y, barWidth, h, CHART_BAR_RADIUS, esPositiva)}"
+      data-chart-bar data-mes="${mesLabel}" data-serie="Rentabilidad" data-valor="${formatMoneda(item.rentabilidad)}"></path>`;
+  });
+
+  el.innerHTML = `
+    <svg class="chart-svg" viewBox="0 0 ${CHART_VIEW_WIDTH} ${CHART_VIEW_HEIGHT}" role="img" aria-label="Rentabilidad por mes">
+      <line class="chart-baseline" x1="${plotLeft}" y1="${baselineY}" x2="${plotRight}" y2="${baselineY}"></line>
+      ${bars}
+      ${labels}
+    </svg>`;
+}
+
+function renderRentabilidadCharts(rentabilidad) {
+  renderChartIngresosGastos(rentabilidad);
+  renderChartRentabilidad(rentabilidad);
+}
+
+// Tooltip compartido por ambas gráficas -- delegado en document (mismo
+// patrón que setupGlobalClicks), mouseover/mouseout sí burbujean a
+// diferencia de mouseenter/mouseleave, así que no hace falta un listener
+// por barra.
+function setupChartTooltip() {
+  const tooltip = document.getElementById("chart-tooltip");
+  document.addEventListener("mouseover", (event) => {
+    const bar = event.target.closest("[data-chart-bar]");
+    if (!bar) return;
+    tooltip.innerHTML = `${bar.dataset.mes} <span class="chart-tooltip-label">${bar.dataset.serie}</span><br><span class="chart-tooltip-value">${bar.dataset.valor}</span>`;
+    tooltip.hidden = false;
+  });
+  document.addEventListener("mousemove", (event) => {
+    if (tooltip.hidden) return;
+    tooltip.style.left = `${event.clientX + 14}px`;
+    tooltip.style.top = `${event.clientY + 14}px`;
+  });
+  document.addEventListener("mouseout", (event) => {
+    const bar = event.target.closest("[data-chart-bar]");
+    if (!bar) return;
+    tooltip.hidden = true;
+  });
+}
+
+// Últimos 12 meses, ingresos - gastos -- ver core.analytics.rentabilidad_service.
+// El backend ya entrega los 12 meses en orden cronológico (el más viejo
+// primero); esta pantalla solo formatea para pantalla, igual que el resto
+// del Dashboard.
+function renderRentabilidadMensual(rentabilidad) {
+  const el = document.getElementById("rentabilidad-mensual");
+  el.innerHTML = rentabilidad
+    .map((item) => {
+      const esPositiva = Number(item.rentabilidad) >= 0;
+      return `
+      <div class="rentabilidad-row">
+        <span class="rentabilidad-row-mes">${MESES_LABELS[item.mes - 1]} ${item.anio}</span>
+        <div class="rentabilidad-row-stats">
+          <div class="rentabilidad-stat">
+            <span class="rentabilidad-stat-label">Ingresos</span>
+            <span class="rentabilidad-stat-value">${formatMoneda(item.ingresos)}</span>
+          </div>
+          <div class="rentabilidad-stat">
+            <span class="rentabilidad-stat-label">Gastos</span>
+            <span class="rentabilidad-stat-value">${formatMoneda(item.gastos)}</span>
+          </div>
+          <div class="rentabilidad-stat rentabilidad-stat-resultado" data-positive="${esPositiva}">
+            <span class="rentabilidad-stat-label">Rentabilidad</span>
+            <span class="rentabilidad-stat-value">${formatMoneda(item.rentabilidad)}</span>
+          </div>
+        </div>
+      </div>`;
+    })
+    .join("");
+}
+
 async function loadDashboard() {
-  const [resumen, alertas, ranking] = await Promise.all([
+  const [resumen, alertas, ranking, rentabilidad] = await Promise.all([
     apiFetch("/dashboard/resumen"),
     apiFetch("/dashboard/alertas"),
     apiFetch("/dashboard/ranking"),
+    apiFetch("/dashboard/rentabilidad"),
   ]);
   renderDashboardSolicitudes(resumen, alertas);
   renderMetricasPrincipales(resumen);
@@ -2206,6 +2512,8 @@ async function loadDashboard() {
     "ranking-comercial-activos",
     "Ningún cliente tiene un contrato vigente en este momento."
   );
+  renderRentabilidadCharts(rentabilidad);
+  renderRentabilidadMensual(rentabilidad);
 }
 
 // ---------- Centro de Decisión (pestaña Alertas, Sprint 5A) ----------
@@ -2718,6 +3026,60 @@ function setupFormPauta() {
   });
 }
 
+function resetFormGastoDrawer() {
+  editingGastoId = null;
+  document.getElementById("drawer-gasto-titulo").textContent = "Nuevo gasto";
+  document.getElementById("form-gasto-submit-label").textContent = "Registrar gasto";
+  setIconUse(document.getElementById("form-gasto-submit-icon"), "icon-plus");
+  document.getElementById("form-gasto").reset();
+}
+
+function startEditGasto(gastoId) {
+  const gasto = gastosTodas.find((g) => g.id === gastoId);
+  if (!gasto) return;
+  editingGastoId = gastoId;
+  document.getElementById("drawer-gasto-titulo").textContent = "Editar gasto";
+  document.getElementById("form-gasto-submit-label").textContent = "Guardar cambios";
+  setIconUse(document.getElementById("form-gasto-submit-icon"), "icon-check");
+  document.getElementById("gasto-descripcion").value = gasto.descripcion;
+  document.getElementById("gasto-valor").value = gasto.valor;
+  document.getElementById("gasto-fecha").value = gasto.fecha;
+}
+
+function setupFormGasto() {
+  document.getElementById("form-gasto").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+      descripcion: document.getElementById("gasto-descripcion").value,
+      valor: document.getElementById("gasto-valor").value,
+      fecha: document.getElementById("gasto-fecha").value,
+    };
+    try {
+      if (editingGastoId) {
+        await apiFetch(`/gastos/${editingGastoId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        showStatus("Gasto actualizado.", false);
+      } else {
+        await apiFetch("/gastos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        showStatus("Gasto registrado.", false);
+      }
+      resetFormGastoDrawer();
+      closeDrawer(document.getElementById("drawer-gasto"));
+      await loadGastos();
+      await loadDashboard();
+    } catch (error) {
+      showStatus(error.message, true);
+    }
+  });
+}
+
 // ---------- arranque ----------
 
 const AUTO_REFRESH_INTERVAL_MS = 30_000; // sensacion de "casi en vivo" sin websockets
@@ -2727,7 +3089,13 @@ function appEstaVisible() {
 }
 
 function refrescarTodo() {
-  return Promise.all([loadClientesYPautas(), loadSolicitudes(), loadDashboard(), loadAlertas()]);
+  return Promise.all([
+    loadClientesYPautas(),
+    loadSolicitudes(),
+    loadDashboard(),
+    loadAlertas(),
+    loadGastos(),
+  ]);
 }
 
 // Sin sincronización en tiempo real entre pestañas/dispositivos — sin esto,
@@ -2795,6 +3163,8 @@ async function init() {
   setupFormSolicitud();
   setupFormCliente();
   setupFormPauta();
+  setupFormGasto();
+  setupChartTooltip();
   setupFormLogin();
   setupLogout();
   setupRefrescoAutomatico();
@@ -2806,6 +3176,11 @@ async function init() {
   document.getElementById("refrescar-dashboard").addEventListener("click", loadDashboard);
   document.getElementById("refrescar-alertas").addEventListener("click", loadAlertas);
   document.getElementById("refrescar-contratos").addEventListener("click", loadClientesYPautas);
+  document.getElementById("refrescar-gastos").addEventListener("click", loadGastos);
+  document.getElementById("gastos-buscar").addEventListener("input", (event) => {
+    gastosFiltro = event.target.value;
+    renderListaGastos();
+  });
   document.getElementById("solicitud-pauta-buscar").addEventListener("input", (event) => {
     solicitudPautaFiltro = event.target.value;
     renderSelectPautas();
@@ -2832,6 +3207,7 @@ async function init() {
     await loadSolicitudes();
     await loadDashboard();
     await loadAlertas();
+    await loadGastos();
   } catch (error) {
     showStatus(error.message, true);
   }

@@ -102,3 +102,21 @@ class RankingComercialItem:
     fecha_vencimiento: date
     vigente: bool
     estado_comercial: EstadoComercial
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RentabilidadMensualItem:
+    """Ingresos, gastos y rentabilidad de un mes calendario.
+
+    `ingresos` usa `Pauta.fecha_pago` — el mismo criterio de "dinero ya
+    cobrado" que `AnalyticsService.ingresos_anio_actual`/el "Pautado este
+    mes" del dashboard ya usan, no una proyección. `gastos` suma
+    `Gasto.valor` cuyo `Gasto.fecha` cae en ese mes. Ver
+    `core.analytics.rentabilidad_service.rentabilidad_mensual`.
+    """
+
+    anio: int
+    mes: int
+    ingresos: Decimal
+    gastos: Decimal
+    rentabilidad: Decimal
