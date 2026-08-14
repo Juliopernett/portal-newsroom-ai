@@ -296,6 +296,45 @@ def test_link_pauta_rejects_an_unknown_pauta_id(client: TestClient) -> None:
     assert response.status_code == 400
 
 
+def test_cancelar_transitions_a_recibida_request_to_cancelada(client: TestClient) -> None:
+    solicitud_id = client.post(
+        "/publication-requests", json={"texto": "El cliente pidió no publicarla"}
+    ).json()["id"]
+
+    response = client.post(f"/publication-requests/{solicitud_id}/cancelar")
+
+    assert response.status_code == 200
+    assert response.json()["estado"] == "cancelada"
+
+
+def test_cancelar_returns_404_when_request_not_found(client: TestClient) -> None:
+    response = client.post("/publication-requests/no-existe/cancelar")
+
+    assert response.status_code == 404
+
+
+def test_cancelar_rejects_an_already_aceptada_request(client: TestClient) -> None:
+    pauta_id = _create_client_and_pauta(client)
+    solicitud_id = client.post("/publication-requests", json={"texto": "Ya en curso"}).json()["id"]
+    client.post(f"/publication-requests/{solicitud_id}/link-pauta", json={"pauta_id": pauta_id})
+    client.post(f"/publication-requests/{solicitud_id}/publish")
+
+    response = client.post(f"/publication-requests/{solicitud_id}/cancelar")
+
+    assert response.status_code == 422
+
+
+def test_cancelar_removes_the_request_from_the_pending_queue(client: TestClient) -> None:
+    solicitud_id = client.post(
+        "/publication-requests", json={"texto": "El cliente pidió no publicarla"}
+    ).json()["id"]
+
+    client.post(f"/publication-requests/{solicitud_id}/cancelar")
+    response = client.get("/publication-requests", params={"estado": "recibida"})
+
+    assert solicitud_id not in [s["id"] for s in response.json()]
+
+
 def test_edit_updates_texto_on_a_recibida_request(client: TestClient) -> None:
     solicitud_id = client.post("/publication-requests", json={"texto": "Texto con un typo"}).json()[
         "id"

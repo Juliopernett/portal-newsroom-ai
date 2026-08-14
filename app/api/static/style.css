@@ -2274,6 +2274,14 @@ form {
 
 .drawer-form {
   padding: var(--space-4);
+  /* Mismo tratamiento que .ficha-content: el drawer es position:fixed con
+     top/bottom:0 y no crece con el contenido -- sin esto, un formulario
+     más alto que la ventana (típico en mobile, sobre todo con el teclado
+     en pantalla) deja campos y el botón de enviar fuera de la vista, sin
+     ninguna forma de llegar a ellos (auditoría de UX móvil, 2026-08-14).
+     overflow:auto basta -- por spec, el tamaño mínimo automático de un
+     hijo flex baja a 0 en cuanto overflow deja de ser "visible". */
+  overflow-y: auto;
 }
 
 /* ---------- drawers ---------- */
@@ -2464,6 +2472,31 @@ form {
   .client-card-footer-secondary .btn-link {
     flex: 1 1 auto;
     justify-content: center;
+    min-height: 44px;
+  }
+
+  /* Varios contextos "compactos" (varias acciones en una fila densa de
+     tarjeta) bajan min-height/font-size a propósito en escritorio, con
+     más especificidad que la regla táctil de arriba -- así que nunca
+     recibían el mínimo de 44px en mobile, justo en las tarjetas con más
+     acciones por tarjeta (cola de Solicitudes, destinos, Alertas).
+     Restaurado explícitamente. Los <select>/<input> de esta lista también
+     recuperan los 16px de fuente (evita el auto-zoom de iOS, misma razón
+     que la regla base de input/select/textarea). Auditoría de UX móvil,
+     2026-08-14. */
+  .kanban-card-footer .btn,
+  .action-item-actions .btn,
+  .destino-row-actions .btn,
+  .destino-row-agregar .btn,
+  .reporte-panel .btn-copiar-reporte {
+    min-height: 44px;
+  }
+
+  .kanban-card-footer select,
+  .destino-row-url,
+  .destino-row-agregar select {
+    min-height: 44px;
+    font-size: 16px;
   }
 
   .client-card-footer-secondary {

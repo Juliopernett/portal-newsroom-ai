@@ -12,6 +12,8 @@ protected automatically instead of by remembering to add it.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.dependencies import get_current_user, get_unit_of_work
@@ -62,6 +64,32 @@ def create_pauta(payload: PautaCreate, uow: UnitOfWork = Depends(get_unit_of_wor
     uow.pautas.save(pauta)
     uow.commit()
     return _to_out(pauta, uow)
+
+
+@router.put("/{pauta_id}", response_model=PautaOut)
+def update_pauta(
+    pauta_id: str, payload: PautaCreate, uow: UnitOfWork = Depends(get_unit_of_work)
+) -> PautaOut:
+    """Replace an existing Pauta's editable fields (fecha_inicio, fecha_fin, ...).
+
+    Same PUT-semantics discipline `app.api.routers.clients.update_client`
+    already uses for `Client`: `Pauta` is immutable (`frozen=True`), so
+    this builds a new instance via `dataclasses.replace`, which re-runs
+    `__post_init__` validation. Added 2026-08-14 after a real data-entry
+    mistake (a Pauta saved with the wrong fecha_fin) had no way to be
+    corrected short of editing the database directly. `id` and
+    `fecha_registro` (audit timestamp, never meant to be edited — see
+    `Pauta`'s own docstring) are preserved; every other field is replaced
+    wholesale from the payload, `client_id` included — the same wholesale
+    replacement `Client` already allows.
+    """
+    existing = uow.pautas.get_by_id(pauta_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Pauta not found")
+    updated = replace(existing, **payload.model_dump())
+    uow.pautas.save(updated)
+    uow.commit()
+    return _to_out(updated, uow)
 
 
 @router.get("/{pauta_id}", response_model=PautaOut)

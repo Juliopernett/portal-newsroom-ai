@@ -85,6 +85,62 @@ def test_get_pauta_returns_the_persisted_pauta(client: TestClient) -> None:
     assert response.json()["id"] == pauta_id
 
 
+def test_update_pauta_returns_404_when_not_found(client: TestClient) -> None:
+    client_id = _create_client(client)
+
+    response = client.put("/pautas/no-existe", json=_pauta_payload(client_id))
+
+    assert response.status_code == 404
+
+
+def test_update_pauta_corrects_a_field_without_changing_the_id(client: TestClient) -> None:
+    client_id = _create_client(client)
+    pauta_id = client.post("/pautas", json=_pauta_payload(client_id)).json()["id"]
+
+    response = client.put(
+        f"/pautas/{pauta_id}", json=_pauta_payload(client_id, fecha_fin="2026-09-13")
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == pauta_id
+    assert body["fecha_fin"] == "2026-09-13"
+
+
+def test_update_pauta_preserves_fecha_registro(client: TestClient) -> None:
+    client_id = _create_client(client)
+    original = client.post("/pautas", json=_pauta_payload(client_id)).json()
+
+    response = client.put(
+        f"/pautas/{original['id']}",
+        json=_pauta_payload(client_id, fecha_fin="2026-09-13"),
+    )
+
+    assert response.json()["fecha_registro"] == original["fecha_registro"]
+
+
+def test_update_pauta_persists_across_a_fresh_get(client: TestClient) -> None:
+    client_id = _create_client(client)
+    pauta_id = client.post("/pautas", json=_pauta_payload(client_id)).json()["id"]
+
+    client.put(f"/pautas/{pauta_id}", json=_pauta_payload(client_id, publicaciones_contratadas=4))
+    response = client.get(f"/pautas/{pauta_id}")
+
+    assert response.json()["publicaciones_contratadas"] == 4
+
+
+def test_update_pauta_rejects_end_date_not_after_start_date(client: TestClient) -> None:
+    client_id = _create_client(client)
+    pauta_id = client.post("/pautas", json=_pauta_payload(client_id)).json()["id"]
+
+    response = client.put(
+        f"/pautas/{pauta_id}",
+        json=_pauta_payload(client_id, fecha_inicio="2026-08-30", fecha_fin="2026-08-30"),
+    )
+
+    assert response.status_code == 422
+
+
 def test_list_pautas_returns_an_empty_list_when_none_exist(client: TestClient) -> None:
     response = client.get("/pautas")
 

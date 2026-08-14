@@ -57,6 +57,7 @@ let solicitudPautaFiltro = "";
 let clientesFiltro = "";
 let contratosFiltro = "";
 let editingClientId = null;
+let editingPautaId = null;
 // Listas completas (sin el recorte de 30 que usa el kanban de "Publicadas")
 // -- la ficha de cliente necesita el historial completo, no solo lo último.
 let solicitudesPendientesTodas = [];
@@ -391,9 +392,12 @@ function setupGlobalClicks() {
       closeAllDrawers();
       if (openBtn.dataset.editClient) {
         startEditCliente(openBtn.dataset.editClient);
+      } else if (openBtn.dataset.editPauta) {
+        startEditPauta(openBtn.dataset.editPauta);
       } else if (openBtn.dataset.openDrawer === "drawer-cliente") {
         resetFormClienteDrawer();
       } else if (openBtn.dataset.openDrawer === "drawer-pauta") {
+        resetFormPautaDrawer();
         // Si "Nueva pauta"/"Renovar pauta" se abrió desde la ficha de un
         // cliente puntual, preseleccionarlo — sin esto el <select> queda
         // en el primer cliente de la lista si nadie lo toca a mano, y una
@@ -553,6 +557,19 @@ function renderEditClienteButton(clienteId) {
     </button>`;
 }
 
+// Mismo patrón que renderEditClienteButton -- corrige un dato de una Pauta
+// ya registrada (fecha_fin equivocada, monto mal digitado, etc.) sin tener
+// que borrar y recrearla. Antes de esto no había forma de corregir un
+// error así salvo editando la base de datos a mano (caso real, 2026-08-14:
+// una Pauta de 4 publicaciones quedó con fecha_fin 2026-08-14 en vez de
+// 2026-09-13).
+function renderEditPautaButton(pautaId) {
+  return `
+    <button type="button" class="btn-link" data-open-drawer="drawer-pauta" data-edit-pauta="${pautaId}">
+      <svg class="icon"><use href="#icon-edit"></use></svg>Editar
+    </button>`;
+}
+
 // Orden de prioridad visual pedido por el negocio (Sprint UX 3): nombre,
 // tipo de plan, publicaciones restantes, vencimiento, valor contratado, y
 // peso comercial al final y en menor tamaño -- es un dato de uso interno,
@@ -663,6 +680,7 @@ function renderHistorialItem(pauta) {
         <span>${PAUTA_TIPO_LABELS[pauta.tipo] ?? pauta.tipo}</span>
         <span>${pauta.publicaciones_restantes}/${pauta.publicaciones_contratadas}</span>
         <span class="badge badge-${estadoClase}">${estadoTexto}</span>
+        ${renderEditPautaButton(pauta.id)}
       </div>
     </div>`;
 }
@@ -702,6 +720,7 @@ function renderContractCard(pauta) {
       <div class="contract-card-footer">
         <span class="contract-card-valor">${formatMoneda(pauta.valor_pagado)}</span>
         <span class="contract-card-peso" title="Peso comercial — uso interno">Peso ${formatMoneda(pauta.peso_comercial)}</span>
+        ${renderEditPautaButton(pauta.id)}
       </div>
     </div>`;
 }
@@ -1285,6 +1304,9 @@ function renderKanbanCard(solicitud, esPublicada) {
     accionHtml += `
          <button type="button" class="btn btn-secondary btn-editar" data-id="${solicitud.id}">
            <svg class="icon"><use href="#icon-edit"></use></svg>Editar
+         </button>
+         <button type="button" class="btn btn-secondary btn-cancelar-solicitud" data-id="${solicitud.id}">
+           <svg class="icon"><use href="#icon-close"></use></svg>Cancelar
          </button>`;
   }
   if (!esPublicada) {
@@ -1485,6 +1507,9 @@ function renderKanbanPendientesColumn() {
       pendEl.querySelector(".kanban-card-edit-texto")?.focus();
     });
   }
+  for (const btn of pendEl.querySelectorAll(".btn-cancelar-solicitud")) {
+    btn.addEventListener("click", () => cancelarSolicitud(btn.dataset.id));
+  }
   for (const btn of pendEl.querySelectorAll(".btn-cancelar-edicion")) {
     btn.addEventListener("click", () => {
       editingSolicitudId = null;
@@ -1616,6 +1641,16 @@ async function vincularPauta(id, pautaId) {
       body: JSON.stringify({ pauta_id: pautaId }),
     });
     showStatus("Pauta vinculada. Ya se puede publicar.", false);
+    await loadSolicitudes();
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+async function cancelarSolicitud(id) {
+  try {
+    await apiFetch(`/publication-requests/${id}/cancelar`, { method: "POST" });
+    showStatus("Solicitud cancelada.", false);
     await loadSolicitudes();
   } catch (error) {
     showStatus(error.message, true);
@@ -1840,7 +1875,7 @@ async function cancelarDestino(id, destinoId) {
 // — esta pantalla no calcula ni reordena nada por su cuenta, solo formatea
 // para pantalla (moneda, fechas, iconos) lo que ya entrega el backend.
 
-// Las 6 métricas que de verdad ayudan a responder "¿cómo va el negocio hoy?"
+// Las métricas que de verdad ayudan a responder "¿cómo va el negocio hoy?"
 // (Sprint UX 3) — el resto de indicadores de AnalyticsService quedan en
 // "Otros indicadores" más abajo, para no competir en espacio con estas.
 const DASHBOARD_METRICAS_PRINCIPALES = [
@@ -1850,6 +1885,7 @@ const DASHBOARD_METRICAS_PRINCIPALES = [
   ["publicaciones_este_mes", "Publicaciones este mes", "icon-check", false],
   ["renovaciones_del_mes", "Renovaciones del mes", "icon-refresh", false],
   ["ingresos_ultimo_mes", "Ingresos último mes", "icon-money", true],
+  ["pautado_mes_actual", "Pautado este mes", "icon-money", true],
 ];
 
 const DASHBOARD_ACTIVIDAD = [
@@ -1859,13 +1895,17 @@ const DASHBOARD_ACTIVIDAD = [
   ["ingreso_historico", "Ingreso histórico", "icon-money", true],
 ];
 
-// "Renovaciones del mes" e "ingresos último mes" no vienen del backend --
-// se calculan aquí mismo, sobre las Pautas que ya están cargadas en
-// memoria (pautasById), sin ningún round-trip nuevo a la API. Ambas
-// definiciones fueron confirmadas con el negocio antes de implementarse
-// (Sprint UX 3): "ingresos" es dinero ya cobrado (fecha_pago), no una
-// proyección; "renovaciones" son contratos por paquete de tiempo (no
-// Individual) cuyo fecha_fin cae en el mes calendario actual.
+// "Renovaciones del mes", "ingresos último mes" y "pautado este mes" no
+// vienen del backend -- se calculan aquí mismo, sobre las Pautas que ya
+// están cargadas en memoria (pautasById), sin ningún round-trip nuevo a
+// la API. Las dos primeras definiciones fueron confirmadas con el
+// negocio antes de implementarse (Sprint UX 3): "ingresos" es dinero ya
+// cobrado (fecha_pago), no una proyección; "renovaciones" son contratos
+// por paquete de tiempo (no Individual) cuyo fecha_fin cae en el mes
+// calendario actual. "Pautado este mes" (2026-08-14) reutiliza la misma
+// función que "ingresos último mes" con offset 0 en vez de -1 -- incluso
+// el nombre "pautado" viene del mismo criterio de fecha_pago, ya
+// confirmado, así que no hace falta una definición nueva.
 
 function calcularRenovacionesDelMes() {
   const ahora = new Date();
@@ -1898,6 +1938,7 @@ function renderMetricasPrincipales(resumen) {
     ...resumen,
     renovaciones_del_mes: calcularRenovacionesDelMes(),
     ingresos_ultimo_mes: calcularIngresosDelMes(-1),
+    pautado_mes_actual: calcularIngresosDelMes(0),
   };
   renderStatRow("dashboard-metricas-principales", DASHBOARD_METRICAS_PRINCIPALES, datos);
 }
@@ -2572,6 +2613,34 @@ function startEditCliente(clientId) {
   document.getElementById("cliente-observaciones").value = cliente.observaciones || "";
 }
 
+function resetFormPautaDrawer() {
+  editingPautaId = null;
+  document.getElementById("drawer-pauta-titulo").textContent = "Nueva pauta";
+  document.getElementById("form-pauta-submit-label").textContent = "Crear pauta";
+  setIconUse(document.getElementById("form-pauta-submit-icon"), "icon-plus");
+  document.getElementById("form-pauta").reset();
+}
+
+function startEditPauta(pautaId) {
+  const pauta = pautasById.get(pautaId);
+  if (!pauta) return;
+  editingPautaId = pautaId;
+  document.getElementById("drawer-pauta-titulo").textContent = "Editar pauta";
+  document.getElementById("form-pauta-submit-label").textContent = "Guardar cambios";
+  setIconUse(document.getElementById("form-pauta-submit-icon"), "icon-check");
+  // El catálogo de planes es solo un atajo de captura (autocompleta
+  // cantidad/valor) -- no es un dato guardado en la Pauta, así que no hay
+  // nada que preseleccionar acá; queda en blanco hasta que se cree otra.
+  document.getElementById("pauta-plan").value = "";
+  document.getElementById("pauta-cliente").value = pauta.client_id;
+  document.getElementById("pauta-fecha-inicio").value = pauta.fecha_inicio;
+  document.getElementById("pauta-fecha-fin").value = pauta.fecha_fin;
+  document.getElementById("pauta-cantidad").value = pauta.publicaciones_contratadas;
+  document.getElementById("pauta-valor").value = pauta.valor_pagado;
+  document.getElementById("pauta-fecha-pago").value = pauta.fecha_pago;
+  document.getElementById("pauta-observaciones").value = pauta.observaciones || "";
+}
+
 function setupFormCliente() {
   document.getElementById("form-cliente").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2623,13 +2692,22 @@ function setupFormPauta() {
       observaciones: document.getElementById("pauta-observaciones").value || null,
     };
     try {
-      await apiFetch("/pautas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      showStatus("Pauta creada.", false);
-      event.target.reset();
+      if (editingPautaId) {
+        await apiFetch(`/pautas/${editingPautaId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        showStatus("Pauta actualizada.", false);
+      } else {
+        await apiFetch("/pautas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        showStatus("Pauta creada.", false);
+      }
+      resetFormPautaDrawer();
       closeDrawer(document.getElementById("drawer-pauta"));
       await loadClientesYPautas();
       await loadDashboard();

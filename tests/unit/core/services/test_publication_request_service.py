@@ -10,6 +10,7 @@ from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicaci
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.services.publication_request_service import (
     aceptar,
+    cancelar_solicitud,
     cerrar_si_completa,
     edit_solicitud,
     link_pauta,
@@ -166,6 +167,47 @@ def test_edit_solicitud_rejects_editing_a_cancelled_request() -> None:
 
     with pytest.raises(ValueError, match="cancelada"):
         edit_solicitud(solicitud, texto="Intento tardío")
+
+
+def test_cancelar_solicitud_transitions_status_to_cancelada() -> None:
+    solicitud = _solicitud()
+
+    resultado = cancelar_solicitud(solicitud)
+
+    assert resultado.estado == PublicationRequestStatus.CANCELADA
+
+
+def test_cancelar_solicitud_does_not_mutate_the_original() -> None:
+    solicitud = _solicitud()
+
+    cancelar_solicitud(solicitud)
+
+    assert solicitud.estado == PublicationRequestStatus.RECIBIDA
+
+
+def test_cancelar_solicitud_preserves_the_rest_of_the_fields() -> None:
+    solicitud = _solicitud(texto="No cambiar este texto", prioridad_manual=True)
+
+    resultado = cancelar_solicitud(solicitud)
+
+    assert resultado.id == solicitud.id
+    assert resultado.pauta_id == solicitud.pauta_id
+    assert resultado.texto == "No cambiar este texto"
+    assert resultado.prioridad_manual is True
+
+
+def test_cancelar_solicitud_rejects_an_already_aceptada_request() -> None:
+    solicitud = _solicitud(estado=PublicationRequestStatus.ACEPTADA)
+
+    with pytest.raises(ValueError, match="aceptada"):
+        cancelar_solicitud(solicitud)
+
+
+def test_cancelar_solicitud_rejects_an_already_cancelled_request() -> None:
+    solicitud = _solicitud(estado=PublicationRequestStatus.CANCELADA, pauta_id=None)
+
+    with pytest.raises(ValueError, match="cancelada"):
+        cancelar_solicitud(solicitud)
 
 
 def _destino(**overrides: object) -> DestinoPublicacion:

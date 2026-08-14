@@ -7,6 +7,11 @@ same `pauta_id`-required invariant `PUBLICADA` used to enforce) and
 creates/marks a compatibility WordPress destino as `PUBLICADO`. See
 `publish_publication_request`'s own docstring.
 
+`POST /{request_id}/cancelar` (2026-08-14) exposes `cancelar_solicitud` --
+closes a request the client asked to cancel before it went out. Only
+valid from RECIBIDA, same restriction `PATCH` already applies and for
+the same reason.
+
 `POST /{request_id}/link-pauta` (Sprint 3E) closes the gap the UX review
 (docs/ux/sprint-3d5-ux-review.md) flagged as the most important one: a
 request received without a Pauta had no way to be completed from the
@@ -94,6 +99,7 @@ from core.services.media_asset_service import (
 )
 from core.services.publication_request_service import (
     aceptar,
+    cancelar_solicitud,
     cerrar_si_completa,
     edit_solicitud,
     link_pauta,
@@ -220,6 +226,25 @@ def edit_publication_request(
     uow.publication_requests.save(editada)
     uow.commit()
     return editada
+
+
+@router.post("/{request_id}/cancelar", response_model=PublicationRequestOut)
+def cancel_publication_request(
+    request_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> PublicationRequest:
+    """Cancel a still-RECIBIDA PublicationRequest that will never be published.
+
+    Raises via `cancelar_solicitud` (422, see `app.api.errors`) if the
+    request already moved past RECIBIDA.
+    """
+    solicitud = uow.publication_requests.get_by_id(request_id)
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    cancelada = cancelar_solicitud(solicitud)
+    uow.publication_requests.save(cancelada)
+    uow.commit()
+    return cancelada
 
 
 @router.post("/{request_id}/link-pauta", response_model=PublicationRequestOut)

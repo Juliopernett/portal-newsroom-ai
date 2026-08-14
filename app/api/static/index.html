@@ -461,7 +461,7 @@
 
 <aside id="drawer-pauta" class="drawer" hidden aria-hidden="true">
   <div class="drawer-header">
-    <h2>Nueva pauta</h2>
+    <h2 id="drawer-pauta-titulo">Nueva pauta</h2>
     <button type="button" class="icon-btn" data-close-drawer aria-label="Cerrar">
       <svg class="icon"><use href="#icon-close"></use></svg>
     </button>
@@ -495,9 +495,9 @@
     <label>Observaciones (opcional)
       <input type="text" id="pauta-observaciones" autocomplete="off">
     </label>
-    <button type="submit" class="btn btn-primary">
-      <svg class="icon"><use href="#icon-plus"></use></svg>
-      Crear pauta
+    <button type="submit" id="form-pauta-submit" class="btn btn-primary">
+      <svg class="icon" id="form-pauta-submit-icon"><use href="#icon-plus"></use></svg>
+      <span id="form-pauta-submit-label">Crear pauta</span>
     </button>
   </form>
 </aside>

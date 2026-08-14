@@ -32,6 +32,27 @@ def aceptar(solicitud: PublicationRequest) -> PublicationRequest:
     return replace(solicitud, estado=PublicationRequestStatus.ACEPTADA)
 
 
+def cancelar_solicitud(solicitud: PublicationRequest) -> PublicationRequest:
+    """Return a copy of `solicitud` transitioned to `CANCELADA`.
+
+    Closes a real gap: `PublicationRequestStatus.CANCELADA` existed on the
+    entity since it was defined but nothing ever produced it — a request
+    the client asked to cancel before it went out had no way to be closed
+    out, and stayed stuck in the working queue indefinitely (2026-08-14).
+    Only a still-RECIBIDA request can be cancelled, the same restriction
+    `edit_solicitud` already applies and for the same reason: once
+    ACEPTADA, distribution work may already be underway (see
+    `core.services.destino_publicacion_service`), so cancelling at that
+    point would hide in-progress work instead of describing a request
+    stopped before anything started.
+    """
+    if solicitud.estado != PublicationRequestStatus.RECIBIDA:
+        raise ValueError(
+            f"cannot cancel a PublicationRequest once its estado is {solicitud.estado.value!r}"
+        )
+    return replace(solicitud, estado=PublicationRequestStatus.CANCELADA)
+
+
 def link_pauta(solicitud: PublicationRequest, pauta_id: str) -> PublicationRequest:
     """Return a copy of `solicitud` linked to `pauta_id`.
 
