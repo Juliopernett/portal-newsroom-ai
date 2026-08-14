@@ -1481,12 +1481,22 @@ button[type="submit"]:hover {
 .inbox-layout {
   display: grid;
   grid-template-columns: 3fr 2fr;
+  grid-template-areas:
+    "cola activity"
+    "publicadas activity";
   gap: var(--space-5);
   align-items: start;
 }
 
-.inbox-main {
+.inbox-section-cola {
+  grid-area: cola;
   min-width: 0;
+}
+
+.inbox-section-publicadas {
+  grid-area: publicadas;
+  min-width: 0;
+  margin-top: var(--space-6);
 }
 
 .inbox-section-header {
@@ -1501,11 +1511,8 @@ button[type="submit"]:hover {
   margin: 0 0 var(--space-3);
 }
 
-.inbox-section-header:not(:first-child) {
-  margin-top: var(--space-6);
-}
-
 .inbox-activity {
+  grid-area: activity;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1636,8 +1643,20 @@ button[type="submit"]:hover {
 }
 
 @media (max-width: 1100px) {
+  /* En mobile la actividad reciente es información de trabajo, no un
+     complemento -- va justo después de la cola de trabajo y antes de
+     publicadas, en vez de quedar hasta el final de una sola columna
+     larga (bug reportado por el usuario, 2026-08-14). */
   .inbox-layout {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "cola"
+      "activity"
+      "publicadas";
+  }
+
+  .inbox-section-publicadas {
+    margin-top: 0;
   }
 
   .inbox-activity {

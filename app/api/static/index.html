@@ -194,15 +194,15 @@
           <div class="ranking-grid">
             <div>
               <div class="section-header-flex">
-                <h2 class="section-title">Histórico</h2>
-              </div>
-              <div id="ranking-comercial" class="ranking-list"></div>
-            </div>
-            <div>
-              <div class="section-header-flex">
                 <h2 class="section-title">Activos ahora</h2>
               </div>
               <div id="ranking-comercial-activos" class="ranking-list"></div>
+            </div>
+            <div>
+              <div class="section-header-flex">
+                <h2 class="section-title">Histórico</h2>
+              </div>
+              <div id="ranking-comercial" class="ranking-list"></div>
             </div>
           </div>
         </div>
@@ -315,18 +315,12 @@
         </form>
 
         <div class="inbox-layout">
-          <div class="inbox-main">
+          <div class="inbox-section-cola">
             <div class="inbox-section-header">
               <span>Cola de trabajo</span>
               <span id="kanban-count-pendientes" class="kanban-count">0</span>
             </div>
             <div id="kanban-pendientes" class="kanban-cards"></div>
-
-            <div class="inbox-section-header">
-              <span>Publicadas</span>
-              <span id="kanban-count-publicadas" class="kanban-count">0</span>
-            </div>
-            <div id="kanban-publicadas" class="kanban-cards"></div>
           </div>
 
           <aside class="inbox-activity">
@@ -336,6 +330,14 @@
             </div>
             <div id="actividad-reciente" class="timeline"></div>
           </aside>
+
+          <div class="inbox-section-publicadas">
+            <div class="inbox-section-header">
+              <span>Publicadas</span>
+              <span id="kanban-count-publicadas" class="kanban-count">0</span>
+            </div>
+            <div id="kanban-publicadas" class="kanban-cards"></div>
+          </div>
         </div>
       </section>
 

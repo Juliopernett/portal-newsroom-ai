@@ -520,12 +520,21 @@ function pautasParaSolicitud() {
   return vigentes.filter((pauta) => pautaOptionLabel(pauta).toLowerCase().includes(termino));
 }
 
+// Preserva la pauta seleccionada al reconstruir el <select> -- si no se
+// restaura, el refresco automático cada 30s (ver setupRefrescoAutomatico)
+// vacía la selección mientras el usuario todavía está redactando el texto
+// de la solicitud, y esta se guarda desvinculada sin que nadie lo note
+// (bug real reportado por el usuario, 2026-08-14).
 function renderSelectPautas() {
   const select = document.getElementById("solicitud-pauta");
+  const previousValue = select.value;
   const placeholder = select.querySelector('option[value=""]');
   select.innerHTML = "";
   select.appendChild(placeholder);
   select.insertAdjacentHTML("beforeend", pautaOptionsHtml(pautasParaSolicitud()));
+  if (previousValue && select.querySelector(`option[value="${previousValue}"]`)) {
+    select.value = previousValue;
+  }
 }
 
 // ---------- Clientes: fichas CRM ----------
