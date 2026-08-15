@@ -5,13 +5,13 @@ import { AuthProvider } from '@/features/auth/AuthProvider'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ProtectedRoute } from '@/features/auth/ProtectedRoute'
 import { Shell } from '@/app/Shell'
-import { PlaceholderPage } from '@/app/PlaceholderPage'
 import { GastosPage } from '@/features/gastos/GastosPage'
 import { ClientesPage } from '@/features/clientes/ClientesPage'
 import { ReportesPage } from '@/features/reportes/ReportesPage'
 import { ContratosPage } from '@/features/contratos/ContratosPage'
 import { SolicitudesPage } from '@/features/solicitudes/SolicitudesPage'
 import { AlertasPage } from '@/features/alertas/AlertasPage'
+import { DashboardPage } from '@/features/dashboard/DashboardPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,7 +31,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<Shell />}>
-                <Route index element={<PlaceholderPage title="Dashboard" />} />
+                <Route index element={<DashboardPage />} />
                 <Route path="alertas" element={<AlertasPage />} />
                 <Route path="solicitudes" element={<SolicitudesPage />} />
                 <Route path="clientes" element={<ClientesPage />} />

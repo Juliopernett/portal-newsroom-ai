@@ -38,6 +38,12 @@
   --warning-bg: #fffbeb;
   --danger: #dc2626;
   --danger-bg: #fef2f2;
+
+  /* Chart categorical pair for Ingresos (--brand) vs Gastos — validated
+     together via dataviz's validate_palette.js (all checks pass, normal
+     ΔE 27.4). Distinct from --danger/--warning on purpose: this is a
+     categorical (identity) color, not a status one. */
+  --chart-gastos: #c2410c;
 }
 
 .dark {
@@ -96,6 +102,7 @@
   --color-warning-bg: var(--warning-bg);
   --color-danger: var(--danger);
   --color-danger-bg: var(--danger-bg);
+  --color-chart-gastos: var(--chart-gastos);
 }
 
 @layer base {
