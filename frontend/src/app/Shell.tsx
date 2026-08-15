@@ -30,7 +30,7 @@ export function Shell() {
     <div className="flex min-h-svh">
       <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-card">
         <div className="px-4 py-5">
-          <p className="text-sm font-semibold">Portal Newsroom AI</p>
+          <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
           {user && <p className="truncate text-xs text-muted-foreground">{user.nombre}</p>}
         </div>
         <nav className="flex flex-1 flex-col gap-1 px-2">

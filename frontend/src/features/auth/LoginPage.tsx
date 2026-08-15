@@ -29,7 +29,7 @@ export function LoginPage() {
     <div className="flex min-h-svh items-center justify-center bg-muted/30 px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Portal Newsroom AI</CardTitle>
+          <CardTitle className="text-xl">Portal Vallenato Newsroom</CardTitle>
           <CardDescription>Inicia sesión para continuar</CardDescription>
         </CardHeader>
         <CardContent>
