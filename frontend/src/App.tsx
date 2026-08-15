@@ -6,6 +6,7 @@ import { LoginPage } from '@/features/auth/LoginPage'
 import { ProtectedRoute } from '@/features/auth/ProtectedRoute'
 import { Shell } from '@/app/Shell'
 import { PlaceholderPage } from '@/app/PlaceholderPage'
+import { GastosPage } from '@/features/gastos/GastosPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,7 +31,7 @@ export default function App() {
                 <Route path="solicitudes" element={<PlaceholderPage title="Solicitudes" />} />
                 <Route path="clientes" element={<PlaceholderPage title="Clientes" />} />
                 <Route path="contratos" element={<PlaceholderPage title="Contratos" />} />
-                <Route path="gastos" element={<PlaceholderPage title="Gastos" />} />
+                <Route path="gastos" element={<GastosPage />} />
               </Route>
             </Route>
           </Routes>
