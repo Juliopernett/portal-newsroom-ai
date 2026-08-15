@@ -1,6 +1,17 @@
 import { useState } from 'react'
 import { Check, Link2, Pencil, Flag, X } from 'lucide-react'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { SelectNative } from '@/components/ui/select-native'
 import { Textarea } from '@/components/ui/textarea'
@@ -187,14 +198,27 @@ export function SolicitudCard({
           <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
             <Pencil /> Editar
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={isActing}
-            onClick={() => onCancelar(solicitud.id)}
-          >
-            <X /> Cancelar
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="secondary" size="sm" disabled={isActing}>
+                <X /> Cancelar
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Cancelar esta solicitud?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. La solicitud quedará marcada como cancelada.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Volver</AlertDialogCancel>
+                <AlertDialogAction onClick={() => onCancelar(solicitud.id)}>
+                  Sí, cancelar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )}
     </div>

@@ -33,6 +33,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+// For mutations with no inline error UI of their own (delete, publish,
+// cancel, link — actions triggered from a list row, not a form) — pass
+// this to a toast.error() in onError.
+export function errorMessage(err: unknown): string {
+  return err instanceof ApiError ? err.message : 'Ocurrió un error inesperado.'
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>

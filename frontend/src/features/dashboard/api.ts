@@ -25,6 +25,13 @@ export const dashboardApi = {
   resumen: () => api.get<DashboardResumen>('/dashboard/resumen'),
   alertas: () => api.get<DashboardAlertas>('/dashboard/alertas'),
   ranking: () => api.get<RankingComercialItem[]>('/dashboard/ranking'),
-  // desde/hasta default to the last 12 calendar months on the backend.
-  rentabilidad: () => api.get<RentabilidadMensual[]>('/dashboard/rentabilidad'),
+  // desde/hasta default to the last 12 calendar months on the backend
+  // when omitted — same endpoint/default logic Reportes' CSV export uses.
+  rentabilidad: (desde?: string, hasta?: string) => {
+    const params = new URLSearchParams()
+    if (desde) params.set('desde', desde)
+    if (hasta) params.set('hasta', hasta)
+    const query = params.toString()
+    return api.get<RentabilidadMensual[]>(`/dashboard/rentabilidad${query ? `?${query}` : ''}`)
+  },
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Calendar, Pencil, Plus, RefreshCw, Search } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { ApiError } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -76,6 +77,7 @@ export function ContratosPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PAUTAS_KEY })
       setSheetOpen(false)
+      toast.success('Pauta creada.')
     },
   })
 
@@ -84,6 +86,7 @@ export function ContratosPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PAUTAS_KEY })
       setSheetOpen(false)
+      toast.success('Pauta actualizada.')
     },
   })
 

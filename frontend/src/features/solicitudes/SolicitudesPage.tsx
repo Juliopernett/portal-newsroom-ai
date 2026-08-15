@@ -1,7 +1,9 @@
 import { useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
 
+import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SelectNative } from '@/components/ui/select-native'
@@ -52,7 +54,9 @@ export function SolicitudesPage() {
     onSuccess: () => {
       invalidateKanban()
       setForm(EMPTY_FORM)
+      toast.success('Solicitud registrada.')
     },
+    onError: (err) => toast.error(errorMessage(err)),
   })
 
   const publishMutation = useMutation({
@@ -60,24 +64,38 @@ export function SolicitudesPage() {
     onSuccess: () => {
       invalidateKanban()
       queryClient.invalidateQueries({ queryKey: PAUTAS_KEY })
+      toast.success('Solicitud publicada.')
     },
+    onError: (err) => toast.error(errorMessage(err)),
   })
 
   const cancelMutation = useMutation({
     mutationFn: solicitudesApi.cancelar,
-    onSuccess: invalidateKanban,
+    onSuccess: () => {
+      invalidateKanban()
+      toast.success('Solicitud cancelada.')
+    },
+    onError: (err) => toast.error(errorMessage(err)),
   })
 
   const linkMutation = useMutation({
     mutationFn: ({ id, pautaId }: { id: string; pautaId: string }) =>
       solicitudesApi.linkPauta(id, pautaId),
-    onSuccess: invalidateKanban,
+    onSuccess: () => {
+      invalidateKanban()
+      toast.success('Pauta vinculada. Ya se puede publicar.')
+    },
+    onError: (err) => toast.error(errorMessage(err)),
   })
 
   const editMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: SolicitudEditInput }) =>
       solicitudesApi.edit(id, payload),
-    onSuccess: invalidateKanban,
+    onSuccess: () => {
+      invalidateKanban()
+      toast.success('Solicitud actualizada.')
+    },
+    onError: (err) => toast.error(errorMessage(err)),
   })
 
   const isActing =
@@ -197,7 +215,10 @@ export function SolicitudesPage() {
                   onPublicar={(id) => publishMutation.mutate(id)}
                   onCancelar={(id) => cancelMutation.mutate(id)}
                   onVincular={(id, pautaId) => {
-                    if (!pautaId) return
+                    if (!pautaId) {
+                      toast.error('Elige una pauta antes de vincular.')
+                      return
+                    }
                     linkMutation.mutate({ id, pautaId })
                   }}
                   onGuardarEdicion={(id, payload) => editMutation.mutate({ id, payload })}

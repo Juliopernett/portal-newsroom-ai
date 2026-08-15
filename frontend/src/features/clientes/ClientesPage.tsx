@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Phone, Plus, RefreshCw, Search } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { ApiError } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -19,9 +21,21 @@ const CLIENTS_KEY = ['clients']
 
 export function ClientesPage() {
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Client | null>(null)
+
+  // Cross-module deep link (from Alertas' "Ver cliente") — same
+  // navigation-state pattern as Contratos' preselectClientId.
+  useEffect(() => {
+    const state = location.state as { buscar?: string } | null
+    if (state?.buscar) {
+      setSearch(state.buscar)
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location.state, location.pathname, navigate])
 
   const clientsQuery = useQuery({ queryKey: CLIENTS_KEY, queryFn: clientsApi.list })
 
@@ -30,6 +44,7 @@ export function ClientesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CLIENTS_KEY })
       setSheetOpen(false)
+      toast.success('Cliente creado.')
     },
   })
 
@@ -38,6 +53,7 @@ export function ClientesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CLIENTS_KEY })
       setSheetOpen(false)
+      toast.success('Cliente actualizado.')
     },
   })
 

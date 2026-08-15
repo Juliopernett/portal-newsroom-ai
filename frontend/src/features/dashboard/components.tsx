@@ -1,16 +1,38 @@
 import type { LucideIcon } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { formatMoneda } from '@/lib/format'
 import type { RankingComercialItem } from '@/features/alertas/api'
 
-export function StatCard({ icon: Icon, valor, label }: { icon: LucideIcon; valor: string | number; label: string }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-3">
+export function StatCard({
+  icon: Icon,
+  valor,
+  label,
+  to,
+}: {
+  icon: LucideIcon
+  valor: string | number
+  label: string
+  to?: string
+}) {
+  const content = (
+    <>
       <Icon className="size-4 text-muted-foreground" />
       <span className="text-lg font-semibold">{valor}</span>
       <span className="text-xs text-muted-foreground">{label}</span>
-    </div>
+    </>
   )
+  if (to) {
+    return (
+      <Link
+        to={to}
+        className="flex flex-col gap-1 rounded-lg border border-border bg-card p-3 transition-colors hover:border-brand/40 hover:bg-accent"
+      >
+        {content}
+      </Link>
+    )
+  }
+  return <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-3">{content}</div>
 }
 
 const ESTADO_COMERCIAL_LABELS: Record<string, string> = {

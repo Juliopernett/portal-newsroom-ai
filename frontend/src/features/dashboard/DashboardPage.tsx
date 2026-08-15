@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -12,6 +12,8 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { pautasApi } from '@/features/contratos/api'
 import { formatMoneda } from '@/lib/format'
 import { dashboardApi } from './api'
@@ -21,11 +23,16 @@ import { MESES_LABELS, calcularIngresosDelMes, calcularRenovacionesDelMes } from
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const [desde, setDesde] = useState('')
+  const [hasta, setHasta] = useState('')
 
   const resumenQuery = useQuery({ queryKey: ['dashboard', 'resumen'], queryFn: dashboardApi.resumen })
   const alertasQuery = useQuery({ queryKey: ['dashboard', 'alertas'], queryFn: dashboardApi.alertas })
   const rankingQuery = useQuery({ queryKey: ['dashboard', 'ranking'], queryFn: dashboardApi.ranking })
-  const rentabilidadQuery = useQuery({ queryKey: ['dashboard', 'rentabilidad'], queryFn: dashboardApi.rentabilidad })
+  const rentabilidadQuery = useQuery({
+    queryKey: ['dashboard', 'rentabilidad', desde, hasta],
+    queryFn: () => dashboardApi.rentabilidad(desde || undefined, hasta || undefined),
+  })
   const pautasQuery = useQuery({ queryKey: ['pautas'], queryFn: pautasApi.list })
 
   const isFetching =
@@ -99,11 +106,11 @@ export function DashboardPage() {
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              <StatCard icon={Users} valor={resumen!.clientes_activos} label="Clientes activos" />
+              <StatCard icon={Users} valor={resumen!.clientes_activos} label="Clientes activos" to="/clientes" />
               <StatCard icon={DollarSign} valor={formatMoneda(resumen!.ingreso_contratado_activo)} label="Ingresos año actual" />
-              <StatCard icon={Inbox} valor={resumen!.solicitudes_pendientes} label="Solicitudes pendientes" />
-              <StatCard icon={CheckCircle2} valor={resumen!.publicaciones_este_mes} label="Publicaciones este mes" />
-              <StatCard icon={RefreshCw} valor={renovacionesDelMes} label="Renovaciones del mes" />
+              <StatCard icon={Inbox} valor={resumen!.solicitudes_pendientes} label="Solicitudes pendientes" to="/solicitudes" />
+              <StatCard icon={CheckCircle2} valor={resumen!.publicaciones_este_mes} label="Publicaciones este mes" to="/solicitudes" />
+              <StatCard icon={RefreshCw} valor={renovacionesDelMes} label="Renovaciones del mes" to="/contratos" />
               <StatCard icon={DollarSign} valor={formatMoneda(ingresosUltimoMes)} label="Ingresos último mes" />
               <StatCard icon={DollarSign} valor={formatMoneda(pautadoMesActual)} label="Pautado este mes" />
             </div>
@@ -111,10 +118,48 @@ export function DashboardPage() {
         </div>
 
         <div>
-          <h3 className="text-sm font-medium text-muted-foreground">Rentabilidad mensual</h3>
-          <p className="mb-2 text-xs text-muted-foreground">
-            Últimos 12 meses — ingresos cobrados menos gastos registrados
-          </p>
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">Rentabilidad mensual</h3>
+              <p className="text-xs text-muted-foreground">
+                {desde || hasta ? 'Rango seleccionado' : 'Últimos 12 meses'} — ingresos cobrados menos gastos registrados
+              </p>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="dashboard-rentabilidad-desde" className="text-xs">Desde</Label>
+                <Input
+                  id="dashboard-rentabilidad-desde"
+                  type="date"
+                  className="h-8"
+                  value={desde}
+                  onChange={(e) => setDesde(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="dashboard-rentabilidad-hasta" className="text-xs">Hasta</Label>
+                <Input
+                  id="dashboard-rentabilidad-hasta"
+                  type="date"
+                  className="h-8"
+                  value={hasta}
+                  onChange={(e) => setHasta(e.target.value)}
+                />
+              </div>
+              {(desde || hasta) && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setDesde('')
+                    setHasta('')
+                  }}
+                >
+                  Últimos 12 meses
+                </Button>
+              )}
+            </div>
+          </div>
           {rentabilidadQuery.isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : (
@@ -194,7 +239,7 @@ export function DashboardPage() {
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <StatCard icon={AlertTriangle} valor={resumen!.pautas_vencidas} label="Pautas vencidas" />
+              <StatCard icon={AlertTriangle} valor={resumen!.pautas_vencidas} label="Pautas vencidas" to="/contratos" />
               <StatCard icon={Target} valor={formatMoneda(resumen!.peso_comercial_promedio)} label="Peso comercial promedio" />
               <StatCard icon={DollarSign} valor={formatMoneda(resumen!.valor_promedio_por_cliente)} label="Valor promedio/cliente" />
               <StatCard icon={DollarSign} valor={formatMoneda(resumen!.ingreso_historico)} label="Ingreso histórico" />

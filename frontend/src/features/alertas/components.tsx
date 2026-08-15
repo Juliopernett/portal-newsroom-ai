@@ -39,10 +39,14 @@ export function ActionItem({
   )
 }
 
-export function VerClienteButton() {
+export function VerClienteButton({ nombre }: { nombre?: string }) {
   const navigate = useNavigate()
   return (
-    <Button variant="secondary" size="sm" onClick={() => navigate('/clientes')}>
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => navigate('/clientes', nombre ? { state: { buscar: nombre } } : undefined)}
+    >
       <Eye /> Ver cliente
     </Button>
   )
@@ -57,8 +61,8 @@ export function RenovarButton({ clienteId, label }: { clienteId: string; label: 
   )
 }
 
-export function ContactarButton({ telefono }: { telefono: string }) {
-  const link = waLink(telefono)
+export function ContactarButton({ telefono, mensaje }: { telefono: string; mensaje?: string }) {
+  const link = waLink(telefono, mensaje)
   if (!link) return null
   return (
     <Button size="sm" asChild>
@@ -73,10 +77,15 @@ export function AccionSugeridaButtons({ cliente, accion }: { cliente: Client | n
   const navigate = useNavigate()
   return (
     <>
-      {cliente && <VerClienteButton />}
+      {cliente && <VerClienteButton nombre={cliente.nombre} />}
       {accion === 'renovar' && cliente && <RenovarButton clienteId={cliente.id} label="Renovar" />}
       {accion === 'reactivar' && cliente && <RenovarButton clienteId={cliente.id} label="Reactivar" />}
-      {accion === 'contactar' && cliente && <ContactarButton telefono={cliente.telefono} />}
+      {accion === 'contactar' && cliente && (
+        <ContactarButton
+          telefono={cliente.telefono}
+          mensaje={`Hola ${cliente.nombre}, te escribimos de Portal Vallenato — ¿tienes alguna publicación para programar?`}
+        />
+      )}
       {accion === 'ver_solicitudes' && (
         <Button variant="secondary" size="sm" onClick={() => navigate('/solicitudes')}>
           <Eye /> Ver
@@ -94,9 +103,12 @@ export function RenewalCard({ item, dias }: { item: { cliente: Client; tipo: Pau
         {PAUTA_TIPO_LABELS[item.tipo]} · vence {formatFecha(item.fecha_vencimiento)} ({dias} día{dias === 1 ? '' : 's'})
       </p>
       <div className="flex flex-wrap gap-2">
-        <VerClienteButton />
+        <VerClienteButton nombre={item.cliente.nombre} />
         <RenovarButton clienteId={item.cliente.id} label="Renovar" />
-        <ContactarButton telefono={item.cliente.telefono} />
+        <ContactarButton
+          telefono={item.cliente.telefono}
+          mensaje={`Hola ${item.cliente.nombre}, tu plan ${PAUTA_TIPO_LABELS[item.tipo]} vence el ${formatFecha(item.fecha_vencimiento)}. ¿Quieres renovarlo?`}
+        />
       </div>
     </div>
   )

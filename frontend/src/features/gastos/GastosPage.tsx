@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, RefreshCw, Search, X } from 'lucide-react'
+import { toast } from 'sonner'
 
-import { ApiError } from '@/api/client'
+import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -31,6 +32,7 @@ export function GastosPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: GASTOS_KEY })
       setSheetOpen(false)
+      toast.success('Gasto registrado.')
     },
   })
 
@@ -39,12 +41,17 @@ export function GastosPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: GASTOS_KEY })
       setSheetOpen(false)
+      toast.success('Gasto actualizado.')
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: gastosApi.delete,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: GASTOS_KEY }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: GASTOS_KEY })
+      toast.success('Gasto eliminado.')
+    },
+    onError: (err) => toast.error(errorMessage(err)),
   })
 
   const gastosFiltrados = useMemo(() => {

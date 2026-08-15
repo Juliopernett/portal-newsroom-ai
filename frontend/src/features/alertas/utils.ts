@@ -33,10 +33,14 @@ export function renderEstrellas(n: number): string {
   return '★'.repeat(n) + '☆'.repeat(5 - n)
 }
 
-// wa.me requires a bare digit string — no spaces/dashes/parens.
-export function waLink(telefono: string): string | null {
+// wa.me requires a bare digit string — no spaces/dashes/parens. An
+// optional prefilled message is just a `text` query param — the
+// recipient can still edit it before sending, never sent automatically.
+export function waLink(telefono: string, mensaje?: string): string | null {
   const digits = telefono.replace(/\D/g, '')
-  return digits ? `https://wa.me/${digits}` : null
+  if (!digits) return null
+  const base = `https://wa.me/${digits}`
+  return mensaje ? `${base}?text=${encodeURIComponent(mensaje)}` : base
 }
 
 type CampoClientes = Exclude<keyof DashboardAlertas, 'solicitudes_antiguas'>
