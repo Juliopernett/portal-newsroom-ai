@@ -1,4 +1,6 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   Inbox,
@@ -8,10 +10,14 @@ import {
   Wallet,
   Download,
   LogOut,
+  Menu,
+  X,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { insightsApi } from '@/features/alertas/api'
+import { centroAlertaKey, useDismissedAlerts } from '@/features/alertas/utils'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -25,13 +31,73 @@ const NAV_ITEMS = [
 
 export function Shell() {
   const { user, logout } = useAuth()
+  const location = useLocation()
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Same query key AlertasPage uses, so whichever loads first primes the
+  // other's cache — this is just a lightweight badge, not a poller. Grouped
+  // and dismiss-filtered the same way AlertasPage renders Centro de
+  // Alertas, so the badge count never disagrees with what the page shows.
+  const centroQuery = useQuery({ queryKey: ['insights', 'centro-alertas'], queryFn: insightsApi.centroAlertas })
+  const { isDismissed } = useDismissedAlerts()
+  const alertasCount = new Set(
+    (centroQuery.data ?? [])
+      .filter((item) => !isDismissed(centroAlertaKey(item)))
+      .map((item) => centroAlertaKey(item)),
+  ).size
+
+  // Close the mobile drawer on every navigation — it doesn't unmount on
+  // its own since Shell stays mounted across route changes.
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
 
   return (
-    <div className="flex h-svh">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-card">
-        <div className="px-4 py-5">
+    <div className="flex h-svh flex-col md:flex-row">
+      <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3 md:hidden">
+        <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
+        <button
+          type="button"
+          aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
+          onClick={() => setMobileOpen((v) => !v)}
+          className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        >
+          {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+        </button>
+      </header>
+
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-border bg-card transition-transform duration-200',
+          'md:static md:z-auto md:w-56 md:translate-x-0',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
+        <div className="hidden px-4 py-5 md:block">
           <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
           {user && <p className="truncate text-xs text-muted-foreground">{user.nombre}</p>}
+        </div>
+        <div className="flex items-center justify-between px-4 py-4 md:hidden">
+          <div>
+            <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
+            {user && <p className="truncate text-xs text-muted-foreground">{user.nombre}</p>}
+          </div>
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            onClick={() => setMobileOpen(false)}
+            className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            <X className="size-5" />
+          </button>
         </div>
         <nav className="flex flex-1 flex-col gap-1 px-2">
           {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
@@ -50,6 +116,11 @@ export function Shell() {
             >
               <Icon className="size-4" />
               {label}
+              {to === '/alertas' && alertasCount > 0 && (
+                <span className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-danger text-xs font-semibold text-white">
+                  {alertasCount > 9 ? '9+' : alertasCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -64,7 +135,7 @@ export function Shell() {
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <Outlet />
       </main>
     </div>

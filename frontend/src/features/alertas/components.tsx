@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, Eye, Phone, PlusCircle, RefreshCw } from 'lucide-react'
+import { ChevronDown, Eye, Phone, PlusCircle, RefreshCw, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import type { Client } from '@/features/clientes/api'
@@ -23,18 +23,40 @@ export function ActionItem({
   severidad,
   children,
   actions,
+  count,
+  onDescartar,
 }: {
   emoji: string
   severidad: 'danger' | 'warning' | 'success'
   children: ReactNode
   actions?: ReactNode
+  count?: number
+  onDescartar?: () => void
 }) {
   const border = { danger: 'border-l-danger', warning: 'border-l-warning', success: 'border-l-success' }[severidad]
   return (
     <div className={`flex flex-wrap items-center gap-3 border-l-4 ${border} bg-card p-3 text-sm`}>
       <span>{emoji}</span>
-      <span className="flex-1">{children}</span>
+      <span className="flex-1">
+        {children}
+        {count !== undefined && count > 1 && (
+          <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+            ×{count}
+          </span>
+        )}
+      </span>
       {actions && <span className="flex shrink-0 items-center gap-2">{actions}</span>}
+      {onDescartar && (
+        <button
+          type="button"
+          aria-label="Descartar"
+          title="Descartar"
+          onClick={onDescartar}
+          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          <X className="size-3.5" />
+        </button>
+      )}
     </div>
   )
 }
@@ -114,32 +136,58 @@ export function RenewalCard({ item, dias }: { item: { cliente: Client; tipo: Pau
   )
 }
 
-export function RadarRenovaciones({ buckets }: { buckets: RenewalBucket[] }) {
+export function RadarRenovaciones({
+  buckets,
+  selected,
+  onSelect,
+}: {
+  buckets: RenewalBucket[]
+  selected: number
+  onSelect: (index: number) => void
+}) {
   const total = buckets.reduce((acc, b) => acc + b.items.length, 0)
   if (total === 0) return <EmptyState emoji="📅" mensaje="No hay renovaciones programadas por ahora." />
+
+  const activo = buckets[selected] ?? buckets[0]
+
   return (
-    <div className="flex flex-col gap-4">
-      {buckets.map(({ titulo, items }) => (
-        <div key={titulo}>
-          <h3 className="mb-2 text-sm font-medium">{titulo}</h3>
-          {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin renovaciones en este rango.</p>
-          ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map(({ item, dias }) => (
-                <RenewalCard key={item.cliente.id} item={item} dias={dias} />
-              ))}
-            </div>
-          )}
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Rango de vencimiento">
+        {buckets.map((b, i) => (
+          <button
+            key={b.titulo}
+            type="button"
+            role="tab"
+            aria-selected={i === selected}
+            onClick={() => onSelect(i)}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+              i === selected
+                ? 'border-brand bg-brand/10 text-foreground'
+                : 'border-border bg-card text-muted-foreground hover:bg-accent'
+            }`}
+          >
+            <span>{b.emoji}</span>
+            <span className="text-lg font-semibold">{b.items.length}</span>
+            <span className="text-xs">{b.titulo}</span>
+          </button>
+        ))}
+      </div>
+      {activo.items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Sin renovaciones en este rango.</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {activo.items.map(({ item, dias }) => (
+            <RenewalCard key={item.cliente.id} item={item} dias={dias} />
+          ))}
         </div>
-      ))}
+      )}
     </div>
   )
 }
 
 export function HealthCard({ cliente, nivel, estrellas, score }: { cliente: Client; nivel: NivelSalud; estrellas: number; score: number }) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-border bg-card p-3">
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-sm font-medium">{cliente.nombre}</h3>
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${NIVEL_SALUD_BADGE[nivel]}`}>
@@ -147,7 +195,10 @@ export function HealthCard({ cliente, nivel, estrellas, score }: { cliente: Clie
         </span>
       </div>
       <p className="text-amber-500">{renderEstrellas(estrellas)}</p>
-      <p className="text-xs text-muted-foreground">{score}%</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">{score}%</p>
+        <VerClienteButton clienteId={cliente.id} />
+      </div>
     </div>
   )
 }

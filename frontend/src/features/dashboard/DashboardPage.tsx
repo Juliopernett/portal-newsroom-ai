@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   DollarSign,
+  Download,
   Inbox,
   RefreshCw,
   Target,
@@ -18,8 +19,21 @@ import { pautasApi } from '@/features/contratos/api'
 import { formatMoneda } from '@/lib/format'
 import { dashboardApi } from './api'
 import { IngresosGastosChart, RentabilidadChart } from './charts'
-import { RankingList, StatCard } from './components'
-import { MESES_LABELS, calcularIngresosDelMes, calcularRenovacionesDelMes } from './utils'
+import { RankingComercialSection, StatCard } from './components'
+import {
+  MESES_LABELS,
+  calcularDeltaPct,
+  calcularIngresosDelMes,
+  calcularRenovacionesDelMes,
+  rangoPreset,
+  type RentabilidadPreset,
+} from './utils'
+
+const RENTABILIDAD_PRESETS: { value: RentabilidadPreset; label: string }[] = [
+  { value: 'este-mes', label: 'Este mes' },
+  { value: 'trimestre', label: 'Último trimestre' },
+  { value: 'este-anio', label: 'Este año' },
+]
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -46,15 +60,30 @@ export function DashboardPage() {
     pautasQuery.refetch()
   }
 
+  function abrirFicha(clienteId: string) {
+    navigate('/clientes', { state: { abrirFichaClientId: clienteId } })
+  }
+
   const pautas = pautasQuery.data ?? []
   const renovacionesDelMes = useMemo(() => calcularRenovacionesDelMes(pautas), [pautas])
   const ingresosUltimoMes = useMemo(() => calcularIngresosDelMes(pautas, -1), [pautas])
+  const ingresosMesAnterior = useMemo(() => calcularIngresosDelMes(pautas, -2), [pautas])
   const pautadoMesActual = useMemo(() => calcularIngresosDelMes(pautas, 0), [pautas])
+  const pautadoMesAnterior = useMemo(() => calcularIngresosDelMes(pautas, -1), [pautas])
+  const deltaIngresosUltimoMes = calcularDeltaPct(ingresosUltimoMes, ingresosMesAnterior)
+  const deltaPautadoMesActual = calcularDeltaPct(pautadoMesActual, pautadoMesAnterior)
 
   const resumen = resumenQuery.data
   const pendientes = resumen?.solicitudes_pendientes ?? 0
   const antiguas = alertasQuery.data?.solicitudes_antiguas.length ?? 0
   const rankingActivos = (rankingQuery.data ?? []).filter((i) => i.vigente)
+  const rentabilidadCsvHref = useMemo(() => {
+    const params = new URLSearchParams()
+    if (desde) params.set('desde', desde)
+    if (hasta) params.set('hasta', hasta)
+    const query = params.toString()
+    return `/reportes/rentabilidad.csv${query ? `?${query}` : ''}`
+  }, [desde, hasta])
 
   return (
     <div className="flex flex-col gap-8">
@@ -101,18 +130,36 @@ export function DashboardPage() {
         <h2 className="text-base font-semibold">Indicadores</h2>
 
         <div>
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">Métricas del mes</h3>
           {resumenQuery.isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              <StatCard icon={Users} valor={resumen!.clientes_activos} label="Clientes activos" to="/clientes" />
-              <StatCard icon={DollarSign} valor={formatMoneda(resumen!.ingreso_contratado_activo)} label="Ingresos año actual" />
-              <StatCard icon={Inbox} valor={resumen!.solicitudes_pendientes} label="Solicitudes pendientes" to="/solicitudes" />
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              <StatCard
+                icon={AlertTriangle}
+                valor={resumen!.pautas_vencidas}
+                label="Pautas vencidas"
+                to="/contratos"
+                tone={resumen!.pautas_vencidas > 0 ? 'danger' : 'default'}
+              />
               <StatCard icon={CheckCircle2} valor={resumen!.publicaciones_este_mes} label="Publicaciones este mes" to="/solicitudes" />
               <StatCard icon={RefreshCw} valor={renovacionesDelMes} label="Renovaciones del mes" to="/contratos" />
-              <StatCard icon={DollarSign} valor={formatMoneda(ingresosUltimoMes)} label="Ingresos último mes" />
-              <StatCard icon={DollarSign} valor={formatMoneda(pautadoMesActual)} label="Pautado este mes" />
+              <StatCard icon={Users} valor={resumen!.clientes_activos} label="Clientes activos" to="/clientes" />
+              <StatCard icon={DollarSign} valor={formatMoneda(resumen!.ingreso_contratado_activo)} label="Ingresos año actual" />
+              <StatCard
+                icon={DollarSign}
+                valor={formatMoneda(ingresosUltimoMes)}
+                label="Ingresos último mes"
+                deltaPct={deltaIngresosUltimoMes}
+              />
+              <StatCard
+                icon={DollarSign}
+                valor={formatMoneda(pautadoMesActual)}
+                label="Pautado este mes"
+                deltaPct={deltaPautadoMesActual}
+              />
+              <StatCard icon={Target} valor={formatMoneda(resumen!.peso_comercial_promedio)} label="Peso comercial promedio" />
+              <StatCard icon={DollarSign} valor={formatMoneda(resumen!.valor_promedio_por_cliente)} label="Valor promedio/cliente" />
+              <StatCard icon={DollarSign} valor={formatMoneda(resumen!.ingreso_historico)} label="Ingreso histórico" />
             </div>
           )}
         </div>
@@ -126,6 +173,23 @@ export function DashboardPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-wrap gap-1">
+                {RENTABILIDAD_PRESETS.map((p) => (
+                  <Button
+                    key={p.value}
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const { desde: d, hasta: h } = rangoPreset(p.value)
+                      setDesde(d)
+                      setHasta(h)
+                    }}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
               <div className="flex flex-col gap-1">
                 <Label htmlFor="dashboard-rentabilidad-desde" className="text-xs">Desde</Label>
                 <Input
@@ -158,6 +222,11 @@ export function DashboardPage() {
                   Últimos 12 meses
                 </Button>
               )}
+              <Button variant="outline" size="sm" asChild>
+                <a href={rentabilidadCsvHref} target="_blank" rel="noopener">
+                  <Download /> Descargar CSV
+                </a>
+              </Button>
             </div>
           </div>
           {rentabilidadQuery.isLoading ? (
@@ -209,43 +278,14 @@ export function DashboardPage() {
 
         <div>
           <h3 className="mb-2 text-sm font-medium text-muted-foreground">Ranking comercial</h3>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <details className="rounded-lg border border-border bg-card" open>
-              <summary className="cursor-pointer p-3 text-sm font-semibold">Activos ahora</summary>
-              <div className="px-3 pb-2">
-                {rankingQuery.isLoading ? (
-                  <p className="p-4 text-sm text-muted-foreground">Cargando…</p>
-                ) : (
-                  <RankingList items={rankingActivos} emptyMessage="Ningún cliente tiene un contrato vigente en este momento." />
-                )}
-              </div>
-            </details>
-            <details className="rounded-lg border border-border bg-card" open>
-              <summary className="cursor-pointer p-3 text-sm font-semibold">Histórico</summary>
-              <div className="px-3 pb-2">
-                {rankingQuery.isLoading ? (
-                  <p className="p-4 text-sm text-muted-foreground">Cargando…</p>
-                ) : (
-                  <RankingList items={rankingQuery.data ?? []} emptyMessage="Todavía no hay clientes con pautas." />
-                )}
-              </div>
-            </details>
-          </div>
+          <RankingComercialSection
+            activos={rankingActivos}
+            historico={rankingQuery.data ?? []}
+            loading={rankingQuery.isLoading}
+            onClienteClick={abrirFicha}
+          />
         </div>
 
-        <div>
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">Otros indicadores</h3>
-          {resumenQuery.isLoading ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <StatCard icon={AlertTriangle} valor={resumen!.pautas_vencidas} label="Pautas vencidas" to="/contratos" />
-              <StatCard icon={Target} valor={formatMoneda(resumen!.peso_comercial_promedio)} label="Peso comercial promedio" />
-              <StatCard icon={DollarSign} valor={formatMoneda(resumen!.valor_promedio_por_cliente)} label="Valor promedio/cliente" />
-              <StatCard icon={DollarSign} valor={formatMoneda(resumen!.ingreso_historico)} label="Ingreso histórico" />
-            </div>
-          )}
-        </div>
       </section>
     </div>
   )

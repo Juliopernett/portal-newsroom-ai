@@ -43,3 +43,33 @@ export function calcularIngresosDelMes(pautas: Pauta[], offsetMeses: number): nu
   }
   return total
 }
+
+// % change vs. the prior period — null when there's no baseline to compare
+// against (division by zero), which the caller renders as "no data" rather
+// than a misleading "+∞%" or "0%".
+export function calcularDeltaPct(actual: number, anterior: number): number | null {
+  if (anterior === 0) return null
+  return Math.round(((actual - anterior) / Math.abs(anterior)) * 100)
+}
+
+export type RentabilidadPreset = 'este-mes' | 'trimestre' | 'este-anio'
+
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+// Quick date-range presets for the Rentabilidad filter — avoids picking
+// two <input type=date> by hand for the ranges people actually ask for.
+// "Últimos 12 meses" is covered separately by clearing the filter (the
+// backend's own default), not a preset here.
+export function rangoPreset(preset: RentabilidadPreset): { desde: string; hasta: string } {
+  const hoy = new Date()
+  switch (preset) {
+    case 'este-mes':
+      return { desde: toIsoDate(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), hasta: toIsoDate(hoy) }
+    case 'trimestre':
+      return { desde: toIsoDate(new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1)), hasta: toIsoDate(hoy) }
+    case 'este-anio':
+      return { desde: toIsoDate(new Date(hoy.getFullYear(), 0, 1)), hasta: toIsoDate(hoy) }
+  }
+}

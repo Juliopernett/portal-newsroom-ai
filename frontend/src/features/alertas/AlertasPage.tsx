@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { RefreshCw } from 'lucide-react'
+import { PartyPopper, RefreshCw, Undo2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { dashboardApi, insightsApi } from './api'
+import { dashboardApi, insightsApi, type AlertaInteligente } from './api'
 import {
   AccionSugeridaButtons,
   ActionItem,
@@ -15,7 +15,7 @@ import {
   RenovarButton,
   VerClienteButton,
 } from './components'
-import { ALERTAS_OPORTUNIDAD, SEVERIDAD_EMOJI, computarRadarBuckets } from './utils'
+import { ALERTAS_OPORTUNIDAD, SEVERIDAD_EMOJI, centroAlertaKey, computarRadarBuckets, useDismissedAlerts } from './utils'
 import { PAUTA_TIPO_LABELS } from '@/features/contratos/api'
 import { formatFecha } from '@/lib/format'
 
@@ -39,8 +39,39 @@ export function AlertasPage() {
   const oportunidadesQuery = useQuery({ queryKey: ['insights', 'oportunidades'], queryFn: insightsApi.oportunidades })
   const dashAlertasQuery = useQuery({ queryKey: ['dashboard', 'alertas'], queryFn: dashboardApi.alertas })
   const rankingQuery = useQuery({ queryKey: ['dashboard', 'ranking'], queryFn: dashboardApi.ranking })
+  const [radarBucket, setRadarBucket] = useState(0)
+  const { isDismissed, dismiss, dismissedCount, restoreAll } = useDismissedAlerts()
 
   const buckets = useMemo(() => computarRadarBuckets(rankingQuery.data ?? []), [rankingQuery.data])
+
+  const centroAgrupado = useMemo(() => {
+    const grupos = new Map<string, { item: AlertaInteligente; count: number }>()
+    for (const item of centroQuery.data ?? []) {
+      const key = centroAlertaKey(item)
+      const existente = grupos.get(key)
+      if (existente) existente.count += 1
+      else grupos.set(key, { item, count: 1 })
+    }
+    return [...grupos.values()].filter(({ item }) => !isDismissed(centroAlertaKey(item)))
+  }, [centroQuery.data, isDismissed])
+
+  const riesgoVisible = (riesgoQuery.data ?? []).filter((r) => !isDismissed(`riesgo::${r.cliente.id}`))
+  const dormidosVisible = (dormidosQuery.data ?? []).filter((d) => !isDismissed(`dormido::${d.cliente.id}`))
+  const patronesVisible = (oportunidadesQuery.data ?? []).filter(
+    (o) => !isDismissed(`patron::${o.cliente.id}::${o.tipo}`),
+  )
+
+  const sinNovedades =
+    !centroQuery.isLoading &&
+    !riesgoQuery.isLoading &&
+    !dormidosQuery.isLoading &&
+    !oportunidadesQuery.isLoading &&
+    !rankingQuery.isLoading &&
+    centroAgrupado.length === 0 &&
+    riesgoVisible.length === 0 &&
+    dormidosVisible.length === 0 &&
+    patronesVisible.length === 0 &&
+    buckets.every((b) => b.items.length === 0)
 
   const isFetching =
     centroQuery.isFetching ||
@@ -68,24 +99,40 @@ export function AlertasPage() {
           <h1 className="text-lg font-semibold">Alertas</h1>
           <p className="text-sm text-muted-foreground">Recomendaciones accionables — no solo números</p>
         </div>
-        <Button variant="outline" size="icon" aria-label="Actualizar" onClick={refetchAll}>
-          <RefreshCw className={isFetching ? 'animate-spin' : ''} />
-        </Button>
+        <div className="flex items-center gap-2">
+          {dismissedCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={restoreAll}>
+              <Undo2 /> Restaurar {dismissedCount} descartada{dismissedCount === 1 ? '' : 's'}
+            </Button>
+          )}
+          <Button variant="outline" size="icon" aria-label="Actualizar" onClick={refetchAll}>
+            <RefreshCw className={isFetching ? 'animate-spin' : ''} />
+          </Button>
+        </div>
       </div>
+
+      {sinNovedades && (
+        <div className="flex items-center gap-3 rounded-lg border border-success/30 bg-success-bg p-4 text-success">
+          <PartyPopper className="size-5 shrink-0" />
+          <p className="text-sm font-medium">¡Todo al día! Ningún cliente necesita atención en este momento.</p>
+        </div>
+      )}
 
       <Section title="Centro de Alertas">
         {centroQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
-        ) : (centroQuery.data ?? []).length === 0 ? (
+        ) : centroAgrupado.length === 0 ? (
           <EmptyState emoji="✅" mensaje="Sin pendientes urgentes — todo al día." />
         ) : (
           <div className="flex flex-col gap-2">
-            {centroQuery.data!.map((item, i) => (
+            {centroAgrupado.map(({ item, count }) => (
               <ActionItem
-                key={i}
+                key={centroAlertaKey(item)}
                 emoji={SEVERIDAD_EMOJI[item.severidad]}
                 severidad={item.severidad === 'critica' ? 'danger' : item.severidad === 'atencion' ? 'warning' : 'success'}
+                count={count}
                 actions={<AccionSugeridaButtons cliente={item.cliente} accion={item.accion} />}
+                onDescartar={() => dismiss(centroAlertaKey(item))}
               >
                 {item.mensaje}
               </ActionItem>
@@ -98,33 +145,23 @@ export function AlertasPage() {
         {rankingQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
         ) : (
-          <>
-            <div className="flex flex-wrap gap-3">
-              {buckets.map((b) => (
-                <div key={b.titulo} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
-                  <span>{b.emoji}</span>
-                  <span className="text-lg font-semibold">{b.items.length}</span>
-                  <span className="text-xs text-muted-foreground">{b.titulo}</span>
-                </div>
-              ))}
-            </div>
-            <RadarRenovaciones buckets={buckets} />
-          </>
+          <RadarRenovaciones buckets={buckets} selected={radarBucket} onSelect={setRadarBucket} />
         )}
       </Section>
 
       <Section title="Riesgo de Abandono" subtitle="Tienen cupo pagado sin usar, pero llevan demasiado tiempo en silencio.">
         {riesgoQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
-        ) : (riesgoQuery.data ?? []).length === 0 ? (
+        ) : riesgoVisible.length === 0 ? (
           <EmptyState emoji="✅" mensaje="Ningún cliente vigente lleva demasiado tiempo en silencio." />
         ) : (
           <div className="flex flex-col gap-2">
-            {riesgoQuery.data!.map((item) => (
+            {riesgoVisible.map((item) => (
               <ActionItem
                 key={item.cliente.id}
                 emoji="⚠️"
                 severidad="danger"
+                onDescartar={() => dismiss(`riesgo::${item.cliente.id}`)}
                 actions={
                   <>
                     <VerClienteButton clienteId={item.cliente.id} />
@@ -146,15 +183,16 @@ export function AlertasPage() {
       <Section title="Clientes Dormidos" subtitle="Sin ningún contrato vigente y sin actividad hace más de 60 días.">
         {dormidosQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
-        ) : (dormidosQuery.data ?? []).length === 0 ? (
+        ) : dormidosVisible.length === 0 ? (
           <EmptyState emoji="✅" mensaje="No hay clientes dormidos por ahora." />
         ) : (
           <div className="flex flex-col gap-2">
-            {dormidosQuery.data!.map((item) => (
+            {dormidosVisible.map((item) => (
               <ActionItem
                 key={item.cliente.id}
                 emoji="💤"
                 severidad="warning"
+                onDescartar={() => dismiss(`dormido::${item.cliente.id}`)}
                 actions={
                   <>
                     <VerClienteButton clienteId={item.cliente.id} />
@@ -210,12 +248,18 @@ export function AlertasPage() {
         <h3 className="mt-2 text-sm font-medium text-muted-foreground">Patrones detectados</h3>
         {oportunidadesQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
-        ) : (oportunidadesQuery.data ?? []).length === 0 ? (
+        ) : patronesVisible.length === 0 ? (
           <EmptyState emoji="✅" mensaje="No se detectaron patrones de compra por ahora." />
         ) : (
           <div className="flex flex-col gap-2">
-            {oportunidadesQuery.data!.map((item, i) => (
-              <ActionItem key={i} emoji="💡" severidad="success" actions={<VerClienteButton clienteId={item.cliente.id} />}>
+            {patronesVisible.map((item) => (
+              <ActionItem
+                key={`${item.cliente.id}-${item.tipo}`}
+                emoji="💡"
+                severidad="success"
+                actions={<VerClienteButton clienteId={item.cliente.id} />}
+                onDescartar={() => dismiss(`patron::${item.cliente.id}::${item.tipo}`)}
+              >
                 {item.mensaje}
               </ActionItem>
             ))}
