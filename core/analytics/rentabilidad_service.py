@@ -29,6 +29,23 @@ def meses_atras(anio: int, mes: int, n: int) -> tuple[int, int]:
     return total // 12, total % 12 + 1
 
 
+def rango_por_defecto(desde: date | None, hasta: date | None, hoy: date) -> tuple[date, date]:
+    """Resolve optional `desde`/`hasta` to explicit dates, defaulting to the last 12 months.
+
+    Shared by every caller offering a "sin fechas = últimos 12 meses"
+    default (`app.api.routers.dashboard.get_rentabilidad` and
+    `app.api.routers.reportes`) so the default window is computed once,
+    not re-derived per route.
+    """
+    hasta_final = hasta or hoy
+    if desde is None:
+        anio_desde, mes_desde = meses_atras(hasta_final.year, hasta_final.month, 11)
+        desde_final = date(anio_desde, mes_desde, 1)
+    else:
+        desde_final = desde
+    return desde_final, hasta_final
+
+
 def rentabilidad_mensual(
     pautas: Sequence[Pauta],
     gastos: Sequence[Gasto],

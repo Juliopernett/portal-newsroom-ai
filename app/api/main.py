@@ -27,6 +27,7 @@ from app.api.routers import (
     insights,
     pautas,
     publication_requests,
+    reportes,
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -42,6 +43,7 @@ app.include_router(gastos.router)
 app.include_router(insights.router)
 app.include_router(pautas.router)
 app.include_router(publication_requests.router)
+app.include_router(reportes.router)
 
 app.mount("/ui", StaticFiles(directory=STATIC_DIR, html=True), name="ui")
 

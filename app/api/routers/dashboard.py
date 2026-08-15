@@ -22,7 +22,7 @@ from app.api.schemas.dashboard import (
     RentabilidadMensualOut,
 )
 from app.api.schemas.publication_request import PublicationRequestOut
-from core.analytics import AnalyticsService, meses_atras, rentabilidad_mensual
+from core.analytics import AnalyticsService, rango_por_defecto, rentabilidad_mensual
 from core.clock import now_local
 from core.ports.unit_of_work import UnitOfWork
 
@@ -120,18 +120,13 @@ def get_rentabilidad(
     Ingresos, gastos y rentabilidad por mes.
 
     `desde`/`hasta` default to the last 12 calendar months ending today —
-    the Dashboard's own view and a custom report (reportes por rango de
-    fechas, 2026-08-14) are the same endpoint with different query params,
-    not two code paths. Not built through `AnalyticsService`/`_analytics`
-    — see `core.analytics.rentabilidad_service`'s module docstring for why
+    the Dashboard's own view and `GET /reportes/rentabilidad.csv` (Reportes,
+    2026-08-15) are the same endpoint/default logic, not two code paths.
+    Not built through `AnalyticsService`/`_analytics` — see
+    `core.analytics.rentabilidad_service`'s module docstring for why
     `gastos` stays out of that class's constructor.
     """
-    hasta_final = hasta or now_local().date()
-    if desde is None:
-        anio_desde, mes_desde = meses_atras(hasta_final.year, hasta_final.month, 11)
-        desde_final = date(anio_desde, mes_desde, 1)
-    else:
-        desde_final = desde
+    desde_final, hasta_final = rango_por_defecto(desde, hasta, now_local().date())
     return rentabilidad_mensual(
         uow.pautas.list_all(), uow.gastos.list_all(), desde=desde_final, hasta=hasta_final
     )

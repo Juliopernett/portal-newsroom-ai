@@ -513,6 +513,7 @@ main {
   transition: background var(--transition-fast), border-color var(--transition-fast),
     transform var(--transition-fast);
   white-space: nowrap;
+  text-decoration: none; /* soporta <a class="btn"> (descargas en Reportes) sin subrayado de link */
 }
 
 .btn:active {
@@ -976,6 +977,33 @@ button[type="submit"]:hover {
   gap: var(--space-2);
 }
 
+/* <details>/<summary> nativo -- cada columna del ranking se colapsa por
+   separado, sin JS. El navegador ya le da a <summary> semántica de
+   disclosure (rol button, foco, Enter/Espacio); solo le quitamos el
+   marcador default (list-style) para dibujar el propio chevron. */
+.ranking-accordion summary {
+  list-style: none;
+  cursor: pointer;
+  margin-bottom: var(--space-3);
+}
+
+.ranking-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.ranking-accordion summary .section-title {
+  margin-bottom: 0;
+}
+
+.ranking-accordion-chevron {
+  color: var(--color-text-tertiary);
+  transition: transform var(--transition-fast);
+}
+
+.ranking-accordion[open] .ranking-accordion-chevron {
+  transform: rotate(90deg);
+}
+
 .ranking-row {
   display: grid;
   grid-template-columns: 28px 1fr auto;
@@ -1284,11 +1312,6 @@ button[type="submit"]:hover {
 .badge-renovacion {
   background: var(--color-orange-bg);
   color: var(--color-orange);
-}
-
-.badge-vencido {
-  background: var(--color-neutral-bg);
-  color: var(--color-neutral);
 }
 
 .badge-neutral {
@@ -2326,12 +2349,6 @@ button[type="submit"]:hover {
 
 .contract-card[data-quota="agotado"] {
   border-left-color: var(--color-danger);
-}
-
-/* Solo aparece en el reporte de Pautas por rango de fechas (Contratos) --
-   la vista por defecto de "Contratos activos" nunca incluye una vencida. */
-.contract-card[data-quota="vencido"] {
-  border-left-color: var(--color-text-tertiary);
 }
 
 .contract-card-header {
