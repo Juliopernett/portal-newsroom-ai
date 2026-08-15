@@ -127,7 +127,7 @@ export function AlertasPage() {
                 severidad="danger"
                 actions={
                   <>
-                    <VerClienteButton nombre={item.cliente.nombre} />
+                    <VerClienteButton clienteId={item.cliente.id} />
                     <ContactarButton
                       telefono={item.cliente.telefono}
                       mensaje={`Hola ${item.cliente.nombre}, notamos que no nos has enviado material últimamente — ¿tienes algo para publicar? Todavía tienes ${item.publicaciones_restantes} publicaciones disponibles.`}
@@ -157,7 +157,7 @@ export function AlertasPage() {
                 severidad="warning"
                 actions={
                   <>
-                    <VerClienteButton nombre={item.cliente.nombre} />
+                    <VerClienteButton clienteId={item.cliente.id} />
                     <RenovarButton clienteId={item.cliente.id} label="Reactivar" />
                   </>
                 }
@@ -215,7 +215,7 @@ export function AlertasPage() {
         ) : (
           <div className="flex flex-col gap-2">
             {oportunidadesQuery.data!.map((item, i) => (
-              <ActionItem key={i} emoji="💡" severidad="success" actions={<VerClienteButton nombre={item.cliente.nombre} />}>
+              <ActionItem key={i} emoji="💡" severidad="success" actions={<VerClienteButton clienteId={item.cliente.id} />}>
                 {item.mensaje}
               </ActionItem>
             ))}

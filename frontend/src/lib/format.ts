@@ -38,6 +38,10 @@ export function sumarDiasFecha(fechaIso: string, dias: number): string {
   return fecha.toISOString().slice(0, 10)
 }
 
+export function truncarTexto(texto: string, maxLen = 60): string {
+  return texto.length > maxLen ? texto.slice(0, maxLen).trimEnd() + '…' : texto
+}
+
 export function diasHasta(fechaIso: string): number {
   const hoy = new Date()
   hoy.setHours(0, 0, 0, 0)

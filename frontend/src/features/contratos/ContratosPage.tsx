@@ -18,26 +18,10 @@ import { clientsApi } from '@/features/clientes/api'
 import { formatFecha, formatMoneda } from '@/lib/format'
 import { PAUTA_TIPO_LABELS, pautasApi, type Pauta, type PautaInput } from './api'
 import { PautaForm } from './PautaForm'
+import { cupoNivel, CUPO_BAR_COLOR } from './utils'
 
 const PAUTAS_KEY = ['pautas']
 const CLIENTS_KEY = ['clients']
-
-function cupoNivel(restantes: number, contratadas: number, vigente: boolean) {
-  if (!vigente) return 'vencido'
-  if (restantes <= 0) return 'agotado'
-  const pct = contratadas > 0 ? restantes / contratadas : 0
-  if (pct > 0.4) return 'alto'
-  if (pct >= 0.15) return 'medio'
-  return 'bajo'
-}
-
-const CUPO_BAR_COLOR: Record<string, string> = {
-  vencido: 'bg-muted-foreground',
-  agotado: 'bg-danger',
-  bajo: 'bg-warning',
-  medio: 'bg-warning',
-  alto: 'bg-success',
-}
 
 export function ContratosPage() {
   const queryClient = useQueryClient()
@@ -48,22 +32,33 @@ export function ContratosPage() {
   const [editing, setEditing] = useState<Pauta | null>(null)
   const [preselectClientId, setPreselectClientId] = useState<string | undefined>()
 
-  // Cross-module "Renovar"/"Reactivar" links (from Alertas) arrive here
-  // via navigation state instead of a query param, then get cleared —
-  // matches the legacy app's data-preselect-client, added after a real
-  // production bug where the drawer silently defaulted to the wrong
-  // client because nothing forced an explicit choice.
+  const pautasQuery = useQuery({ queryKey: PAUTAS_KEY, queryFn: pautasApi.list })
+
+  // Cross-module deep links arrive via navigation state, then get
+  // cleared — matches the legacy app's data-preselect-client /
+  // data-edit-pauta. preselectClientId comes from Alertas'
+  // "Renovar"/"Reactivar"; editPautaId comes from a client's ficha
+  // ("Editar" on one specific pauta in their historial) — this one
+  // needs the unfiltered pautasQuery data since a client's history can
+  // include pautas that are no longer vigente (and so wouldn't be in
+  // contratosFiltrados).
   useEffect(() => {
-    const state = location.state as { preselectClientId?: string } | null
+    const state = location.state as { preselectClientId?: string; editPautaId?: string } | null
     if (state?.preselectClientId) {
       setEditing(null)
       setPreselectClientId(state.preselectClientId)
       setSheetOpen(true)
       navigate(location.pathname, { replace: true, state: null })
+    } else if (state?.editPautaId && pautasQuery.data) {
+      const pauta = pautasQuery.data.find((p) => p.id === state.editPautaId)
+      if (pauta) {
+        setEditing(pauta)
+        setPreselectClientId(undefined)
+        setSheetOpen(true)
+      }
+      navigate(location.pathname, { replace: true, state: null })
     }
-  }, [location.state, location.pathname, navigate])
-
-  const pautasQuery = useQuery({ queryKey: PAUTAS_KEY, queryFn: pautasApi.list })
+  }, [location.state, location.pathname, navigate, pautasQuery.data])
   const clientsQuery = useQuery({ queryKey: CLIENTS_KEY, queryFn: clientsApi.list })
 
   const clientsById = useMemo(() => {

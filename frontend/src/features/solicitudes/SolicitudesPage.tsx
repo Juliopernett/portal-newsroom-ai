@@ -1,4 +1,5 @@
-import { useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Paperclip, Plus, RefreshCw, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -25,9 +26,12 @@ const EMPTY_FORM = { pautaId: '', titulo: '', texto: '', prioridad: false }
 
 export function SolicitudesPage() {
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [form, setForm] = useState(EMPTY_FORM)
   const [adjuntoAbierto, setAdjuntoAbierto] = useState(false)
   const [archivo, setArchivo] = useState<File | null>(null)
+  const textoRef = useRef<HTMLTextAreaElement>(null)
 
   const kanbanQuery = useQuery({ queryKey: KANBAN_KEY, queryFn: solicitudesApi.loadKanban })
   const pautasQuery = useQuery({ queryKey: PAUTAS_KEY, queryFn: pautasApi.list })
@@ -51,6 +55,20 @@ export function SolicitudesPage() {
   )
 
   const pautaSeleccionada = form.pautaId ? (pautasById.get(form.pautaId) ?? null) : null
+
+  // Cross-module deep link (from Clientes' "Registrar publicación") — same
+  // navigation-state pattern as Contratos' preselectClientId. Legacy's
+  // quickSolicitudParaCliente prefills the client's vigente pauta and
+  // focuses the texto field so the operator can paste and submit right away.
+  useEffect(() => {
+    const state = location.state as { prefillClientId?: string } | null
+    if (state?.prefillClientId && pautasQuery.data) {
+      const pauta = pautasVigentes.find((p) => p.client_id === state.prefillClientId)
+      if (pauta) setForm((f) => ({ ...f, pautaId: pauta.id }))
+      textoRef.current?.focus()
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location.state, location.pathname, navigate, pautasQuery.data, pautasVigentes])
 
   function invalidateKanban() {
     queryClient.invalidateQueries({ queryKey: KANBAN_KEY })
@@ -223,6 +241,7 @@ export function SolicitudesPage() {
         )}
 
         <Textarea
+          ref={textoRef}
           required
           rows={2}
           placeholder="Pegar texto de la publicación… (Ctrl/Cmd+Enter para enviar)"

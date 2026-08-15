@@ -39,13 +39,13 @@ export function ActionItem({
   )
 }
 
-export function VerClienteButton({ nombre }: { nombre?: string }) {
+export function VerClienteButton({ clienteId }: { clienteId: string }) {
   const navigate = useNavigate()
   return (
     <Button
       variant="secondary"
       size="sm"
-      onClick={() => navigate('/clientes', nombre ? { state: { buscar: nombre } } : undefined)}
+      onClick={() => navigate('/clientes', { state: { abrirFichaClientId: clienteId } })}
     >
       <Eye /> Ver cliente
     </Button>
@@ -77,7 +77,7 @@ export function AccionSugeridaButtons({ cliente, accion }: { cliente: Client | n
   const navigate = useNavigate()
   return (
     <>
-      {cliente && <VerClienteButton nombre={cliente.nombre} />}
+      {cliente && <VerClienteButton clienteId={cliente.id} />}
       {accion === 'renovar' && cliente && <RenovarButton clienteId={cliente.id} label="Renovar" />}
       {accion === 'reactivar' && cliente && <RenovarButton clienteId={cliente.id} label="Reactivar" />}
       {accion === 'contactar' && cliente && (
@@ -103,7 +103,7 @@ export function RenewalCard({ item, dias }: { item: { cliente: Client; tipo: Pau
         {PAUTA_TIPO_LABELS[item.tipo]} · vence {formatFecha(item.fecha_vencimiento)} ({dias} día{dias === 1 ? '' : 's'})
       </p>
       <div className="flex flex-wrap gap-2">
-        <VerClienteButton nombre={item.cliente.nombre} />
+        <VerClienteButton clienteId={item.cliente.id} />
         <RenovarButton clienteId={item.cliente.id} label="Renovar" />
         <ContactarButton
           telefono={item.cliente.telefono}
