@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Paperclip, Plus, RefreshCw, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { errorMessage } from '@/api/client'
@@ -26,6 +26,8 @@ const EMPTY_FORM = { pautaId: '', titulo: '', texto: '', prioridad: false }
 export function SolicitudesPage() {
   const queryClient = useQueryClient()
   const [form, setForm] = useState(EMPTY_FORM)
+  const [adjuntoAbierto, setAdjuntoAbierto] = useState(false)
+  const [archivo, setArchivo] = useState<File | null>(null)
 
   const kanbanQuery = useQuery({ queryKey: KANBAN_KEY, queryFn: solicitudesApi.loadKanban })
   const pautasQuery = useQuery({ queryKey: PAUTAS_KEY, queryFn: pautasApi.list })
@@ -55,10 +57,27 @@ export function SolicitudesPage() {
   }
 
   const createMutation = useMutation({
-    mutationFn: solicitudesApi.create,
+    mutationFn: async ({ payload, archivo }: { payload: SolicitudCreateInput; archivo: File | null }) => {
+      const solicitud = await solicitudesApi.create(payload)
+      if (archivo) {
+        // Best-effort: the solicitud itself must exist first (media is
+        // scoped to a publication_request_id), so this is a second call
+        // right after creation — if it fails, the solicitud still got
+        // created; the operator can attach the file later from its card.
+        try {
+          await solicitudesApi.uploadMedia(solicitud.id, archivo)
+        } catch (err) {
+          toast.error(`Solicitud registrada, pero el archivo no se pudo subir: ${errorMessage(err)}`)
+          return solicitud
+        }
+      }
+      return solicitud
+    },
     onSuccess: () => {
       invalidateKanban()
       setForm(EMPTY_FORM)
+      setArchivo(null)
+      setAdjuntoAbierto(false)
       toast.success('Solicitud registrada.')
     },
     onError: (err) => toast.error(errorMessage(err)),
@@ -114,7 +133,7 @@ export function SolicitudesPage() {
       texto: form.texto,
       prioridad_manual: form.prioridad,
     }
-    createMutation.mutate(payload)
+    createMutation.mutate({ payload, archivo })
   }
 
   function handleTextoKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -211,8 +230,40 @@ export function SolicitudesPage() {
           onChange={(e) => setForm({ ...form, texto: e.target.value })}
           onKeyDown={handleTextoKeyDown}
         />
+
+        {!adjuntoAbierto ? (
+          <button
+            type="button"
+            className="flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setAdjuntoAbierto(true)}
+          >
+            <Paperclip className="size-3.5" /> Adjuntar material (opcional)
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Paperclip className="size-4 shrink-0 text-muted-foreground" />
+            <input
+              type="file"
+              accept="image/*,video/*"
+              className="text-xs"
+              onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Quitar adjunto"
+              onClick={() => {
+                setArchivo(null)
+                setAdjuntoAbierto(false)
+              }}
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
+
         <Button type="submit" disabled={createMutation.isPending} className="self-start">
-          <Plus /> Registrar
+          <Plus /> {createMutation.isPending ? 'Registrando…' : 'Registrar'}
         </Button>
       </form>
 

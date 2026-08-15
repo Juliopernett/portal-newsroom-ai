@@ -27,7 +27,7 @@ export function Shell() {
   const { user, logout } = useAuth()
 
   return (
-    <div className="flex min-h-svh">
+    <div className="flex h-svh">
       <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-card">
         <div className="px-4 py-5">
           <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
