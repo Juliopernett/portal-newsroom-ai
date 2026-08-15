@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Calendar, Pencil, Plus, RefreshCw, Search } from 'lucide-react'
 
@@ -39,9 +40,27 @@ const CUPO_BAR_COLOR: Record<string, string> = {
 
 export function ContratosPage() {
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Pauta | null>(null)
+  const [preselectClientId, setPreselectClientId] = useState<string | undefined>()
+
+  // Cross-module "Renovar"/"Reactivar" links (from Alertas) arrive here
+  // via navigation state instead of a query param, then get cleared —
+  // matches the legacy app's data-preselect-client, added after a real
+  // production bug where the drawer silently defaulted to the wrong
+  // client because nothing forced an explicit choice.
+  useEffect(() => {
+    const state = location.state as { preselectClientId?: string } | null
+    if (state?.preselectClientId) {
+      setEditing(null)
+      setPreselectClientId(state.preselectClientId)
+      setSheetOpen(true)
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location.state, location.pathname, navigate])
 
   const pautasQuery = useQuery({ queryKey: PAUTAS_KEY, queryFn: pautasApi.list })
   const clientsQuery = useQuery({ queryKey: CLIENTS_KEY, queryFn: clientsApi.list })
@@ -79,6 +98,7 @@ export function ContratosPage() {
 
   function openNew() {
     setEditing(null)
+    setPreselectClientId(undefined)
     createMutation.reset()
     updateMutation.reset()
     setSheetOpen(true)
@@ -195,6 +215,7 @@ export function ContratosPage() {
           <PautaForm
             pauta={editing}
             clients={clientsQuery.data ?? []}
+            preselectClientId={preselectClientId}
             onSubmit={(payload) =>
               editing ? updateMutation.mutate(payload) : createMutation.mutate(payload)
             }

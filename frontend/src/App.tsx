@@ -11,6 +11,7 @@ import { ClientesPage } from '@/features/clientes/ClientesPage'
 import { ReportesPage } from '@/features/reportes/ReportesPage'
 import { ContratosPage } from '@/features/contratos/ContratosPage'
 import { SolicitudesPage } from '@/features/solicitudes/SolicitudesPage'
+import { AlertasPage } from '@/features/alertas/AlertasPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,7 +32,7 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<Shell />}>
                 <Route index element={<PlaceholderPage title="Dashboard" />} />
-                <Route path="alertas" element={<PlaceholderPage title="Alertas" />} />
+                <Route path="alertas" element={<AlertasPage />} />
                 <Route path="solicitudes" element={<SolicitudesPage />} />
                 <Route path="clientes" element={<ClientesPage />} />
                 <Route path="contratos" element={<ContratosPage />} />

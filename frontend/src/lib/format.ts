@@ -37,3 +37,10 @@ export function sumarDiasFecha(fechaIso: string, dias: number): string {
   fecha.setUTCDate(fecha.getUTCDate() + dias)
   return fecha.toISOString().slice(0, 10)
 }
+
+export function diasHasta(fechaIso: string): number {
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const fecha = new Date(fechaIso + 'T00:00:00')
+  return Math.round((fecha.getTime() - hoy.getTime()) / 86_400_000)
+}
