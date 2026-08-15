@@ -6,6 +6,7 @@ import {
   Users,
   FileText,
   Wallet,
+  Download,
   LogOut,
 } from 'lucide-react'
 
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { to: '/clientes', label: 'Clientes', icon: Users, end: false },
   { to: '/contratos', label: 'Contratos', icon: FileText, end: false },
   { to: '/gastos', label: 'Gastos', icon: Wallet, end: false },
+  { to: '/reportes', label: 'Reportes', icon: Download, end: false },
 ] as const
 
 export function Shell() {

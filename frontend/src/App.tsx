@@ -8,6 +8,7 @@ import { Shell } from '@/app/Shell'
 import { PlaceholderPage } from '@/app/PlaceholderPage'
 import { GastosPage } from '@/features/gastos/GastosPage'
 import { ClientesPage } from '@/features/clientes/ClientesPage'
+import { ReportesPage } from '@/features/reportes/ReportesPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,7 @@ export default function App() {
                 <Route path="clientes" element={<ClientesPage />} />
                 <Route path="contratos" element={<PlaceholderPage title="Contratos" />} />
                 <Route path="gastos" element={<GastosPage />} />
+                <Route path="reportes" element={<ReportesPage />} />
               </Route>
             </Route>
           </Routes>
