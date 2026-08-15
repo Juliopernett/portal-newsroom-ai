@@ -191,25 +191,10 @@
           <h3 class="section-subtitle">Métricas del mes</h3>
           <div id="dashboard-metricas-principales" class="stat-row stat-row-money"></div>
 
-          <h3 class="section-subtitle">Otros indicadores</h3>
-          <div id="dashboard-actividad" class="stat-row stat-row-compact"></div>
-
-          <h3 class="section-subtitle">Ranking comercial</h3>
-          <div class="ranking-grid">
-            <div>
-              <div class="section-header-flex">
-                <h2 class="section-title">Activos ahora</h2>
-              </div>
-              <div id="ranking-comercial-activos" class="ranking-list"></div>
-            </div>
-            <div>
-              <div class="section-header-flex">
-                <h2 class="section-title">Histórico</h2>
-              </div>
-              <div id="ranking-comercial" class="ranking-list"></div>
-            </div>
-          </div>
-
+          <!-- Rentabilidad primero: es la respuesta a "¿cómo va el negocio?"
+               de un vistazo (ingresos vs. gastos, tendencia de ganancia/
+               pérdida) -- más arriba que el ranking de clientes o los
+               indicadores secundarios, que son detalle, no el resumen. -->
           <h3 class="section-subtitle">Rentabilidad mensual</h3>
           <p class="page-subtitle">Últimos 12 meses — ingresos cobrados menos gastos registrados</p>
           <div class="chart-card">
@@ -229,6 +214,25 @@
             <div id="chart-rentabilidad"></div>
           </div>
           <div id="rentabilidad-mensual" class="rentabilidad-list"></div>
+
+          <h3 class="section-subtitle">Ranking comercial</h3>
+          <div class="ranking-grid">
+            <div>
+              <div class="section-header-flex">
+                <h2 class="section-title">Activos ahora</h2>
+              </div>
+              <div id="ranking-comercial-activos" class="ranking-list"></div>
+            </div>
+            <div>
+              <div class="section-header-flex">
+                <h2 class="section-title">Histórico</h2>
+              </div>
+              <div id="ranking-comercial" class="ranking-list"></div>
+            </div>
+          </div>
+
+          <h3 class="section-subtitle">Otros indicadores</h3>
+          <div id="dashboard-actividad" class="stat-row stat-row-compact"></div>
         </div>
       </section>
 
