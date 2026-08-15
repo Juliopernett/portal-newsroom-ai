@@ -6,17 +6,20 @@ import { toast } from 'sonner'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { SelectNative } from '@/components/ui/select-native'
 import { Textarea } from '@/components/ui/textarea'
 import { clientsApi } from '@/features/clientes/api'
-import { pautasApi, type Pauta } from '@/features/contratos/api'
+import { PAUTA_TIPO_LABELS, pautasApi, type Pauta } from '@/features/contratos/api'
+import { formatFecha, formatMoneda } from '@/lib/format'
 import { solicitudesApi, type SolicitudCreateInput, type SolicitudEditInput } from './api'
 import { SolicitudCard } from './SolicitudCard'
-import { pautaOptionLabel } from './utils'
+import { ActividadReciente } from './ActividadReciente'
+import { MetricasSolicitudes } from './MetricasSolicitudes'
+import { PautaCombobox } from './PautaCombobox'
 
 const KANBAN_KEY = ['solicitudes-kanban']
 const PAUTAS_KEY = ['pautas']
 const CLIENTS_KEY = ['clients']
+const PUBLICADAS_VISIBLES = 30
 
 const EMPTY_FORM = { pautaId: '', titulo: '', texto: '', prioridad: false }
 
@@ -44,6 +47,8 @@ export function SolicitudesPage() {
     () => (pautasQuery.data ?? []).filter((p) => p.vigente),
     [pautasQuery.data],
   )
+
+  const pautaSeleccionada = form.pautaId ? (pautasById.get(form.pautaId) ?? null) : null
 
   function invalidateKanban() {
     queryClient.invalidateQueries({ queryKey: KANBAN_KEY })
@@ -120,7 +125,14 @@ export function SolicitudesPage() {
   }
 
   const pendientes = kanbanQuery.data?.pendientes ?? []
-  const publicadas = kanbanQuery.data?.publicadas ?? []
+  const publicadasTodas = kanbanQuery.data?.publicadas ?? []
+  const publicadasVisibles = publicadasTodas.slice(0, PUBLICADAS_VISIBLES)
+
+  function clienteDe(s: { pauta_id: string | null }) {
+    if (!s.pauta_id) return '(sin vincular)'
+    const pauta = pautasById.get(s.pauta_id)
+    return pauta ? (clientesById.get(pauta.client_id) ?? '(sin vincular)') : '(sin vincular)'
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -142,22 +154,25 @@ export function SolicitudesPage() {
         </Button>
       </div>
 
+      {!kanbanQuery.isLoading && (
+        <MetricasSolicitudes
+          pendientes={pendientes}
+          publicadas={publicadasTodas}
+          pautasById={pautasById}
+          pautas={pautasQuery.data ?? []}
+        />
+      )}
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-lg border border-border p-3">
         <div className="flex flex-wrap gap-2">
-          <SelectNative
-            className="w-auto max-w-[16rem]"
+          <PautaCombobox
+            pautas={pautasVigentes}
+            clientesById={clientesById}
             value={form.pautaId}
-            onChange={(e) => setForm({ ...form, pautaId: e.target.value })}
-          >
-            <option value="">(sin pauta todavía — se vincula después)</option>
-            {pautasVigentes.map((p) => (
-              <option key={p.id} value={p.id}>
-                {pautaOptionLabel(p, clientesById.get(p.client_id) ?? '(cliente desconocido)')}
-              </option>
-            ))}
-          </SelectNative>
+            onChange={(pautaId) => setForm({ ...form, pautaId })}
+          />
           <Input
-            className="w-48"
+            className="min-w-[16rem] flex-1"
             placeholder="Título (opcional)"
             value={form.titulo}
             onChange={(e) => setForm({ ...form, titulo: e.target.value })}
@@ -171,6 +186,23 @@ export function SolicitudesPage() {
             Prioridad
           </label>
         </div>
+
+        {pautaSeleccionada && (
+          <div className="flex flex-wrap items-center gap-3 rounded-md bg-muted p-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {clientesById.get(pautaSeleccionada.client_id) ?? '(cliente desconocido)'}
+            </span>
+            <span>{PAUTA_TIPO_LABELS[pautaSeleccionada.tipo]}</span>
+            <span>
+              {formatFecha(pautaSeleccionada.fecha_inicio)} – {formatFecha(pautaSeleccionada.fecha_fin)}
+            </span>
+            <span>
+              {pautaSeleccionada.publicaciones_restantes}/{pautaSeleccionada.publicaciones_contratadas} restantes
+            </span>
+            <span>{formatMoneda(pautaSeleccionada.valor_pagado)}</span>
+          </div>
+        )}
+
         <Textarea
           required
           rows={2}
@@ -184,7 +216,7 @@ export function SolicitudesPage() {
         </Button>
       </form>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_16rem_1fr]">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-sm font-medium">
             Cola de trabajo
@@ -204,11 +236,7 @@ export function SolicitudesPage() {
                   solicitud={s}
                   esPublicada={false}
                   pauta={s.pauta_id ? (pautasById.get(s.pauta_id) ?? null) : null}
-                  clienteNombre={
-                    s.pauta_id
-                      ? (clientesById.get(pautasById.get(s.pauta_id)?.client_id ?? '') ?? '(sin vincular)')
-                      : '(sin vincular)'
-                  }
+                  clienteNombre={clienteDe(s)}
                   pautasVigentes={pautasVigentes}
                   clientesById={clientesById}
                   isActing={isActing}
@@ -228,30 +256,33 @@ export function SolicitudesPage() {
           </div>
         </div>
 
+        <ActividadReciente
+          pendientes={pendientes}
+          publicadas={publicadasTodas}
+          pautas={pautasQuery.data ?? []}
+          clientesById={clientesById}
+        />
+
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-sm font-medium">
             Publicadas
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {publicadas.length}
+              {publicadasTodas.length}
             </span>
           </div>
           <div className="flex flex-col gap-2">
             {kanbanQuery.isLoading ? (
               <p className="p-6 text-center text-sm text-muted-foreground">Cargando…</p>
-            ) : publicadas.length === 0 ? (
+            ) : publicadasVisibles.length === 0 ? (
               <p className="p-6 text-center text-sm text-muted-foreground">Todavía no hay publicadas.</p>
             ) : (
-              publicadas.map((s) => (
+              publicadasVisibles.map((s) => (
                 <SolicitudCard
                   key={s.id}
                   solicitud={s}
                   esPublicada
                   pauta={s.pauta_id ? (pautasById.get(s.pauta_id) ?? null) : null}
-                  clienteNombre={
-                    s.pauta_id
-                      ? (clientesById.get(pautasById.get(s.pauta_id)?.client_id ?? '') ?? '(sin vincular)')
-                      : '(sin vincular)'
-                  }
+                  clienteNombre={clienteDe(s)}
                   pautasVigentes={pautasVigentes}
                   clientesById={clientesById}
                   isActing={isActing}

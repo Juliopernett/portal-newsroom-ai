@@ -32,6 +32,56 @@ export interface SolicitudesKanban {
   publicadas: Solicitud[]
 }
 
+export type CanalPublicacion = 'wordpress' | 'facebook' | 'instagram'
+export type EstadoDestino = 'pendiente' | 'publicado' | 'fallido' | 'cancelado'
+
+export interface DestinoPublicacion {
+  id: string
+  publication_request_id: string
+  canal: CanalPublicacion
+  estado: EstadoDestino
+  wp_post_id: string | null
+  wp_url: string | null
+  url_publicacion: string | null
+  registrado_por_user_id: string | null
+  fecha_publicacion: string | null
+  ultimo_error: string | null
+}
+
+export type MediaAssetTipo = 'imagen' | 'video'
+
+export interface MediaAsset {
+  id: string
+  publication_request_id: string
+  tipo: MediaAssetTipo
+  nombre_archivo: string
+  content_type: string
+  tamano_bytes: number
+  fecha_subida: string
+  subido_por_user_id: string | null
+}
+
+export interface ReporteDestino {
+  canal: CanalPublicacion
+  estado: EstadoDestino
+  enlace: string | null
+  fecha_publicacion: string | null
+  ultimo_error: string | null
+}
+
+export interface ReporteSolicitud {
+  publication_request_id: string
+  titulo: string | null
+  texto: string
+  cliente_nombre: string | null
+  pauta_id: string | null
+  fecha_recepcion: string
+  fecha_cierre: string | null
+  completa: boolean
+  pauta_consumida: boolean
+  destinos: ReporteDestino[]
+}
+
 export const solicitudesApi = {
   // Three parallel requests, same split the legacy app uses: "recibida"
   // comes back from the backend already in work order (prioridad manual >
@@ -55,4 +105,35 @@ export const solicitudesApi = {
   cancelar: (id: string) => api.post<Solicitud>(`/publication-requests/${id}/cancelar`),
   linkPauta: (id: string, pautaId: string) =>
     api.post<Solicitud>(`/publication-requests/${id}/link-pauta`, { pauta_id: pautaId }),
+
+  // Destinos (multi-canal — WordPress/Facebook/Instagram)
+  listDestinos: (id: string) => api.get<DestinoPublicacion[]>(`/publication-requests/${id}/destinos`),
+  addDestino: (id: string, canal: CanalPublicacion) =>
+    api.post<DestinoPublicacion>(`/publication-requests/${id}/destinos`, { canal }),
+  crearBorradorWordpress: (id: string, destinoId: string) =>
+    api.post<DestinoPublicacion>(
+      `/publication-requests/${id}/destinos/${destinoId}/crear-borrador-wordpress`,
+    ),
+  confirmarDestino: (id: string, destinoId: string, urlPublicacion: string | null) =>
+    api.post<DestinoPublicacion>(
+      `/publication-requests/${id}/destinos/${destinoId}/confirmar-publicacion`,
+      urlPublicacion ? { url_publicacion: urlPublicacion } : {},
+    ),
+  cancelarDestino: (id: string, destinoId: string) =>
+    api.post<DestinoPublicacion>(`/publication-requests/${id}/destinos/${destinoId}/cancelar`),
+
+  // Reporte (read-only, generated on demand, never persisted)
+  getReporte: (id: string) => api.get<ReporteSolicitud>(`/publication-requests/${id}/reporte`),
+
+  // Media (imágenes/videos adjuntos)
+  listMedia: (id: string) => api.get<MediaAsset[]>(`/publication-requests/${id}/media`),
+  uploadMedia: (id: string, file: File) => {
+    const form = new FormData()
+    form.append('archivo', file)
+    return api.postForm<MediaAsset>(`/publication-requests/${id}/media`, form)
+  },
+  deleteMedia: (id: string, mediaId: string) =>
+    api.delete<void>(`/publication-requests/${id}/media/${mediaId}`),
+  mediaContentUrl: (id: string, mediaId: string) =>
+    `/publication-requests/${id}/media/${mediaId}/contenido`,
 }

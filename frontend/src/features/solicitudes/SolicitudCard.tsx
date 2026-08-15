@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Link2, Pencil, Flag, X } from 'lucide-react'
+import { Check, Image, Link2, Pencil, Flag, FileText, X } from 'lucide-react'
 
 import {
   AlertDialog,
@@ -20,6 +20,9 @@ import type { Pauta } from '@/features/contratos/api'
 import { formatFechaHoraNegocio, formatMoneda } from '@/lib/format'
 import { PAUTA_TIPO_LABELS } from '@/features/contratos/api'
 import type { Solicitud, SolicitudEditInput } from './api'
+import { DestinosPanel } from './DestinosPanel'
+import { ReportePanel } from './ReportePanel'
+import { MediaPanel } from './MediaPanel'
 import { esperandoMucho, formatHoras, horasEnEspera, motivoPrioridadCorto, pautaOptionLabel, scoreSolicitud } from './utils'
 
 export function SolicitudCard({
@@ -52,6 +55,10 @@ export function SolicitudCard({
   const [editTitulo, setEditTitulo] = useState(solicitud.titulo ?? '')
   const [editTexto, setEditTexto] = useState(solicitud.texto)
   const [editPrioridad, setEditPrioridad] = useState(solicitud.prioridad_manual)
+  const [verTextoCompleto, setVerTextoCompleto] = useState(false)
+  const [destinosOpen, setDestinosOpen] = useState(false)
+  const [reporteOpen, setReporteOpen] = useState(false)
+  const [mediaOpen, setMediaOpen] = useState(false)
 
   const esRecibida = !esPublicada && solicitud.estado === 'recibida'
   const esEnCurso = !esPublicada && solicitud.estado === 'aceptada'
@@ -163,7 +170,20 @@ export function SolicitudCard({
         <p className="text-xs text-muted-foreground">{motivoPrioridadCorto(solicitud, pauta)}</p>
       )}
       {solicitud.titulo && <p className="text-sm font-medium">{solicitud.titulo}</p>}
-      <p className={`text-sm whitespace-pre-wrap ${esPublicada ? 'line-clamp-2' : ''}`}>{solicitud.texto}</p>
+      <p
+        className={`text-sm whitespace-pre-wrap ${esPublicada && !verTextoCompleto ? 'line-clamp-2' : ''}`}
+      >
+        {solicitud.texto}
+      </p>
+      {esPublicada && (
+        <button
+          type="button"
+          className="self-start text-xs text-brand underline"
+          onClick={() => setVerTextoCompleto((v) => !v)}
+        >
+          {verTextoCompleto ? 'Ocultar' : 'Ver texto completo'}
+        </button>
+      )}
 
       {esRecibida && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -221,6 +241,24 @@ export function SolicitudCard({
           </AlertDialog>
         </div>
       )}
+
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        {!esPublicada && (
+          <Button variant="secondary" size="sm" onClick={() => setDestinosOpen((v) => !v)}>
+            <Link2 /> {destinosOpen ? 'Ocultar destinos' : 'Destinos'}
+          </Button>
+        )}
+        <Button variant="secondary" size="sm" onClick={() => setReporteOpen((v) => !v)}>
+          <FileText /> {reporteOpen ? 'Ocultar reporte' : 'Ver reporte'}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => setMediaOpen((v) => !v)}>
+          <Image /> {mediaOpen ? 'Ocultar media' : 'Media'}
+        </Button>
+      </div>
+
+      {destinosOpen && !esPublicada && <DestinosPanel solicitudId={solicitud.id} />}
+      {reporteOpen && <ReportePanel solicitudId={solicitud.id} />}
+      {mediaOpen && <MediaPanel solicitudId={solicitud.id} esPublicada={esPublicada} />}
     </div>
   )
 }

@@ -20,10 +20,18 @@ import tailwindcss from '@tailwindcss/vite'
 // address bar) and must always reach the backend. So the SPA bypass
 // there has to match the exact client-route path, not the whole
 // proxied prefix — matchPath lets each entry opt into that.
-function backendProxy(matchPath?: string): ProxyOptions {
+//
+// /publication-requests has the same problem one level deeper: no
+// client route lives at that path (the client route is /solicitudes),
+// but /publication-requests/{id}/media/{mediaId}/contenido is a real
+// file (opened via target="_blank", same as a CSV download) that must
+// never be swallowed by the SPA fallback — pass `false` to disable the
+// bypass for a prefix entirely.
+function backendProxy(matchPath?: string | false): ProxyOptions {
   return {
     target: 'http://localhost:8000',
     bypass(req) {
+      if (matchPath === false) return
       if (!req.headers.accept?.includes('text/html')) return
       if (matchPath && req.url?.split('?')[0] !== matchPath) return
       return '/index.html'
@@ -49,7 +57,7 @@ export default defineConfig({
       '/gastos': backendProxy(),
       '/insights': backendProxy(),
       '/pautas': backendProxy(),
-      '/publication-requests': backendProxy(),
+      '/publication-requests': backendProxy(false),
       '/reportes': backendProxy('/reportes'),
     },
   },
