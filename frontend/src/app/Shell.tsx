@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { insightsApi } from '@/features/alertas/api'
 import { centroAlertaKey, useDismissedAlerts } from '@/features/alertas/utils'
+import logoMark from '@/assets/logo-mark.png'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -55,7 +56,10 @@ export function Shell() {
   return (
     <div className="flex h-svh flex-col md:flex-row">
       <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3 md:hidden">
-        <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
+        <div className="flex items-center gap-2">
+          <img src={logoMark} alt="" className="size-6" />
+          <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
+        </div>
         <button
           type="button"
           aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
@@ -81,14 +85,20 @@ export function Shell() {
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="hidden px-4 py-5 md:block">
-          <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
-          {user && <p className="truncate text-xs text-muted-foreground">{user.nombre}</p>}
-        </div>
-        <div className="flex items-center justify-between px-4 py-4 md:hidden">
+        <div className="hidden items-center gap-2 px-4 py-5 md:flex">
+          <img src={logoMark} alt="" className="size-8 shrink-0" />
           <div>
             <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
             {user && <p className="truncate text-xs text-muted-foreground">{user.nombre}</p>}
+          </div>
+        </div>
+        <div className="flex items-center justify-between px-4 py-4 md:hidden">
+          <div className="flex items-center gap-2">
+            <img src={logoMark} alt="" className="size-7 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
+              {user && <p className="truncate text-xs text-muted-foreground">{user.nombre}</p>}
+            </div>
           </div>
           <button
             type="button"

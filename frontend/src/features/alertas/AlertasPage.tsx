@@ -197,6 +197,10 @@ export function AlertasPage() {
                   <>
                     <VerClienteButton clienteId={item.cliente.id} />
                     <RenovarButton clienteId={item.cliente.id} label="Reactivar" />
+                    <ContactarButton
+                      telefono={item.cliente.telefono}
+                      mensaje={`Hola ${item.cliente.nombre}, notamos que hace ${item.dias_sin_actividad} días no tienes actividad con nosotros — ¿qué ha pasado? Cuéntanos si podemos ayudarte a retomar tus publicaciones.`}
+                    />
                   </>
                 }
               >
