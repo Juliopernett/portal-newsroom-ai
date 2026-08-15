@@ -56,6 +56,9 @@ let rankingByClientId = new Map();
 let solicitudPautaFiltro = "";
 let clientesFiltro = "";
 let contratosFiltro = "";
+let contratosDesde = "";
+let contratosHasta = "";
+let rentabilidadActual = [];
 let editingClientId = null;
 let editingPautaId = null;
 let editingGastoId = null;
@@ -143,6 +146,28 @@ function sumarDiasFecha(fechaIso, dias) {
 
 function formatMoneda(valor) {
   return "$" + Number(valor).toLocaleString("es-CO", { maximumFractionDigits: 0 });
+}
+
+// Exporta un reporte (rentabilidad, pautas) como CSV -- sin backend nuevo,
+// se arma en el navegador desde los datos que ya están en pantalla. BOM
+// al inicio para que Excel abra bien los acentos/ñ en vez de mostrarlos
+// como caracteres sueltos.
+function descargarCsv(nombreArchivo, encabezados, filas) {
+  const escapar = (valor) => {
+    const texto = String(valor ?? "");
+    return /[",\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+  };
+  const lineas = [encabezados, ...filas].map((fila) => fila.map(escapar).join(","));
+  const csv = "﻿" + lineas.join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombreArchivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function formatBytes(bytes) {
@@ -721,6 +746,7 @@ function renderContractCard(pauta) {
       <div class="contract-card-header">
         <h3 data-ficha-cliente="${pauta.client_id}">${nombre}</h3>
         <span class="badge badge-neutral">${PAUTA_TIPO_LABELS[pauta.tipo] ?? pauta.tipo}</span>
+        ${pauta.vigente ? "" : '<span class="badge badge-vencido">Vencido</span>'}
       </div>
       <p class="contract-card-meta">
         <svg class="icon"><use href="#icon-calendar"></use></svg>${formatFecha(pauta.fecha_inicio)} – ${formatFecha(pauta.fecha_fin)}
@@ -745,11 +771,26 @@ function contratosActivos() {
     .sort((a, b) => a.fecha_fin.localeCompare(b.fecha_fin));
 }
 
+// Sin rango de fechas: la vista de siempre, solo contratos vigentes. Con
+// rango: reporte -- cualquier pauta (vigente o vencida) cuyo fecha_inicio
+// caiga en [contratosDesde, contratosHasta], ordenada cronológicamente.
+// `fecha_inicio` es "YYYY-MM-DD" (ISO) -- comparación de string alcanza,
+// mismo truco que el resto de la app ya usa para ordenar fechas.
+function contratosEnReporte() {
+  return Array.from(pautasById.values())
+    .filter(
+      (p) =>
+        (!contratosDesde || p.fecha_inicio >= contratosDesde) &&
+        (!contratosHasta || p.fecha_inicio <= contratosHasta)
+    )
+    .sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+}
+
 function contratosFiltrados() {
   const termino = contratosFiltro.trim().toLowerCase();
-  const activos = contratosActivos();
-  if (!termino) return activos;
-  return activos.filter((pauta) => {
+  const pautas = contratosDesde || contratosHasta ? contratosEnReporte() : contratosActivos();
+  if (!termino) return pautas;
+  return pautas.filter((pauta) => {
     const cliente = clientsById.get(pauta.client_id);
     return cliente && cliente.nombre.toLowerCase().includes(termino);
   });
@@ -759,9 +800,63 @@ function renderListaContratos() {
   const el = document.getElementById("lista-contratos");
   if (!el) return;
   const contratos = contratosFiltrados();
+  const enReporte = contratosDesde || contratosHasta;
   el.innerHTML = contratos.length
     ? contratos.map(renderContractCard).join("")
-    : renderEmptyState("📄", contratosFiltro.trim() ? "No se encontraron contratos con ese criterio." : "No hay contratos vigentes en este momento.");
+    : renderEmptyState(
+        "📄",
+        contratosFiltro.trim()
+          ? "No se encontraron contratos con ese criterio."
+          : enReporte
+            ? "No hay pautas en ese rango de fechas."
+            : "No hay contratos vigentes en este momento."
+      );
+
+  const resumen = document.getElementById("contratos-resumen");
+  if (!enReporte) {
+    resumen.hidden = true;
+    return;
+  }
+  const totalValor = contratos.reduce((acc, p) => acc + Number(p.valor_pagado), 0);
+  resumen.hidden = false;
+  resumen.textContent = `${contratos.length} pauta${contratos.length === 1 ? "" : "s"} · ${formatMoneda(totalValor)} contratados en el rango`;
+}
+
+function descargarPautasCsv() {
+  const contratos = contratosFiltrados();
+  if (!contratos.length) {
+    showStatus("No hay pautas para exportar.", true);
+    return;
+  }
+  const filas = contratos.map((pauta) => {
+    const cliente = clientsById.get(pauta.client_id);
+    return [
+      cliente ? cliente.nombre : "(cliente desconocido)",
+      PAUTA_TIPO_LABELS[pauta.tipo] ?? pauta.tipo,
+      pauta.fecha_inicio,
+      pauta.fecha_fin,
+      pauta.publicaciones_contratadas,
+      pauta.publicaciones_restantes,
+      pauta.valor_pagado,
+      pauta.fecha_pago,
+      pauta.vigente ? "Vigente" : "Vencido",
+    ];
+  });
+  descargarCsv(
+    "pautas.csv",
+    [
+      "Cliente",
+      "Tipo",
+      "Fecha inicio",
+      "Fecha fin",
+      "Publicaciones contratadas",
+      "Publicaciones restantes",
+      "Valor pagado",
+      "Fecha pago",
+      "Estado",
+    ],
+    filas
+  );
 }
 
 // ---------- Gastos ----------
@@ -2494,11 +2589,10 @@ function renderRentabilidadMensual(rentabilidad) {
 }
 
 async function loadDashboard() {
-  const [resumen, alertas, ranking, rentabilidad] = await Promise.all([
+  const [resumen, alertas, ranking] = await Promise.all([
     apiFetch("/dashboard/resumen"),
     apiFetch("/dashboard/alertas"),
     apiFetch("/dashboard/ranking"),
-    apiFetch("/dashboard/rentabilidad"),
   ]);
   renderDashboardSolicitudes(resumen, alertas);
   renderMetricasPrincipales(resumen);
@@ -2512,8 +2606,46 @@ async function loadDashboard() {
     "ranking-comercial-activos",
     "Ningún cliente tiene un contrato vigente en este momento."
   );
+  await loadRentabilidad();
+}
+
+// Separado de loadDashboard -- así cambiar el rango de fechas (o
+// "Últimos 12 meses") solo vuelve a pedir esto, sin recargar el resto del
+// Dashboard. `contratosDesde`/`contratosHasta` no le sirven a esta función
+// -- son del filtro de Pautas en Contratos, cada reporte tiene su propio
+// rango.
+async function loadRentabilidad() {
+  const desde = document.getElementById("rentabilidad-desde").value;
+  const hasta = document.getElementById("rentabilidad-hasta").value;
+  const params = new URLSearchParams();
+  if (desde) params.set("desde", desde);
+  if (hasta) params.set("hasta", hasta);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const rentabilidad = await apiFetch(`/dashboard/rentabilidad${query}`);
+  rentabilidadActual = rentabilidad;
   renderRentabilidadCharts(rentabilidad);
   renderRentabilidadMensual(rentabilidad);
+  const subtitulo = document.getElementById("rentabilidad-subtitulo");
+  if (rentabilidad.length) {
+    const primero = rentabilidad[0];
+    const ultimo = rentabilidad[rentabilidad.length - 1];
+    const rango = `${MESES_LABELS[primero.mes - 1]} ${primero.anio} – ${MESES_LABELS[ultimo.mes - 1]} ${ultimo.anio}`;
+    subtitulo.textContent = `${rango} · ingresos cobrados menos gastos registrados`;
+  }
+}
+
+function descargarRentabilidadCsv() {
+  if (!rentabilidadActual.length) {
+    showStatus("No hay datos de rentabilidad para exportar.", true);
+    return;
+  }
+  const filas = rentabilidadActual.map((item) => [
+    `${MESES_LABELS[item.mes - 1]} ${item.anio}`,
+    item.ingresos,
+    item.gastos,
+    item.rentabilidad,
+  ]);
+  descargarCsv("rentabilidad_mensual.csv", ["Mes", "Ingresos", "Gastos", "Rentabilidad"], filas);
 }
 
 // ---------- Centro de Decisión (pestaña Alertas, Sprint 5A) ----------
@@ -3193,6 +3325,30 @@ async function init() {
     contratosFiltro = event.target.value;
     renderListaContratos();
   });
+  document.getElementById("contratos-desde").addEventListener("change", (event) => {
+    contratosDesde = event.target.value;
+    renderListaContratos();
+  });
+  document.getElementById("contratos-hasta").addEventListener("change", (event) => {
+    contratosHasta = event.target.value;
+    renderListaContratos();
+  });
+  document.getElementById("contratos-limpiar").addEventListener("click", () => {
+    contratosDesde = "";
+    contratosHasta = "";
+    document.getElementById("contratos-desde").value = "";
+    document.getElementById("contratos-hasta").value = "";
+    renderListaContratos();
+  });
+  document.getElementById("contratos-csv").addEventListener("click", descargarPautasCsv);
+  document.getElementById("rentabilidad-desde").addEventListener("change", loadRentabilidad);
+  document.getElementById("rentabilidad-hasta").addEventListener("change", loadRentabilidad);
+  document.getElementById("rentabilidad-limpiar").addEventListener("click", () => {
+    document.getElementById("rentabilidad-desde").value = "";
+    document.getElementById("rentabilidad-hasta").value = "";
+    loadRentabilidad();
+  });
+  document.getElementById("rentabilidad-csv").addEventListener("click", descargarRentabilidadCsv);
 
   try {
     await apiFetch("/auth/me");

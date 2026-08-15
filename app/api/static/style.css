@@ -1048,6 +1048,22 @@ button[type="submit"]:hover {
   color: var(--color-text-secondary);
 }
 
+/* ---------- filtro de reportes por rango de fechas ---------- */
+/* Reutilizado por Rentabilidad (Dashboard) y Pautas (Contratos) --
+   mismo filtro Desde/Hasta + Descargar CSV en los dos lugares. */
+
+.report-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.report-filter-row label {
+  min-width: 150px;
+}
+
 /* ---------- gráficas (Dashboard) ---------- */
 /*
    SVG generado en JS (renderChartIngresosGastos/renderChartRentabilidad,
@@ -2312,8 +2328,15 @@ button[type="submit"]:hover {
   border-left-color: var(--color-danger);
 }
 
+/* Solo aparece en el reporte de Pautas por rango de fechas (Contratos) --
+   la vista por defecto de "Contratos activos" nunca incluye una vencida. */
+.contract-card[data-quota="vencido"] {
+  border-left-color: var(--color-text-tertiary);
+}
+
 .contract-card-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: var(--space-2);

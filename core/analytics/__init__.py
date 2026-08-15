@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from core.analytics.analytics_service import AnalyticsService
 from core.analytics.decision_engine import DecisionEngineService
-from core.analytics.rentabilidad_service import rentabilidad_mensual
+from core.analytics.rentabilidad_service import meses_atras, rentabilidad_mensual
 from core.analytics.view_models import ClienteIngreso, ClientePesoComercial, RentabilidadMensualItem
 
 __all__ = [
@@ -20,5 +20,6 @@ __all__ = [
     "ClientePesoComercial",
     "DecisionEngineService",
     "RentabilidadMensualItem",
+    "meses_atras",
     "rentabilidad_mensual",
 ]

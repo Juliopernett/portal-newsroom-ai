@@ -9,6 +9,8 @@ and never touches `core.entities`/`core.services` beyond what
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import get_current_user, get_unit_of_work
@@ -20,7 +22,8 @@ from app.api.schemas.dashboard import (
     RentabilidadMensualOut,
 )
 from app.api.schemas.publication_request import PublicationRequestOut
-from core.analytics import AnalyticsService, rentabilidad_mensual
+from core.analytics import AnalyticsService, meses_atras, rentabilidad_mensual
+from core.clock import now_local
 from core.ports.unit_of_work import UnitOfWork
 
 router = APIRouter(
@@ -107,11 +110,28 @@ def get_ranking(uow: UnitOfWork = Depends(get_unit_of_work)) -> list[RankingCome
 
 
 @router.get("/rentabilidad", response_model=list[RentabilidadMensualOut])
-def get_rentabilidad(uow: UnitOfWork = Depends(get_unit_of_work)):
-    """Return the last 12 calendar months, oldest first — ingresos, gastos, rentabilidad.
+def get_rentabilidad(
+    desde: date | None = None,
+    hasta: date | None = None,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+):
+    """Return every calendar month in [`desde`, `hasta`], oldest first.
 
-    Not built through `AnalyticsService`/`_analytics` — see
-    `core.analytics.rentabilidad_service`'s module docstring for why
+    Ingresos, gastos y rentabilidad por mes.
+
+    `desde`/`hasta` default to the last 12 calendar months ending today —
+    the Dashboard's own view and a custom report (reportes por rango de
+    fechas, 2026-08-14) are the same endpoint with different query params,
+    not two code paths. Not built through `AnalyticsService`/`_analytics`
+    — see `core.analytics.rentabilidad_service`'s module docstring for why
     `gastos` stays out of that class's constructor.
     """
-    return rentabilidad_mensual(uow.pautas.list_all(), uow.gastos.list_all())
+    hasta_final = hasta or now_local().date()
+    if desde is None:
+        anio_desde, mes_desde = meses_atras(hasta_final.year, hasta_final.month, 11)
+        desde_final = date(anio_desde, mes_desde, 1)
+    else:
+        desde_final = desde
+    return rentabilidad_mensual(
+        uow.pautas.list_all(), uow.gastos.list_all(), desde=desde_final, hasta=hasta_final
+    )

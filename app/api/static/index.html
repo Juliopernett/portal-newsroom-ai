@@ -196,7 +196,17 @@
                pérdida) -- más arriba que el ranking de clientes o los
                indicadores secundarios, que son detalle, no el resumen. -->
           <h3 class="section-subtitle">Rentabilidad mensual</h3>
-          <p class="page-subtitle">Últimos 12 meses — ingresos cobrados menos gastos registrados</p>
+          <div class="report-filter-row">
+            <label>Desde
+              <input type="date" id="rentabilidad-desde">
+            </label>
+            <label>Hasta
+              <input type="date" id="rentabilidad-hasta">
+            </label>
+            <button type="button" id="rentabilidad-limpiar" class="btn btn-secondary">Últimos 12 meses</button>
+            <button type="button" id="rentabilidad-csv" class="btn btn-secondary">Descargar CSV</button>
+          </div>
+          <p class="page-subtitle" id="rentabilidad-subtitulo">Últimos 12 meses — ingresos cobrados menos gastos registrados</p>
           <div class="chart-card">
             <div class="chart-card-header">
               <h4 class="chart-card-title">Ingresos vs. gastos</h4>
@@ -425,6 +435,22 @@
             autocomplete="off"
           >
         </div>
+
+        <!-- Reporte de Pautas por rango de fechas -- sin rango, la lista
+             de siempre (solo vigentes); con rango, cualquier pauta cuyo
+             fecha_inicio caiga ahí (vigente o vencida, ver contratosEnReporte
+             en app.js), más el resumen y el CSV. -->
+        <div class="report-filter-row">
+          <label>Desde
+            <input type="date" id="contratos-desde">
+          </label>
+          <label>Hasta
+            <input type="date" id="contratos-hasta">
+          </label>
+          <button type="button" id="contratos-limpiar" class="btn btn-secondary">Solo vigentes</button>
+          <button type="button" id="contratos-csv" class="btn btn-secondary">Descargar CSV</button>
+        </div>
+        <p class="page-subtitle" id="contratos-resumen" hidden></p>
 
         <div id="lista-contratos" class="contract-grid"></div>
       </section>

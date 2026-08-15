@@ -245,3 +245,42 @@ def test_rentabilidad_includes_ingresos_and_gastos_for_the_current_month(
     assert mes_actual["ingresos"] == "100000.00"
     assert mes_actual["gastos"] == "30000.00"
     assert mes_actual["rentabilidad"] == "70000.00"
+
+
+def test_rentabilidad_accepts_a_custom_date_range(client: TestClient) -> None:
+    response = client.get(
+        "/dashboard/rentabilidad", params={"desde": "2026-01-01", "hasta": "2026-03-31"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [(item["anio"], item["mes"]) for item in body] == [
+        (2026, 1),
+        (2026, 2),
+        (2026, 3),
+    ]
+
+
+def test_rentabilidad_custom_range_only_sums_within_it(client: TestClient) -> None:
+    client_id = _create_client(client)
+    _create_pauta(
+        client,
+        client_id,
+        fecha_inicio="2026-01-01",
+        fecha_fin="2026-01-31",
+        fecha_pago="2026-01-15",
+        valor_pagado="100000.00",
+    )
+    client.post(
+        "/gastos",
+        json={"descripcion": "Fuera de rango", "valor": "50000.00", "fecha": "2026-06-15"},
+    )
+
+    response = client.get(
+        "/dashboard/rentabilidad", params={"desde": "2026-01-01", "hasta": "2026-01-31"}
+    )
+
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["ingresos"] == "100000.00"
+    assert body[0]["gastos"] == "0"
