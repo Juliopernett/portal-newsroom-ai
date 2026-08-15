@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SelectNative } from '@/components/ui/select-native'
@@ -139,14 +140,11 @@ export function PautaForm({
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="pauta-valor">Valor pagado</Label>
-        <Input
+        <CurrencyInput
           id="pauta-valor"
-          type="number"
-          min="0"
-          step="0.01"
           required
           value={form.valor_pagado}
-          onChange={(e) => setForm({ ...form, valor_pagado: e.target.value })}
+          onValueChange={(digits) => setForm({ ...form, valor_pagado: digits })}
         />
       </div>
       <div className="flex flex-col gap-2">

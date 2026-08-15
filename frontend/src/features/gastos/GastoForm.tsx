@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { Gasto, GastoInput } from './api'
@@ -43,14 +44,11 @@ export function GastoForm({
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="gasto-valor">Valor</Label>
-        <Input
+        <CurrencyInput
           id="gasto-valor"
-          type="number"
-          min="0"
-          step="0.01"
           required
           value={form.valor}
-          onChange={(e) => setForm({ ...form, valor: e.target.value })}
+          onValueChange={(digits) => setForm({ ...form, valor: digits })}
         />
       </div>
       <div className="flex flex-col gap-2">
