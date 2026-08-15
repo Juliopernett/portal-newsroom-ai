@@ -4,19 +4,20 @@ Run locally with:
 
     uvicorn app.api.main:app --reload
 
-Then open http://127.0.0.1:8000/ — the Excel-replacement UI (Sprint
-3D-UI) lives at `/ui/`, served as static files from the same app so it
-never needs CORS. No custom OpenAPI — FastAPI's default `/docs` is enough
-for a first internal interface, per this sprint's explicit scope.
+Then open http://127.0.0.1:8000/ — the React frontend (`frontend/`,
+built to `frontend/dist/` at Docker build time) is served from the same
+app so it never needs CORS. No custom OpenAPI — FastAPI's default
+`/docs` is enough for a first internal interface, per this sprint's
+explicit scope.
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, Response
 
 from app.api.errors import register_exception_handlers
 from app.api.routers import (
@@ -30,7 +31,8 @@ from app.api.routers import (
     reportes,
 )
 
-STATIC_DIR = Path(__file__).parent / "static"
+FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
+FRONTEND_INDEX = FRONTEND_DIST / "index.html"
 
 app = FastAPI(title="Portal Newsroom AI — Commercial Core API")
 
@@ -45,10 +47,36 @@ app.include_router(pautas.router)
 app.include_router(publication_requests.router)
 app.include_router(reportes.router)
 
-app.mount("/ui", StaticFiles(directory=STATIC_DIR, html=True), name="ui")
+# Some React Router client routes share their exact top-level path with an
+# API router prefix (`/gastos`, `/reportes`) — the same collision the dev
+# Vite proxy resolves in `frontend/vite.config.ts::backendProxy()`. There's
+# only one origin in production, so this middleware does the equivalent
+# job: a real static file on disk always wins (JS/CSS bundle, favicon...);
+# otherwise, a real browser navigation (`Accept: text/html`) gets the SPA
+# shell so React Router can take over — UNLESS the path is one that must
+# always reach a router (a CSV download, a media file stream: both opened
+# via `target="_blank"`, which is *also* a full-page `text/html` request,
+# so Accept alone can't tell them apart from a page visit).
+_ALWAYS_BACKEND_PREFIXES = ("/publication-requests", "/docs", "/redoc", "/openapi.json")
+_HAS_FILE_EXTENSION = re.compile(r"\.[A-Za-z0-9]{2,5}$")
 
 
-@app.get("/", include_in_schema=False)
-def redirect_to_ui() -> RedirectResponse:
-    """Send a bare visit to the app straight to the UI, not an empty JSON root."""
-    return RedirectResponse(url="/ui/")
+@app.middleware("http")
+async def serve_frontend(request: Request, call_next) -> Response:
+    if request.method != "GET" or not FRONTEND_INDEX.exists():
+        return await call_next(request)
+
+    path = request.url.path
+    if path.startswith(_ALWAYS_BACKEND_PREFIXES):
+        return await call_next(request)
+
+    if path != "/":
+        candidate = (FRONTEND_DIST / path.lstrip("/")).resolve()
+        if candidate.is_file() and candidate.is_relative_to(FRONTEND_DIST.resolve()):
+            return FileResponse(candidate)
+
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and not _HAS_FILE_EXTENSION.search(path):
+        return FileResponse(FRONTEND_INDEX)
+
+    return await call_next(request)
