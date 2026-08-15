@@ -48,23 +48,26 @@ export function ActividadReciente({
     .slice(0, LIMITE)
 
   return (
-    <aside className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
+    <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 text-sm font-medium">
         <span className="size-2 animate-pulse rounded-full bg-success" />
         Actividad reciente
       </div>
-      {eventos.length === 0 ? (
-        <p className="p-4 text-center text-sm text-muted-foreground">🕐 Sin actividad todavía.</p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {eventos.map((e, i) => (
-            <div key={i} className="flex items-start gap-2 text-xs">
-              <span className="shrink-0 text-muted-foreground">{formatHoras(horasEnEspera(e.fecha))}</span>
-              <span>{e.texto}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </aside>
+      <aside className="rounded-lg border border-border bg-card p-3">
+        {eventos.length === 0 ? (
+          <p className="p-4 text-center text-sm text-muted-foreground">🕐 Sin actividad todavía.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {eventos.map((e, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs">
+                <span className="w-20 shrink-0 text-muted-foreground">{formatHoras(horasEnEspera(e.fecha))}</span>
+                <span className="h-4 w-px shrink-0 bg-border" />
+                <span className="pl-1">{e.texto}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </aside>
+    </div>
   )
 }
