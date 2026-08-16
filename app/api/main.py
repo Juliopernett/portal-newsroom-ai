@@ -26,6 +26,7 @@ from app.api.routers import (
     dashboard,
     gastos,
     insights,
+    otros_ingresos,
     pautas,
     publication_requests,
     reportes,
@@ -43,6 +44,7 @@ app.include_router(clients.router)
 app.include_router(dashboard.router)
 app.include_router(gastos.router)
 app.include_router(insights.router)
+app.include_router(otros_ingresos.router)
 app.include_router(pautas.router)
 app.include_router(publication_requests.router)
 app.include_router(reportes.router)

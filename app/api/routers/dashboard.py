@@ -128,5 +128,9 @@ def get_rentabilidad(
     """
     desde_final, hasta_final = rango_por_defecto(desde, hasta, now_local().date())
     return rentabilidad_mensual(
-        uow.pautas.list_all(), uow.gastos.list_all(), desde=desde_final, hasta=hasta_final
+        uow.pautas.list_all(),
+        uow.gastos.list_all(),
+        uow.otros_ingresos.list_all(),
+        desde=desde_final,
+        hasta=hasta_final,
     )

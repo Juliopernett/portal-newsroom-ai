@@ -44,7 +44,7 @@ const NAV_GROUPS = [
   {
     label: 'Finanzas',
     items: [
-      { to: '/gastos', label: 'Gastos', icon: Wallet, end: false },
+      { to: '/gastos', label: 'Ingresos y gastos', icon: Wallet, end: false },
       { to: '/reportes', label: 'Reportes', icon: Download, end: false },
     ],
   },

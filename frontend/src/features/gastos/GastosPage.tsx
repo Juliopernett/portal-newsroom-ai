@@ -16,10 +16,15 @@ import {
 import { formatFecha, formatMoneda } from '@/lib/format'
 import { gastosApi, type Gasto, type GastoInput } from './api'
 import { GastoForm } from './GastoForm'
+import { otrosIngresosApi, type OtroIngreso, type OtroIngresoInput } from './otrosIngresosApi'
+import { OtroIngresoForm } from './OtroIngresoForm'
 
 const GASTOS_KEY = ['gastos']
+const OTROS_INGRESOS_KEY = ['otros-ingresos']
 
-export function GastosPage() {
+type FinanzasTab = 'gastos' | 'ingresos'
+
+function GastosPanel() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -82,12 +87,9 @@ export function GastosPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold">Gastos</h1>
-          <p className="text-sm text-muted-foreground">
-            Gastos operativos — alimentan la rentabilidad mensual del Dashboard
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Gastos operativos — alimentan la rentabilidad mensual del Dashboard
+        </p>
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={openNew}>
             <Plus /> Nuevo gasto
@@ -163,6 +165,199 @@ export function GastosPage() {
           />
         </SheetContent>
       </Sheet>
+    </div>
+  )
+}
+
+function OtrosIngresosPanel() {
+  const queryClient = useQueryClient()
+  const [search, setSearch] = useState('')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editing, setEditing] = useState<OtroIngreso | null>(null)
+
+  const ingresosQuery = useQuery({ queryKey: OTROS_INGRESOS_KEY, queryFn: otrosIngresosApi.list })
+
+  const createMutation = useMutation({
+    mutationFn: otrosIngresosApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: OTROS_INGRESOS_KEY })
+      setSheetOpen(false)
+      toast.success('Ingreso registrado.')
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: OtroIngresoInput) => otrosIngresosApi.update(editing!.id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: OTROS_INGRESOS_KEY })
+      setSheetOpen(false)
+      toast.success('Ingreso actualizado.')
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: otrosIngresosApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: OTROS_INGRESOS_KEY })
+      toast.success('Ingreso eliminado.')
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
+  const ingresosFiltrados = useMemo(() => {
+    const ingresos = ingresosQuery.data ?? []
+    const ordenados = [...ingresos].sort((a, b) => b.fecha_cobro.localeCompare(a.fecha_cobro))
+    const termino = search.trim().toLowerCase()
+    if (!termino) return ordenados
+    return ordenados.filter((i) => i.origen.toLowerCase().includes(termino))
+  }, [ingresosQuery.data, search])
+
+  function openNew() {
+    setEditing(null)
+    createMutation.reset()
+    updateMutation.reset()
+    setSheetOpen(true)
+  }
+
+  function openEdit(ingreso: OtroIngreso) {
+    setEditing(ingreso)
+    createMutation.reset()
+    updateMutation.reset()
+    setSheetOpen(true)
+  }
+
+  const activeMutation = editing ? updateMutation : createMutation
+  const mutationError = activeMutation.error instanceof ApiError ? activeMutation.error.message : null
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-sm text-muted-foreground">
+          Ingresos que no vienen de una pauta (Facebook, AdSense…) — también suman en la
+          rentabilidad mensual del Dashboard
+        </p>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={openNew}>
+            <Plus /> Nuevo ingreso
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Actualizar"
+            onClick={() => ingresosQuery.refetch()}
+          >
+            <RefreshCw className={ingresosQuery.isFetching ? 'animate-spin' : ''} />
+          </Button>
+        </div>
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por origen…"
+          className="pl-9"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
+        {ingresosQuery.isLoading ? (
+          <p className="p-6 text-center text-sm text-muted-foreground">Cargando…</p>
+        ) : ingresosFiltrados.length === 0 ? (
+          <p className="p-6 text-center text-sm text-muted-foreground">
+            {search.trim()
+              ? 'No se encontraron ingresos con ese criterio.'
+              : 'Todavía no hay ingresos registrados.'}
+          </p>
+        ) : (
+          ingresosFiltrados.map((ingreso) => (
+            <div key={ingreso.id} className="flex items-center gap-4 px-4 py-3 text-sm">
+              <span className="flex-1 truncate">{ingreso.origen}</span>
+              {ingreso.monto_usd && (
+                <span className="w-20 shrink-0 text-muted-foreground">
+                  US${Number(ingreso.monto_usd).toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                </span>
+              )}
+              <span className="w-24 shrink-0 text-muted-foreground">{formatFecha(ingreso.fecha_cobro)}</span>
+              <span className="w-28 shrink-0 text-right font-medium">{formatMoneda(ingreso.monto)}</span>
+              <span className="flex shrink-0 items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={() => openEdit(ingreso)}>
+                  <Pencil /> Editar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-danger hover:text-danger"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => deleteMutation.mutate(ingreso.id)}
+                >
+                  <X /> Eliminar
+                </Button>
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{editing ? 'Editar ingreso' : 'Nuevo ingreso'}</SheetTitle>
+            <SheetDescription>
+              {editing
+                ? 'Actualiza los datos de este ingreso.'
+                : 'Registra un ingreso recibido fuera de una pauta.'}
+            </SheetDescription>
+          </SheetHeader>
+          <OtroIngresoForm
+            ingreso={editing}
+            onSubmit={(payload) =>
+              editing ? updateMutation.mutate(payload) : createMutation.mutate(payload)
+            }
+            isSubmitting={activeMutation.isPending}
+            error={mutationError}
+          />
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
+
+export function GastosPage() {
+  const [tab, setTab] = useState<FinanzasTab>('gastos')
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-lg font-semibold">Gastos e ingresos</h1>
+      </div>
+
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Tipo de movimiento">
+        {(
+          [
+            { id: 'gastos', label: 'Gastos' },
+            { id: 'ingresos', label: 'Otros ingresos' },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+              tab === t.id
+                ? 'border-brand bg-brand/10 text-foreground'
+                : 'border-border bg-card text-muted-foreground hover:bg-accent'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'gastos' ? <GastosPanel /> : <OtrosIngresosPanel />}
     </div>
   )
 }

@@ -20,6 +20,7 @@ from decimal import Decimal
 
 from core.analytics.view_models import RentabilidadMensualItem
 from core.entities.gasto import Gasto
+from core.entities.otro_ingreso import OtroIngreso
 from core.entities.pauta import Pauta
 
 
@@ -49,6 +50,7 @@ def rango_por_defecto(desde: date | None, hasta: date | None, hoy: date) -> tupl
 def rentabilidad_mensual(
     pautas: Sequence[Pauta],
     gastos: Sequence[Gasto],
+    otros_ingresos: Sequence[OtroIngreso] = (),
     *,
     desde: date,
     hasta: date,
@@ -62,14 +64,18 @@ def rentabilidad_mensual(
     `app.api.routers.dashboard.get_rentabilidad` for the default-range
     computation.
 
-    `ingresos` groups `Pauta.valor_pagado` by the month of `fecha_pago` —
-    the same "dinero ya cobrado" definition the dashboard's "Ingresos
+    `ingresos` groups `Pauta.valor_pagado` by the month of `fecha_pago`,
+    same as before, plus `OtroIngreso.monto` by the month of `fecha_cobro`
+    — money that reaches the portal outside any Pauta (Meta/AdSense
+    payouts) but is just as much "dinero ya cobrado" as a contract's. Both
+    are the same "dinero ya cobrado" definition the dashboard's "Ingresos
     último mes"/"Pautado este mes" already use (see
     `app.api.static.app.js::calcularIngresosDelMes`), not `fecha_inicio`.
-    `gastos` groups `Gasto.valor` by the month of `Gasto.fecha`. Months
-    with no ingresos or no gastos still appear, at zero — a report that
-    silently skipped an empty month would look like missing data, not a
-    quiet month.
+    `otros_ingresos` defaults to `()` so every existing caller (and every
+    existing test) keeps working unchanged. `gastos` groups `Gasto.valor`
+    by the month of `Gasto.fecha`. Months with no ingresos or no gastos
+    still appear, at zero — a report that silently skipped an empty month
+    would look like missing data, not a quiet month.
     """
     meses_rango: list[tuple[int, int]] = []
     anio, mes = desde.year, desde.month
@@ -84,6 +90,9 @@ def rentabilidad_mensual(
     for pauta in pautas:
         clave = (pauta.fecha_pago.year, pauta.fecha_pago.month)
         ingresos_por_mes[clave] += pauta.valor_pagado
+    for otro in otros_ingresos:
+        clave = (otro.fecha_cobro.year, otro.fecha_cobro.month)
+        ingresos_por_mes[clave] += otro.monto
 
     gastos_por_mes: dict[tuple[int, int], Decimal] = defaultdict(lambda: Decimal("0"))
     for gasto in gastos:

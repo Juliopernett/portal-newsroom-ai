@@ -66,7 +66,11 @@ def descargar_rentabilidad_csv(
     """
     desde_final, hasta_final = rango_por_defecto(desde, hasta, now_local().date())
     items = rentabilidad_mensual(
-        uow.pautas.list_all(), uow.gastos.list_all(), desde=desde_final, hasta=hasta_final
+        uow.pautas.list_all(),
+        uow.gastos.list_all(),
+        uow.otros_ingresos.list_all(),
+        desde=desde_final,
+        hasta=hasta_final,
     )
     filas = [[f"{item.anio}-{item.mes:02d}", item.ingresos, item.gastos, item.rentabilidad] for item in items]
     return _csv_response(
