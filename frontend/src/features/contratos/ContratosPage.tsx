@@ -170,7 +170,7 @@ export function ContratosPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Estado del contrato">
           {ESTADO_TABS.map((tab) => (
             <button
@@ -192,7 +192,7 @@ export function ContratosPage() {
             </button>
           ))}
         </div>
-        <div className="relative max-w-sm flex-1 sm:flex-none">
+        <div className="relative w-full sm:max-w-sm">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por cliente…"

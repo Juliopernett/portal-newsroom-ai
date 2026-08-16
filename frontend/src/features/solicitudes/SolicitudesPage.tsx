@@ -30,6 +30,7 @@ export function SolicitudesPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const [form, setForm] = useState(EMPTY_FORM)
+  const [formAbierto, setFormAbierto] = useState(false)
   const [adjuntoAbierto, setAdjuntoAbierto] = useState(false)
   const [archivo, setArchivo] = useState<File | null>(null)
   const [busqueda, setBusqueda] = useState('')
@@ -67,7 +68,10 @@ export function SolicitudesPage() {
     if (state?.prefillClientId && pautasQuery.data) {
       const pauta = pautasVigentes.find((p) => p.client_id === state.prefillClientId)
       if (pauta) setForm((f) => ({ ...f, pautaId: pauta.id }))
-      textoRef.current?.focus()
+      setFormAbierto(true)
+      // The form (and its textarea) only mounts once formAbierto flips —
+      // deferred so this runs after that render commits, not before.
+      setTimeout(() => textoRef.current?.focus(), 0)
       navigate(location.pathname, { replace: true, state: null })
     }
   }, [location.state, location.pathname, navigate, pautasQuery.data, pautasVigentes])
@@ -223,98 +227,115 @@ export function SolicitudesPage() {
         />
       )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-lg border border-border p-3">
-        <div className="flex flex-wrap gap-2">
-          <PautaCombobox
-            pautas={pautasVigentes}
-            clientesById={clientesById}
-            value={form.pautaId}
-            onChange={(pautaId) => setForm({ ...form, pautaId, clienteId: pautaId ? '' : form.clienteId })}
-          />
-          {!form.pautaId && (
-            <ClienteCombobox
-              clients={clientsQuery.data ?? []}
-              value={form.clienteId}
-              onChange={(clienteId) => setForm({ ...form, clienteId })}
-            />
-          )}
-          <Input
-            className="min-w-[16rem] flex-1"
-            placeholder="Título (opcional)"
-            value={form.titulo}
-            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-          />
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.prioridad}
-              onChange={(e) => setForm({ ...form, prioridad: e.target.checked })}
-            />
-            Prioridad
-          </label>
-        </div>
-
-        {pautaSeleccionada && (
-          <div className="flex flex-wrap items-center gap-3 rounded-md bg-muted p-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">
-              {clientesById.get(pautaSeleccionada.client_id) ?? '(cliente desconocido)'}
-            </span>
-            <span>{PAUTA_TIPO_LABELS[pautaSeleccionada.tipo]}</span>
-            <span>
-              {formatFecha(pautaSeleccionada.fecha_inicio)} – {formatFecha(pautaSeleccionada.fecha_fin)}
-            </span>
-            <span>
-              {pautaSeleccionada.publicaciones_restantes}/{pautaSeleccionada.publicaciones_contratadas} restantes
-            </span>
-            <span>{formatMoneda(pautaSeleccionada.valor_pagado)}</span>
-          </div>
-        )}
-
-        <Textarea
-          ref={textoRef}
-          required
-          rows={2}
-          placeholder="Pegar texto de la publicación… (Ctrl/Cmd+Enter para enviar)"
-          value={form.texto}
-          onChange={(e) => setForm({ ...form, texto: e.target.value })}
-          onKeyDown={handleTextoKeyDown}
-        />
-
-        {!adjuntoAbierto ? (
-          <button
-            type="button"
-            className="flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setAdjuntoAbierto(true)}
-          >
-            <Paperclip className="size-3.5" /> Adjuntar material (opcional)
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Paperclip className="size-4 shrink-0 text-muted-foreground" />
-            <input
-              type="file"
-              accept="image/*,video/*"
-              className="text-xs"
-              onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
-            />
+      {!formAbierto ? (
+        <Button className="self-start" onClick={() => setFormAbierto(true)}>
+          <Plus /> Nueva solicitud
+        </Button>
+      ) : (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Nueva solicitud</span>
             <button
               type="button"
+              aria-label="Cerrar"
               className="text-muted-foreground hover:text-foreground"
-              aria-label="Quitar adjunto"
-              onClick={() => {
-                setArchivo(null)
-                setAdjuntoAbierto(false)
-              }}
+              onClick={() => setFormAbierto(false)}
             >
-              <X className="size-3.5" />
+              <X className="size-4" />
             </button>
           </div>
-        )}
+          <div className="flex flex-wrap gap-2">
+            <PautaCombobox
+              pautas={pautasVigentes}
+              clientesById={clientesById}
+              value={form.pautaId}
+              onChange={(pautaId) => setForm({ ...form, pautaId, clienteId: pautaId ? '' : form.clienteId })}
+            />
+            {!form.pautaId && (
+              <ClienteCombobox
+                clients={clientsQuery.data ?? []}
+                value={form.clienteId}
+                onChange={(clienteId) => setForm({ ...form, clienteId })}
+              />
+            )}
+            <Input
+              className="min-w-[16rem] flex-1"
+              placeholder="Título (opcional)"
+              value={form.titulo}
+              onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+            />
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.prioridad}
+                onChange={(e) => setForm({ ...form, prioridad: e.target.checked })}
+              />
+              Prioridad
+            </label>
+          </div>
 
-        <Button type="submit" disabled={createMutation.isPending} className="self-start">
-          <Plus /> {createMutation.isPending ? 'Registrando…' : 'Registrar'}
-        </Button>
-      </form>
+          {pautaSeleccionada && (
+            <div className="flex flex-wrap items-center gap-3 rounded-md bg-muted p-2 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {clientesById.get(pautaSeleccionada.client_id) ?? '(cliente desconocido)'}
+              </span>
+              <span>{PAUTA_TIPO_LABELS[pautaSeleccionada.tipo]}</span>
+              <span>
+                {formatFecha(pautaSeleccionada.fecha_inicio)} – {formatFecha(pautaSeleccionada.fecha_fin)}
+              </span>
+              <span>
+                {pautaSeleccionada.publicaciones_restantes}/{pautaSeleccionada.publicaciones_contratadas} restantes
+              </span>
+              <span>{formatMoneda(pautaSeleccionada.valor_pagado)}</span>
+            </div>
+          )}
+
+          <Textarea
+            ref={textoRef}
+            required
+            rows={2}
+            placeholder="Pegar texto de la publicación… (Ctrl/Cmd+Enter para enviar)"
+            value={form.texto}
+            onChange={(e) => setForm({ ...form, texto: e.target.value })}
+            onKeyDown={handleTextoKeyDown}
+          />
+
+          {!adjuntoAbierto ? (
+            <button
+              type="button"
+              className="flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setAdjuntoAbierto(true)}
+            >
+              <Paperclip className="size-3.5" /> Adjuntar material (opcional)
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Paperclip className="size-4 shrink-0 text-muted-foreground" />
+              <input
+                type="file"
+                accept="image/*,video/*"
+                className="text-xs"
+                onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+              />
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Quitar adjunto"
+                onClick={() => {
+                  setArchivo(null)
+                  setAdjuntoAbierto(false)
+                }}
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+
+          <Button type="submit" disabled={createMutation.isPending} className="self-start">
+            <Plus /> {createMutation.isPending ? 'Registrando…' : 'Registrar'}
+          </Button>
+        </form>
+      )}
 
       <div className="relative max-w-sm">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
