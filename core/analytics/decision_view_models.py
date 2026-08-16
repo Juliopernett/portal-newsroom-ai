@@ -68,6 +68,7 @@ class AlertaTipo(StrEnum):
     SIN_ACTIVIDAD_RECIENTE = "sin_actividad_reciente"
     MATERIAL_RECIBIDO = "material_recibido"
     RIESGO_ABANDONO = "riesgo_abandono"
+    CUENTA_POR_COBRAR = "cuenta_por_cobrar"
     SOLICITUD_ANTIGUA = "solicitud_antigua"
 
 
@@ -82,6 +83,7 @@ class AccionSugerida(StrEnum):
 
     RENOVAR = "renovar"
     CONTACTAR = "contactar"
+    COBRAR = "cobrar"
     REACTIVAR = "reactivar"
     VER_CLIENTE = "ver_cliente"
     VER_SOLICITUDES = "ver_solicitudes"

@@ -8,6 +8,7 @@ export type AlertaSeveridad = 'critica' | 'atencion' | 'informativa'
 export type AccionSugerida =
   | 'renovar'
   | 'contactar'
+  | 'cobrar'
   | 'reactivar'
   | 'ver_cliente'
   | 'ver_solicitudes'

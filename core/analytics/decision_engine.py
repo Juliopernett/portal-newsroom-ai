@@ -113,7 +113,8 @@ _ORDEN_TIPO: dict[AlertaTipo, int] = {
     AlertaTipo.SIN_ACTIVIDAD_RECIENTE: 3,
     AlertaTipo.MATERIAL_RECIBIDO: 4,
     AlertaTipo.RIESGO_ABANDONO: 5,
-    AlertaTipo.SOLICITUD_ANTIGUA: 6,
+    AlertaTipo.CUENTA_POR_COBRAR: 6,
+    AlertaTipo.SOLICITUD_ANTIGUA: 7,
 }
 
 
@@ -481,10 +482,14 @@ class DecisionEngineService:
         sub-umbrales hoy/<=3 días/<=7 días), menos de 3 restantes, "hace N
         días no publica" (nuevo — ventana 5-14 días, ver
         `_UMBRAL_NO_PUBLICA_DIAS`), "ya envió material" (nuevo, últimas
-        24h), riesgo de abandono (nuevo, >=15 días) y solicitudes
-        antiguas. Un Client ya cubierto por una categoría más severa no se
-        repite en "menos de 3 restantes" ni en "hace N días no publica" —
-        cada uno aparece una sola vez con su señal más urgente.
+        24h), riesgo de abandono (nuevo, >=15 días), cuentas por cobrar
+        (una Pauta con saldo_pendiente > 0 — ver `cuentas_por_cobrar`) y
+        solicitudes antiguas. Un Client ya cubierto por una categoría más
+        severa no se repite en "menos de 3 restantes" ni en "hace N días
+        no publica" — cada uno aparece una sola vez con su señal más
+        urgente. Cuentas por cobrar is per-Pauta, not per-Client, and
+        orthogonal to quota/timing — never deduped via `ids_cubiertos`,
+        same as riesgo de abandono.
         """
         alertas: list[AlertaInteligente] = []
         ids_cubiertos: set[str] = set()
@@ -608,6 +613,18 @@ class DecisionEngineService:
                     cliente=riesgo.cliente,
                     accion=AccionSugerida.CONTACTAR,
                     dias=riesgo.dias_sin_actividad,
+                )
+            )
+
+        for cobrar in self.cuentas_por_cobrar():
+            monto = f"${cobrar.saldo_pendiente:,.0f}".replace(",", ".")
+            alertas.append(
+                AlertaInteligente(
+                    tipo=AlertaTipo.CUENTA_POR_COBRAR,
+                    severidad=AlertaSeveridad.CRITICA,
+                    mensaje=f"{cobrar.cliente.nombre}: debe {monto} de su plan {cobrar.tipo.value}.",
+                    cliente=cobrar.cliente,
+                    accion=AccionSugerida.COBRAR,
                 )
             )
 

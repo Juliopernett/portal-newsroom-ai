@@ -95,7 +95,15 @@ export function ContactarButton({ telefono, mensaje }: { telefono: string; mensa
   )
 }
 
-export function AccionSugeridaButtons({ cliente, accion }: { cliente: Client | null; accion: AccionSugerida }) {
+export function AccionSugeridaButtons({
+  cliente,
+  accion,
+  mensaje,
+}: {
+  cliente: Client | null
+  accion: AccionSugerida
+  mensaje: string
+}) {
   const navigate = useNavigate()
   return (
     <>
@@ -106,6 +114,12 @@ export function AccionSugeridaButtons({ cliente, accion }: { cliente: Client | n
         <ContactarButton
           telefono={cliente.telefono}
           mensaje={`Hola ${cliente.nombre}, te escribimos de Portal Vallenato — ¿tienes alguna publicación para programar?`}
+        />
+      )}
+      {accion === 'cobrar' && cliente && (
+        <ContactarButton
+          telefono={cliente.telefono}
+          mensaje={`Hola ${cliente.nombre}, te escribimos de Portal Vallenato — ${mensaje.replace(`${cliente.nombre}: `, '')} ¿Puedes completar el pago?`}
         />
       )}
       {accion === 'ver_solicitudes' && (

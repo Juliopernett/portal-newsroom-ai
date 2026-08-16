@@ -137,7 +137,9 @@ export function AlertasPage() {
                 emoji={SEVERIDAD_EMOJI[item.severidad]}
                 severidad={item.severidad === 'critica' ? 'danger' : item.severidad === 'atencion' ? 'warning' : 'success'}
                 count={count}
-                actions={<AccionSugeridaButtons cliente={item.cliente} accion={item.accion} />}
+                actions={
+                  <AccionSugeridaButtons cliente={item.cliente} accion={item.accion} mensaje={item.mensaje} />
+                }
                 onDescartar={() => dismiss(centroAlertaKey(item))}
               >
                 {item.mensaje}
