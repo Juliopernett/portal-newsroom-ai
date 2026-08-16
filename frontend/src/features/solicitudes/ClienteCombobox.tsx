@@ -37,7 +37,7 @@ export function ClienteCombobox({
     <div ref={containerRef} className="relative w-full sm:w-64">
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
-        className="h-9 pr-7 pl-8 text-xs"
+        className="h-9 pr-7 pl-8 text-base sm:text-xs"
         placeholder="¿De quién es este material? (opcional)"
         value={displayValue}
         onFocus={() => {

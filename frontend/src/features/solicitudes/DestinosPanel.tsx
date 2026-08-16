@@ -162,7 +162,7 @@ export function DestinosPanel({ solicitudId }: { solicitudId: string }) {
 
       {disponibles.length > 0 && (
         <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
-          <SelectNative className="h-8 text-xs" value={canal} onChange={(e) => setCanal(e.target.value as CanalPublicacion)}>
+          <SelectNative className="h-8 text-base sm:text-xs" value={canal} onChange={(e) => setCanal(e.target.value as CanalPublicacion)}>
             <option value="">Agregar destino…</option>
             {disponibles.map((c) => (
               <option key={c.value} value={c.value}>

@@ -208,7 +208,7 @@ export function SolicitudCard({
           ) : (
             <>
               <SelectNative
-                className="h-8 w-auto max-w-[14rem] text-xs"
+                className="h-8 w-auto max-w-[14rem] text-base sm:text-xs"
                 value={selectedPautaId}
                 onChange={(e) => setSelectedPautaId(e.target.value)}
               >
