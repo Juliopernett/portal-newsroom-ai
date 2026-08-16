@@ -32,6 +32,12 @@ const REPORTS: ReportOption[] = [
     baseUrl: '/reportes/gastos.csv',
     helpText: 'Vacío = histórico completo. Ordenado por fecha.',
   },
+  {
+    value: 'otros-ingresos',
+    label: 'Otros ingresos',
+    baseUrl: '/reportes/otros-ingresos.csv',
+    helpText: 'Vacío = histórico completo. Ingresos recibidos fuera de una pauta (Facebook, AdSense…), ordenados por fecha de cobro.',
+  },
 ]
 
 export function ReportesPage() {

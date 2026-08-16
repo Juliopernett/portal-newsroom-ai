@@ -151,3 +151,39 @@ def descargar_gastos_csv(
     gastos.sort(key=lambda gasto: gasto.fecha)
     filas = [[gasto.fecha.isoformat(), gasto.descripcion, gasto.valor] for gasto in gastos]
     return _csv_response("gastos.csv", ["Fecha", "Descripción", "Valor"], filas)
+
+
+@router.get("/otros-ingresos.csv")
+def descargar_otros_ingresos_csv(
+    desde: date | None = None,
+    hasta: date | None = None,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> Response:
+    """OtroIngreso cuya `fecha_cobro` cae en el rango dado, ordenados por fecha.
+
+    Mismo patrón que `descargar_gastos_csv` — el contraparte de ingreso,
+    para poder auditar por separado lo que ya entra sumado (sin distinguir
+    origen) en `rentabilidad.csv`. Sin fechas, histórico completo.
+    """
+    ingresos = [
+        ingreso
+        for ingreso in uow.otros_ingresos.list_all()
+        if (desde is None or ingreso.fecha_cobro >= desde)
+        and (hasta is None or ingreso.fecha_cobro <= hasta)
+    ]
+    ingresos.sort(key=lambda ingreso: ingreso.fecha_cobro)
+    filas = [
+        [
+            ingreso.fecha_cobro.isoformat(),
+            ingreso.origen,
+            ingreso.monto,
+            ingreso.monto_usd if ingreso.monto_usd is not None else "",
+            ingreso.observaciones or "",
+        ]
+        for ingreso in ingresos
+    ]
+    return _csv_response(
+        "otros_ingresos.csv",
+        ["Fecha", "Origen", "Valor (COP)", "Valor (USD)", "Notas"],
+        filas,
+    )
