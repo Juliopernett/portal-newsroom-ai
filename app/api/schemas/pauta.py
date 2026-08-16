@@ -25,6 +25,7 @@ class PautaCreate(BaseModel):
     publicaciones_contratadas: int
     valor_pagado: Decimal
     fecha_pago: date
+    saldo_pendiente: Decimal = Decimal("0")
     observaciones: str | None = None
 
 
@@ -44,6 +45,7 @@ class PautaOut(BaseModel):
     publicaciones_contratadas: int
     valor_pagado: Decimal
     fecha_pago: date
+    saldo_pendiente: Decimal
     fecha_registro: datetime
     observaciones: str | None
     publicaciones_consumidas: int

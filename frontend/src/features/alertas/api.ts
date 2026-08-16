@@ -49,6 +49,14 @@ export interface ClienteDormido {
   ultimo_contrato_fecha_fin: string
 }
 
+export interface ClienteCuentaPorCobrar {
+  cliente: Client
+  pauta_id: string
+  saldo_pendiente: string
+  tipo: PautaTipo
+  fecha_fin: string
+}
+
 export interface OportunidadComercial {
   cliente: Client
   tipo: PatronComercialTipo
@@ -61,6 +69,7 @@ export interface OportunidadComercial {
 export const insightsApi = {
   centroAlertas: () => api.get<AlertaInteligente[]>('/insights/centro-alertas'),
   riesgoAbandono: () => api.get<ClienteRiesgoAbandono[]>('/insights/riesgo-abandono'),
+  cuentasPorCobrar: () => api.get<ClienteCuentaPorCobrar[]>('/insights/cuentas-por-cobrar'),
   dormidos: () => api.get<ClienteDormido[]>('/insights/dormidos'),
   saludClientes: () => api.get<ClienteScoreSalud[]>('/insights/salud-clientes'),
   oportunidades: () => api.get<OportunidadComercial[]>('/insights/oportunidades'),

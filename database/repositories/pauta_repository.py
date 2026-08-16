@@ -25,6 +25,7 @@ def _to_model(pauta: Pauta) -> PautaModel:
         publicaciones_contratadas=pauta.publicaciones_contratadas,
         valor_pagado=pauta.valor_pagado,
         fecha_pago=pauta.fecha_pago,
+        saldo_pendiente=pauta.saldo_pendiente,
         fecha_registro=pauta.fecha_registro,
         observaciones=pauta.observaciones,
     )
@@ -45,6 +46,7 @@ def _to_domain(model: PautaModel) -> Pauta:
         publicaciones_contratadas=model.publicaciones_contratadas,
         valor_pagado=model.valor_pagado,
         fecha_pago=model.fecha_pago,
+        saldo_pendiente=model.saldo_pendiente,
         fecha_registro=fecha_registro,
         observaciones=model.observaciones,
     )

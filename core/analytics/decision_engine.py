@@ -28,6 +28,7 @@ from core.analytics.decision_view_models import (
     AlertaInteligente,
     AlertaSeveridad,
     AlertaTipo,
+    ClienteCuentaPorCobrar,
     ClienteDormido,
     ClienteRiesgoAbandono,
     ClienteScoreSalud,
@@ -189,6 +190,34 @@ class DecisionEngineService:
                 )
             )
         resultado.sort(key=lambda item: item.dias_sin_actividad, reverse=True)
+        return resultado
+
+    def cuentas_por_cobrar(self) -> list[ClienteCuentaPorCobrar]:
+        """Return every Pauta with `saldo_pendiente > 0` — money owed, not yet collected.
+
+        One row per Pauta (a Client can owe on more than one), regardless
+        of whether that Pauta is still vigente — an expired plan can
+        still have an unpaid balance. Sorted by `saldo_pendiente`
+        descending, largest debts first.
+        """
+        clientes_por_id = {cliente.id: cliente for cliente in self._clients}
+        resultado = []
+        for pauta in self._pautas:
+            if pauta.saldo_pendiente <= 0:
+                continue
+            cliente = clientes_por_id.get(pauta.client_id)
+            if cliente is None:
+                continue
+            resultado.append(
+                ClienteCuentaPorCobrar(
+                    cliente=cliente,
+                    pauta_id=pauta.id,
+                    saldo_pendiente=pauta.saldo_pendiente,
+                    tipo=pauta.tipo,
+                    fecha_fin=pauta.fecha_fin,
+                )
+            )
+        resultado.sort(key=lambda item: item.saldo_pendiente, reverse=True)
         return resultado
 
     def clientes_dormidos(self, umbral_dias: int = _UMBRAL_DORMIDO_DIAS) -> list[ClienteDormido]:

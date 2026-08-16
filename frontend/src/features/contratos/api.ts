@@ -19,6 +19,7 @@ export interface Pauta {
   publicaciones_contratadas: number
   valor_pagado: string
   fecha_pago: string
+  saldo_pendiente: string
   fecha_registro: string
   observaciones: string | null
   publicaciones_consumidas: number
@@ -37,6 +38,7 @@ export interface PautaInput {
   publicaciones_contratadas: number
   valor_pagado: string
   fecha_pago: string
+  saldo_pendiente: string
   observaciones: string | null
 }
 

@@ -120,6 +120,25 @@ class ClienteRiesgoAbandono:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class ClienteCuentaPorCobrar:
+    """A `Pauta` with `saldo_pendiente > 0` — money owed, not yet collected.
+
+    One row per Pauta, not per Client — a Client can owe on more than one
+    plan. See `DecisionEngineService.cuentas_por_cobrar`. Unlike
+    `ClienteRiesgoAbandono`/`ClienteDormido`, this isn't a Sprint 5A
+    scoring judgment — `saldo_pendiente > 0` is a plain fact read straight
+    off the Pauta — but it lives here anyway so the Alertas screen has one
+    place to fetch every actionable list from.
+    """
+
+    cliente: Client
+    pauta_id: str
+    saldo_pendiente: Decimal
+    tipo: PautaTipo
+    fecha_fin: date
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ClienteDormido:
     """A `Client` with no vigente `Pauta` who has gone quiet for a long time.
 

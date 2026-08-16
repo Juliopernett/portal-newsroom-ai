@@ -15,6 +15,7 @@ from app.api.dependencies import get_current_user, get_unit_of_work
 from app.api.schemas.client import ClientOut
 from app.api.schemas.insights import (
     AlertaInteligenteOut,
+    ClienteCuentaPorCobrarOut,
     ClienteDormidoOut,
     ClienteRiesgoAbandonoOut,
     ClienteScoreSaludOut,
@@ -83,6 +84,24 @@ def get_riesgo_abandono(
             fecha_vencimiento=item.fecha_vencimiento,
         )
         for item in engine.clientes_riesgo_abandono()
+    ]
+
+
+@router.get("/cuentas-por-cobrar", response_model=list[ClienteCuentaPorCobrarOut])
+def get_cuentas_por_cobrar(
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> list[ClienteCuentaPorCobrarOut]:
+    """Return every Pauta with an unpaid balance, largest debt first."""
+    engine = _decision_engine(uow)
+    return [
+        ClienteCuentaPorCobrarOut(
+            cliente=ClientOut.model_validate(item.cliente),
+            pauta_id=item.pauta_id,
+            saldo_pendiente=item.saldo_pendiente,
+            tipo=item.tipo,
+            fecha_fin=item.fecha_fin,
+        )
+        for item in engine.cuentas_por_cobrar()
     ]
 
 

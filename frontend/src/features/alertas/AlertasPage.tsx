@@ -17,7 +17,7 @@ import {
 } from './components'
 import { ALERTAS_OPORTUNIDAD, SEVERIDAD_EMOJI, centroAlertaKey, computarRadarBuckets, useDismissedAlerts } from './utils'
 import { PAUTA_TIPO_LABELS } from '@/features/contratos/api'
-import { formatFecha } from '@/lib/format'
+import { formatFecha, formatMoneda } from '@/lib/format'
 
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
@@ -34,6 +34,7 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
 export function AlertasPage() {
   const centroQuery = useQuery({ queryKey: ['insights', 'centro-alertas'], queryFn: insightsApi.centroAlertas })
   const riesgoQuery = useQuery({ queryKey: ['insights', 'riesgo-abandono'], queryFn: insightsApi.riesgoAbandono })
+  const cobrarQuery = useQuery({ queryKey: ['insights', 'cuentas-por-cobrar'], queryFn: insightsApi.cuentasPorCobrar })
   const dormidosQuery = useQuery({ queryKey: ['insights', 'dormidos'], queryFn: insightsApi.dormidos })
   const saludQuery = useQuery({ queryKey: ['insights', 'salud-clientes'], queryFn: insightsApi.saludClientes })
   const oportunidadesQuery = useQuery({ queryKey: ['insights', 'oportunidades'], queryFn: insightsApi.oportunidades })
@@ -56,6 +57,7 @@ export function AlertasPage() {
   }, [centroQuery.data, isDismissed])
 
   const riesgoVisible = (riesgoQuery.data ?? []).filter((r) => !isDismissed(`riesgo::${r.cliente.id}`))
+  const cobrarVisible = (cobrarQuery.data ?? []).filter((c) => !isDismissed(`cobrar::${c.pauta_id}`))
   const dormidosVisible = (dormidosQuery.data ?? []).filter((d) => !isDismissed(`dormido::${d.cliente.id}`))
   const patronesVisible = (oportunidadesQuery.data ?? []).filter(
     (o) => !isDismissed(`patron::${o.cliente.id}::${o.tipo}`),
@@ -64,11 +66,13 @@ export function AlertasPage() {
   const sinNovedades =
     !centroQuery.isLoading &&
     !riesgoQuery.isLoading &&
+    !cobrarQuery.isLoading &&
     !dormidosQuery.isLoading &&
     !oportunidadesQuery.isLoading &&
     !rankingQuery.isLoading &&
     centroAgrupado.length === 0 &&
     riesgoVisible.length === 0 &&
+    cobrarVisible.length === 0 &&
     dormidosVisible.length === 0 &&
     patronesVisible.length === 0 &&
     buckets.every((b) => b.items.length === 0)
@@ -76,6 +80,7 @@ export function AlertasPage() {
   const isFetching =
     centroQuery.isFetching ||
     riesgoQuery.isFetching ||
+    cobrarQuery.isFetching ||
     dormidosQuery.isFetching ||
     saludQuery.isFetching ||
     oportunidadesQuery.isFetching ||
@@ -85,6 +90,7 @@ export function AlertasPage() {
   function refetchAll() {
     centroQuery.refetch()
     riesgoQuery.refetch()
+    cobrarQuery.refetch()
     dormidosQuery.refetch()
     saludQuery.refetch()
     oportunidadesQuery.refetch()
@@ -174,6 +180,37 @@ export function AlertasPage() {
               >
                 {item.cliente.nombre}: hace {item.dias_sin_actividad} días no envía material. Tiene{' '}
                 {item.publicaciones_restantes} publicaciones disponibles.
+              </ActionItem>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Cuentas por Cobrar" subtitle="Pautas con saldo pendiente — pagaron una parte y falta el resto.">
+        {cobrarQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">Cargando…</p>
+        ) : cobrarVisible.length === 0 ? (
+          <EmptyState emoji="✅" mensaje="Ningún cliente tiene saldo pendiente." />
+        ) : (
+          <div className="flex flex-col gap-2">
+            {cobrarVisible.map((item) => (
+              <ActionItem
+                key={item.pauta_id}
+                emoji="💰"
+                severidad="warning"
+                onDescartar={() => dismiss(`cobrar::${item.pauta_id}`)}
+                actions={
+                  <>
+                    <VerClienteButton clienteId={item.cliente.id} />
+                    <ContactarButton
+                      telefono={item.cliente.telefono}
+                      mensaje={`Hola ${item.cliente.nombre}, te escribimos de Portal Vallenato — tienes un saldo pendiente de ${formatMoneda(item.saldo_pendiente)} de tu plan ${PAUTA_TIPO_LABELS[item.tipo]}. ¿Puedes completar el pago?`}
+                    />
+                  </>
+                }
+              >
+                {item.cliente.nombre}: debe {formatMoneda(item.saldo_pendiente)} de su plan{' '}
+                {PAUTA_TIPO_LABELS[item.tipo]} ({formatFecha(item.fecha_fin)}).
               </ActionItem>
             ))}
           </div>

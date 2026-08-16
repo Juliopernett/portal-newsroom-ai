@@ -81,8 +81,8 @@ export function ReportesPage() {
           </SelectNative>
         </div>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="flex w-full flex-col gap-2 sm:w-auto">
             <Label htmlFor="reporte-desde">Desde</Label>
             <Input
               id="reporte-desde"
@@ -91,7 +91,7 @@ export function ReportesPage() {
               onChange={(e) => setDesde(e.target.value)}
             />
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto">
             <Label htmlFor="reporte-hasta">Hasta</Label>
             <Input
               id="reporte-hasta"
@@ -100,7 +100,7 @@ export function ReportesPage() {
               onChange={(e) => setHasta(e.target.value)}
             />
           </div>
-          <Button variant="secondary" asChild>
+          <Button variant="secondary" className="w-full sm:w-auto" asChild>
             <a href={href} target="_blank" rel="noopener">
               <Download /> Descargar CSV
             </a>

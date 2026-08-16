@@ -232,6 +232,11 @@ export function ClienteFicha({
                           {p.vigente ? 'Vigente' : 'Vencido'}
                         </span>
                       </p>
+                      {Number(p.saldo_pendiente) > 0 && (
+                        <p className="text-xs font-medium text-danger">
+                          Debe {formatMoneda(p.saldo_pendiente)}
+                        </p>
+                      )}
                     </div>
                     <Button
                       variant="ghost"

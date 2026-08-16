@@ -53,6 +53,16 @@ class ClienteRiesgoAbandonoOut(BaseModel):
     fecha_vencimiento: date
 
 
+class ClienteCuentaPorCobrarOut(BaseModel):
+    """One row of `GET /insights/cuentas-por-cobrar`."""
+
+    cliente: ClientOut
+    pauta_id: str
+    saldo_pendiente: Decimal
+    tipo: PautaTipo
+    fecha_fin: date
+
+
 class ClienteDormidoOut(BaseModel):
     """One row of `GET /insights/dormidos`."""
 

@@ -57,6 +57,15 @@ class Pauta:
     separate from `fecha_pago`/`fecha_inicio`/`fecha_fin`, which are all
     business dates the operator enters by hand — this one is assigned by
     the system itself and is never meant to be edited.
+
+    `saldo_pendiente` tracks a client who paid part of this Pauta and
+    still owes the rest — "cuentas por cobrar". Deliberately independent
+    of `valor_pagado`, which keeps meaning exactly what it always has
+    ("money already collected") so `peso_comercial` and every revenue
+    report built on it stay correct without change: this field is purely
+    informational until the debt is collected, at which point the
+    operator raises `valor_pagado` and lowers `saldo_pendiente` by hand —
+    no derived total, no automatic reconciliation.
     """
 
     id: str = field(default_factory=lambda: str(uuid4()))
@@ -66,6 +75,7 @@ class Pauta:
     publicaciones_contratadas: int
     valor_pagado: Decimal
     fecha_pago: date
+    saldo_pendiente: Decimal = Decimal("0")
     fecha_registro: datetime = field(default_factory=lambda: datetime.now(UTC))
     observaciones: str | None = None
 
@@ -81,6 +91,10 @@ class Pauta:
             )
         if self.valor_pagado < 0:
             raise ValueError(f"valor_pagado must not be negative, got {self.valor_pagado!r}")
+        if self.saldo_pendiente < 0:
+            raise ValueError(
+                f"saldo_pendiente must not be negative, got {self.saldo_pendiente!r}"
+            )
 
     @property
     def peso_comercial(self) -> Decimal:

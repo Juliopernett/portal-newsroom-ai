@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   DollarSign,
-  Download,
   Inbox,
   RefreshCw,
   Target,
@@ -95,13 +94,6 @@ export function DashboardPage() {
   const pendientes = resumen?.solicitudes_pendientes ?? 0
   const antiguas = alertasQuery.data?.solicitudes_antiguas.length ?? 0
   const rankingActivos = (rankingQuery.data ?? []).filter((i) => i.vigente)
-  const rentabilidadCsvHref = useMemo(() => {
-    const params = new URLSearchParams()
-    if (desde) params.set('desde', desde)
-    if (hasta) params.set('hasta', hasta)
-    const query = params.toString()
-    return `/reportes/rentabilidad.csv${query ? `?${query}` : ''}`
-  }, [desde, hasta])
 
   return (
     <div className="flex flex-col gap-8">
@@ -208,7 +200,7 @@ export function DashboardPage() {
                   </Button>
                 ))}
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex w-full flex-col gap-1 sm:w-auto">
                 <Label htmlFor="dashboard-rentabilidad-desde" className="text-xs">Desde</Label>
                 <Input
                   id="dashboard-rentabilidad-desde"
@@ -218,7 +210,7 @@ export function DashboardPage() {
                   onChange={(e) => setDesde(e.target.value)}
                 />
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex w-full flex-col gap-1 sm:w-auto">
                 <Label htmlFor="dashboard-rentabilidad-hasta" className="text-xs">Hasta</Label>
                 <Input
                   id="dashboard-rentabilidad-hasta"
@@ -240,11 +232,6 @@ export function DashboardPage() {
                   Últimos 12 meses
                 </Button>
               )}
-              <Button variant="outline" size="sm" asChild>
-                <a href={rentabilidadCsvHref} target="_blank" rel="noopener">
-                  <Download /> Descargar CSV
-                </a>
-              </Button>
             </div>
           </div>
           {rentabilidadQuery.isLoading ? (

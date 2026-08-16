@@ -30,5 +30,6 @@ class PautaModel(Base):
     publicaciones_contratadas: Mapped[int] = mapped_column(nullable=False)
     valor_pagado: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     fecha_pago: Mapped[date] = mapped_column(Date, nullable=False)
+    saldo_pendiente: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     fecha_registro: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     observaciones: Mapped[str | None] = mapped_column(String, nullable=True)

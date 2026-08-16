@@ -124,11 +124,11 @@ function GastosPanel() {
           </p>
         ) : (
           gastosFiltrados.map((gasto) => (
-            <div key={gasto.id} className="flex items-center gap-4 px-4 py-3 text-sm">
-              <span className="flex-1 truncate">{gasto.descripcion}</span>
-              <span className="w-24 shrink-0 text-muted-foreground">{formatFecha(gasto.fecha)}</span>
-              <span className="w-28 shrink-0 text-right font-medium">{formatMoneda(gasto.valor)}</span>
-              <span className="flex shrink-0 items-center gap-1">
+            <div key={gasto.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
+              <span className="w-full min-w-0 truncate sm:w-auto sm:flex-1">{gasto.descripcion}</span>
+              <span className="shrink-0 text-muted-foreground sm:w-24">{formatFecha(gasto.fecha)}</span>
+              <span className="shrink-0 font-medium sm:w-28 sm:text-right">{formatMoneda(gasto.valor)}</span>
+              <span className="ml-auto flex shrink-0 items-center gap-1">
                 <Button variant="ghost" size="sm" onClick={() => openEdit(gasto)}>
                   <Pencil /> Editar
                 </Button>
@@ -272,16 +272,16 @@ function OtrosIngresosPanel() {
           </p>
         ) : (
           ingresosFiltrados.map((ingreso) => (
-            <div key={ingreso.id} className="flex items-center gap-4 px-4 py-3 text-sm">
-              <span className="flex-1 truncate">{ingreso.origen}</span>
+            <div key={ingreso.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
+              <span className="w-full min-w-0 truncate sm:w-auto sm:flex-1">{ingreso.origen}</span>
               {ingreso.monto_usd && (
-                <span className="w-20 shrink-0 text-muted-foreground">
+                <span className="shrink-0 text-muted-foreground sm:w-20">
                   US${Number(ingreso.monto_usd).toLocaleString('en-US', { maximumFractionDigits: 2 })}
                 </span>
               )}
-              <span className="w-24 shrink-0 text-muted-foreground">{formatFecha(ingreso.fecha_cobro)}</span>
-              <span className="w-28 shrink-0 text-right font-medium">{formatMoneda(ingreso.monto)}</span>
-              <span className="flex shrink-0 items-center gap-1">
+              <span className="shrink-0 text-muted-foreground sm:w-24">{formatFecha(ingreso.fecha_cobro)}</span>
+              <span className="shrink-0 font-medium sm:w-28 sm:text-right">{formatMoneda(ingreso.monto)}</span>
+              <span className="ml-auto flex shrink-0 items-center gap-1">
                 <Button variant="ghost" size="sm" onClick={() => openEdit(ingreso)}>
                   <Pencil /> Editar
                 </Button>

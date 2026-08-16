@@ -45,6 +45,7 @@ def _to_out(pauta: Pauta, uow: UnitOfWork) -> PautaOut:
         publicaciones_contratadas=pauta.publicaciones_contratadas,
         valor_pagado=pauta.valor_pagado,
         fecha_pago=pauta.fecha_pago,
+        saldo_pendiente=pauta.saldo_pendiente,
         fecha_registro=pauta.fecha_registro,
         observaciones=pauta.observaciones,
         publicaciones_consumidas=service.publicaciones_consumidas(pauta, solicitudes, destinos),

@@ -17,6 +17,7 @@ function emptyForm(preselectClientId?: string): PautaInput {
     publicaciones_contratadas: 1,
     valor_pagado: '',
     fecha_pago: '',
+    saldo_pendiente: '0',
     observaciones: '',
   }
 }
@@ -50,6 +51,7 @@ export function PautaForm({
             publicaciones_contratadas: pauta.publicaciones_contratadas,
             valor_pagado: pauta.valor_pagado,
             fecha_pago: pauta.fecha_pago,
+            saldo_pendiente: pauta.saldo_pendiente,
             observaciones: pauta.observaciones ?? '',
           }
         : emptyForm(preselectClientId),
@@ -72,7 +74,11 @@ export function PautaForm({
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    onSubmit({ ...form, observaciones: form.observaciones?.trim() || null })
+    onSubmit({
+      ...form,
+      saldo_pendiente: form.saldo_pendiente || '0',
+      observaciones: form.observaciones?.trim() || null,
+    })
   }
 
   return (
@@ -146,6 +152,17 @@ export function PautaForm({
           value={form.valor_pagado}
           onValueChange={(digits) => setForm({ ...form, valor_pagado: digits })}
         />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="pauta-saldo">Saldo pendiente (opcional)</Label>
+        <CurrencyInput
+          id="pauta-saldo"
+          value={form.saldo_pendiente}
+          onValueChange={(digits) => setForm({ ...form, saldo_pendiente: digits })}
+        />
+        <p className="text-xs text-muted-foreground">
+          Lo que el cliente todavía debe de esta pauta — cuentas por cobrar.
+        </p>
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="pauta-fecha-pago">Fecha de pago</Label>

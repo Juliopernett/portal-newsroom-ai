@@ -253,6 +253,11 @@ export function ContratosPage() {
                   <strong>{pauta.publicaciones_restantes}</strong> de {pauta.publicaciones_contratadas}{' '}
                   publicaciones disponibles
                 </p>
+                {Number(pauta.saldo_pendiente) > 0 && (
+                  <span className="w-fit rounded-full bg-danger-bg px-2 py-0.5 text-xs font-medium text-danger">
+                    Debe {formatMoneda(pauta.saldo_pendiente)}
+                  </span>
+                )}
                 <div className="mt-1 flex items-center justify-between">
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{formatMoneda(pauta.valor_pagado)}</span>
