@@ -37,6 +37,7 @@ def _analytics(uow: UnitOfWork) -> AnalyticsService:
         pautas=uow.pautas.list_all(),
         solicitudes=uow.publication_requests.list_all(),
         destinos=uow.destinos_publicacion.list_all(),
+        otros_ingresos=uow.otros_ingresos.list_all(),
     )
 
 

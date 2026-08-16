@@ -32,6 +32,7 @@ from core.analytics.view_models import (
 from core.clock import now_local
 from core.entities.client import Client
 from core.entities.destino_publicacion import DestinoPublicacion
+from core.entities.otro_ingreso import OtroIngreso
 from core.entities.pauta import Pauta, PautaTipo
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.services.destino_publicacion_service import esta_completa
@@ -54,6 +55,7 @@ class AnalyticsService:
         pautas: Sequence[Pauta],
         solicitudes: Sequence[PublicationRequest],
         destinos: Sequence[DestinoPublicacion],
+        otros_ingresos: Sequence[OtroIngreso] = (),
         clock: Callable[[], datetime] = lambda: now_local(),
     ) -> None:
         """`clock` is injectable so tests can control what "now" means.
@@ -68,11 +70,18 @@ class AnalyticsService:
         `solicitudes` itself, required (no default) so a caller that
         forgets to wire it fails loudly instead of silently reporting
         zero consumed quota everywhere.
+
+        `otros_ingresos` defaults to `()` so every existing caller (and
+        every existing test) keeps working unchanged — only
+        `ingresos_anio_actual`/`ingresos_historicos` read it; nothing else
+        here is about aggregate portal revenue, so a caller that doesn't
+        pass it just gets the pre-existing pauta-only totals.
         """
         self._clients = clients
         self._pautas = pautas
         self._solicitudes = solicitudes
         self._destinos = destinos
+        self._otros_ingresos = otros_ingresos
         self._clock = clock
         self._pauta_service = PautaService(clock=lambda: clock().date())
 
@@ -112,23 +121,34 @@ class AnalyticsService:
         return len(self.solicitudes_publicadas())
 
     def ingresos_anio_actual(self) -> Decimal:
-        """Return total `valor_pagado` across every `Pauta` started in the current year.
+        """Return total revenue across every `Pauta` started in the current year,
+        plus every `OtroIngreso` collected in the current year.
 
-        Uses `fecha_inicio` as the revenue-recognition date — migrated
-        records have no separate "date received" field, so `fecha_inicio`
-        is the closest proxy for "when this revenue counts". Includes
-        vigente, vencida, and future `Pauta`s alike; only the year of
-        `fecha_inicio` matters, not whether the contract is active today.
+        Uses `fecha_inicio` as the revenue-recognition date for `Pauta` —
+        migrated records have no separate "date received" field, so
+        `fecha_inicio` is the closest proxy for "when this revenue
+        counts". Includes vigente, vencida, and future `Pauta`s alike;
+        only the year matters, not whether the contract is active today.
+        `OtroIngreso` has no such ambiguity — `fecha_cobro` is literally
+        the date the money arrived, the same field `rentabilidad_mensual`
+        already groups it by.
         """
         anio_actual = self._clock().year
-        return sum(
+        total_pautas = sum(
             (p.valor_pagado for p in self._pautas if p.fecha_inicio.year == anio_actual),
             start=Decimal("0"),
         )
+        total_otros = sum(
+            (o.monto for o in self._otros_ingresos if o.fecha_cobro.year == anio_actual),
+            start=Decimal("0"),
+        )
+        return total_pautas + total_otros
 
     def ingresos_historicos(self) -> Decimal:
-        """Return total `valor_pagado` across every `Pauta`, past or present."""
-        return sum((p.valor_pagado for p in self._pautas), start=Decimal("0"))
+        """Return total `valor_pagado` across every `Pauta`, plus every `OtroIngreso.monto`, past or present."""
+        total_pautas = sum((p.valor_pagado for p in self._pautas), start=Decimal("0"))
+        total_otros = sum((o.monto for o in self._otros_ingresos), start=Decimal("0"))
+        return total_pautas + total_otros
 
     def cantidad_publicaciones_publicadas_este_mes(self) -> int:
         """Return how many `PublicationRequest`s were published in the current month.

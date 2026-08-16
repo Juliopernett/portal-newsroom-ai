@@ -1,4 +1,5 @@
 import type { Pauta } from '@/features/contratos/api'
+import type { OtroIngreso } from '@/features/gastos/otrosIngresosApi'
 import type { RentabilidadMensual } from './api'
 
 export const MESES_LABELS = [
@@ -39,6 +40,25 @@ export function calcularIngresosDelMes(pautas: Pauta[], offsetMeses: number): nu
     const fechaPago = new Date(pauta.fecha_pago + 'T00:00:00')
     if (fechaPago.getMonth() === objetivo.getMonth() && fechaPago.getFullYear() === objetivo.getFullYear()) {
       total += Number(pauta.valor_pagado)
+    }
+  }
+  return total
+}
+
+// Same "dinero ya cobrado" definition as calcularIngresosDelMes, but for
+// income that never came from a Pauta (Facebook, AdSense…) — kept as a
+// separate function rather than folded into the one above because
+// "Pautado este mes" reuses that function too, and a Facebook payout
+// isn't "pautado" by any reading of the word. Only "Ingresos último mes"
+// adds this on top.
+export function calcularOtrosIngresosDelMes(otrosIngresos: OtroIngreso[], offsetMeses: number): number {
+  const ahora = new Date()
+  const objetivo = new Date(ahora.getFullYear(), ahora.getMonth() + offsetMeses, 1)
+  let total = 0
+  for (const ingreso of otrosIngresos) {
+    const fechaCobro = new Date(ingreso.fecha_cobro + 'T00:00:00')
+    if (fechaCobro.getMonth() === objetivo.getMonth() && fechaCobro.getFullYear() === objetivo.getFullYear()) {
+      total += Number(ingreso.monto)
     }
   }
   return total

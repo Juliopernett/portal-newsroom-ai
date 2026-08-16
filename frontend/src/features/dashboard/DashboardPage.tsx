@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { pautasApi } from '@/features/contratos/api'
+import { otrosIngresosApi } from '@/features/gastos/otrosIngresosApi'
 import { formatMoneda } from '@/lib/format'
 import { dashboardApi } from './api'
 import { IngresosGastosChart, RentabilidadChart } from './charts'
@@ -24,6 +25,7 @@ import {
   MESES_LABELS,
   calcularDeltaPct,
   calcularIngresosDelMes,
+  calcularOtrosIngresosDelMes,
   calcularRenovacionesDelMes,
   rangoPreset,
   type RentabilidadPreset,
@@ -48,9 +50,14 @@ export function DashboardPage() {
     queryFn: () => dashboardApi.rentabilidad(desde || undefined, hasta || undefined),
   })
   const pautasQuery = useQuery({ queryKey: ['pautas'], queryFn: pautasApi.list })
+  const otrosIngresosQuery = useQuery({ queryKey: ['otros-ingresos'], queryFn: otrosIngresosApi.list })
 
   const isFetching =
-    resumenQuery.isFetching || alertasQuery.isFetching || rankingQuery.isFetching || rentabilidadQuery.isFetching
+    resumenQuery.isFetching ||
+    alertasQuery.isFetching ||
+    rankingQuery.isFetching ||
+    rentabilidadQuery.isFetching ||
+    otrosIngresosQuery.isFetching
 
   function refetchAll() {
     resumenQuery.refetch()
@@ -58,6 +65,7 @@ export function DashboardPage() {
     rankingQuery.refetch()
     rentabilidadQuery.refetch()
     pautasQuery.refetch()
+    otrosIngresosQuery.refetch()
   }
 
   function abrirFicha(clienteId: string) {
@@ -65,9 +73,19 @@ export function DashboardPage() {
   }
 
   const pautas = pautasQuery.data ?? []
+  const otrosIngresos = otrosIngresosQuery.data ?? []
   const renovacionesDelMes = useMemo(() => calcularRenovacionesDelMes(pautas), [pautas])
-  const ingresosUltimoMes = useMemo(() => calcularIngresosDelMes(pautas, -1), [pautas])
-  const ingresosMesAnterior = useMemo(() => calcularIngresosDelMes(pautas, -2), [pautas])
+  // "Ingresos último mes" es el total real cobrado — pautas + lo que entra
+  // fuera de una pauta (Facebook, AdSense…). "Pautado este mes" sigue
+  // siendo solo pautas, ver calcularOtrosIngresosDelMes.
+  const ingresosUltimoMes = useMemo(
+    () => calcularIngresosDelMes(pautas, -1) + calcularOtrosIngresosDelMes(otrosIngresos, -1),
+    [pautas, otrosIngresos],
+  )
+  const ingresosMesAnterior = useMemo(
+    () => calcularIngresosDelMes(pautas, -2) + calcularOtrosIngresosDelMes(otrosIngresos, -2),
+    [pautas, otrosIngresos],
+  )
   const pautadoMesActual = useMemo(() => calcularIngresosDelMes(pautas, 0), [pautas])
   const pautadoMesAnterior = useMemo(() => calcularIngresosDelMes(pautas, -1), [pautas])
   const deltaIngresosUltimoMes = calcularDeltaPct(ingresosUltimoMes, ingresosMesAnterior)
