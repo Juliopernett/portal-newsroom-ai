@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Paperclip, Plus, RefreshCw, X } from 'lucide-react'
+import { Paperclip, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { errorMessage } from '@/api/client'
@@ -16,13 +16,14 @@ import { SolicitudCard } from './SolicitudCard'
 import { ActividadReciente } from './ActividadReciente'
 import { MetricasSolicitudes } from './MetricasSolicitudes'
 import { PautaCombobox } from './PautaCombobox'
+import { ClienteCombobox } from './ClienteCombobox'
 
 const KANBAN_KEY = ['solicitudes-kanban']
 const PAUTAS_KEY = ['pautas']
 const CLIENTS_KEY = ['clients']
 const PUBLICADAS_VISIBLES = 30
 
-const EMPTY_FORM = { pautaId: '', titulo: '', texto: '', prioridad: false }
+const EMPTY_FORM = { pautaId: '', clienteId: '', titulo: '', texto: '', prioridad: false }
 
 export function SolicitudesPage() {
   const queryClient = useQueryClient()
@@ -31,6 +32,7 @@ export function SolicitudesPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [adjuntoAbierto, setAdjuntoAbierto] = useState(false)
   const [archivo, setArchivo] = useState<File | null>(null)
+  const [busqueda, setBusqueda] = useState('')
   const textoRef = useRef<HTMLTextAreaElement>(null)
 
   const kanbanQuery = useQuery({ queryKey: KANBAN_KEY, queryFn: solicitudesApi.loadKanban })
@@ -147,6 +149,7 @@ export function SolicitudesPage() {
     e.preventDefault()
     const payload: SolicitudCreateInput = {
       pauta_id: form.pautaId || null,
+      client_id: form.pautaId ? null : form.clienteId || null,
       titulo: form.titulo.trim() || null,
       texto: form.texto,
       prioridad_manual: form.prioridad,
@@ -165,11 +168,31 @@ export function SolicitudesPage() {
   const publicadasTodas = kanbanQuery.data?.publicadas ?? []
   const publicadasVisibles = publicadasTodas.slice(0, PUBLICADAS_VISIBLES)
 
-  function clienteDe(s: { pauta_id: string | null }) {
-    if (!s.pauta_id) return '(sin vincular)'
-    const pauta = pautasById.get(s.pauta_id)
-    return pauta ? (clientesById.get(pauta.client_id) ?? '(sin vincular)') : '(sin vincular)'
+  // pauta_id wins when both are present (it's the authoritative link once a
+  // contrato is known); client_id is the fallback identity captured at
+  // intake, so a request that hasn't been linked to a Pauta yet still has
+  // an owner instead of showing as anonymous in the queue.
+  function clienteIdDe(s: { pauta_id: string | null; client_id: string | null }) {
+    if (s.pauta_id) return pautasById.get(s.pauta_id)?.client_id ?? null
+    return s.client_id
   }
+
+  function clienteDe(s: { pauta_id: string | null; client_id: string | null }) {
+    const clienteId = clienteIdDe(s)
+    return clienteId ? (clientesById.get(clienteId) ?? '(sin vincular)') : '(sin vincular)'
+  }
+
+  const busquedaTrim = busqueda.trim().toLowerCase()
+  function coincide(s: { texto: string; titulo: string | null; pauta_id: string | null; client_id: string | null }) {
+    if (!busquedaTrim) return true
+    return (
+      clienteDe(s).toLowerCase().includes(busquedaTrim) ||
+      s.texto.toLowerCase().includes(busquedaTrim) ||
+      (s.titulo ?? '').toLowerCase().includes(busquedaTrim)
+    )
+  }
+  const pendientesVisibles = pendientes.filter(coincide)
+  const publicadasFiltradas = publicadasVisibles.filter(coincide)
 
   return (
     <div className="flex flex-col gap-4">
@@ -206,8 +229,15 @@ export function SolicitudesPage() {
             pautas={pautasVigentes}
             clientesById={clientesById}
             value={form.pautaId}
-            onChange={(pautaId) => setForm({ ...form, pautaId })}
+            onChange={(pautaId) => setForm({ ...form, pautaId, clienteId: pautaId ? '' : form.clienteId })}
           />
+          {!form.pautaId && (
+            <ClienteCombobox
+              clients={clientsQuery.data ?? []}
+              value={form.clienteId}
+              onChange={(clienteId) => setForm({ ...form, clienteId })}
+            />
+          )}
           <Input
             className="min-w-[16rem] flex-1"
             placeholder="Título (opcional)"
@@ -286,6 +316,16 @@ export function SolicitudesPage() {
         </Button>
       </form>
 
+      <div className="relative max-w-sm">
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por cliente o texto…"
+          className="pl-9"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+      </div>
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_16rem_1fr]">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-sm font-medium">
@@ -299,14 +339,17 @@ export function SolicitudesPage() {
               <p className="p-6 text-center text-sm text-muted-foreground">Cargando…</p>
             ) : pendientes.length === 0 ? (
               <p className="p-6 text-center text-sm text-muted-foreground">No hay solicitudes pendientes.</p>
+            ) : pendientesVisibles.length === 0 ? (
+              <p className="p-6 text-center text-sm text-muted-foreground">Nada coincide con "{busqueda}".</p>
             ) : (
-              pendientes.map((s) => (
+              pendientesVisibles.map((s) => (
                 <SolicitudCard
                   key={s.id}
                   solicitud={s}
                   esPublicada={false}
                   pauta={s.pauta_id ? (pautasById.get(s.pauta_id) ?? null) : null}
                   clienteNombre={clienteDe(s)}
+                  clienteId={clienteIdDe(s)}
                   pautasVigentes={pautasVigentes}
                   clientesById={clientesById}
                   isActing={isActing}
@@ -320,6 +363,7 @@ export function SolicitudesPage() {
                     linkMutation.mutate({ id, pautaId })
                   }}
                   onGuardarEdicion={(id, payload) => editMutation.mutate({ id, payload })}
+                  onVerCliente={(id) => navigate('/clientes', { state: { abrirFichaClientId: id } })}
                 />
               ))
             )}
@@ -345,14 +389,17 @@ export function SolicitudesPage() {
               <p className="p-6 text-center text-sm text-muted-foreground">Cargando…</p>
             ) : publicadasVisibles.length === 0 ? (
               <p className="p-6 text-center text-sm text-muted-foreground">Todavía no hay publicadas.</p>
+            ) : publicadasFiltradas.length === 0 ? (
+              <p className="p-6 text-center text-sm text-muted-foreground">Nada coincide con "{busqueda}".</p>
             ) : (
-              publicadasVisibles.map((s) => (
+              publicadasFiltradas.map((s) => (
                 <SolicitudCard
                   key={s.id}
                   solicitud={s}
                   esPublicada
                   pauta={s.pauta_id ? (pautasById.get(s.pauta_id) ?? null) : null}
                   clienteNombre={clienteDe(s)}
+                  clienteId={clienteIdDe(s)}
                   pautasVigentes={pautasVigentes}
                   clientesById={clientesById}
                   isActing={isActing}
@@ -360,6 +407,7 @@ export function SolicitudesPage() {
                   onCancelar={() => {}}
                   onVincular={() => {}}
                   onGuardarEdicion={() => {}}
+                  onVerCliente={(id) => navigate('/clientes', { state: { abrirFichaClientId: id } })}
                 />
               ))
             )}

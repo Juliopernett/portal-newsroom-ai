@@ -17,6 +17,15 @@ links a request to a `Client`'s `Pauta` before accepting it, never before.
 docs/adr/ADR-006-multichannel-publication.md) — Increment 1 of that
 ADR's rollout.
 
+`client_id` is a separate, optional reference to the `Client` the request
+came from — independent of `pauta_id`. A request received before its
+`Pauta` is known (or from a client with no vigente `Pauta` yet) would
+otherwise carry no identity at all in the working queue; this lets an
+operator record who sent it without forcing a `Pauta` link at intake.
+Unlike `pauta_id`, nothing in this entity ever requires `client_id` — it
+is informational only, never validated against `pauta_id`'s own client
+once a `Pauta` is linked.
+
 **`PUBLICADA` retired in Increment 4.** `estado` now describes only
 intake triage (`RECIBIDA` → `ACEPTADA` → `CANCELADA`) — the same
 deliberately simple role `ArticleStatus` plays for `Article` (see
@@ -63,6 +72,7 @@ class PublicationRequest:
 
     id: str = field(default_factory=lambda: str(uuid4()))
     pauta_id: str | None = None
+    client_id: str | None = None
     fecha_recepcion: datetime = field(default_factory=lambda: datetime.now(UTC))
     titulo: str | None = None
     texto: str
@@ -75,6 +85,10 @@ class PublicationRequest:
         if self.pauta_id == "":
             raise ValueError(
                 "pauta_id must not be an empty string — use None if not linked to a Pauta yet"
+            )
+        if self.client_id == "":
+            raise ValueError(
+                "client_id must not be an empty string — use None if not set"
             )
         if not self.texto:
             raise ValueError("texto must not be empty")

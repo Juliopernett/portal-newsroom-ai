@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Calendar, Pencil, Plus, RefreshCw, Search } from 'lucide-react'
+import { Calendar, Inbox, Pencil, Plus, RefreshCw, Search } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ApiError } from '@/api/client'
@@ -15,10 +15,28 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 import { clientsApi } from '@/features/clientes/api'
-import { formatFecha, formatMoneda } from '@/lib/format'
+import { diasHasta, formatFecha, formatMoneda } from '@/lib/format'
 import { PAUTA_TIPO_LABELS, pautasApi, type Pauta, type PautaInput } from './api'
 import { PautaForm } from './PautaForm'
 import { cupoNivel, CUPO_BAR_COLOR } from './utils'
+
+type EstadoFiltro = 'vigentes' | 'vencidos' | 'todos'
+
+const ESTADO_TABS: { id: EstadoFiltro; label: string }[] = [
+  { id: 'vigentes', label: 'Vigentes' },
+  { id: 'vencidos', label: 'Vencidos' },
+  { id: 'todos', label: 'Todos' },
+]
+
+// Same 7/15/30 urgency the Radar de Renovaciones already uses in Alertas —
+// reused here so "vence pronto" reads the same way in both places instead
+// of only being visible if you happen to check Alertas.
+function venceProntoBadge(dias: number): { label: string; className: string } | null {
+  if (dias < 0 || dias > 30) return null
+  if (dias <= 7) return { label: `Vence en ${dias}d`, className: 'bg-danger-bg text-danger' }
+  if (dias <= 15) return { label: `Vence en ${dias}d`, className: 'bg-warning-bg text-warning' }
+  return { label: `Vence en ${dias}d`, className: 'bg-muted text-muted-foreground' }
+}
 
 const PAUTAS_KEY = ['pautas']
 const CLIENTS_KEY = ['clients']
@@ -28,6 +46,7 @@ export function ContratosPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('vigentes')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Pauta | null>(null)
   const [preselectClientId, setPreselectClientId] = useState<string | undefined>()
@@ -85,14 +104,26 @@ export function ContratosPage() {
     },
   })
 
+  const todasPautas = pautasQuery.data ?? []
+  const vigentesCount = todasPautas.filter((p) => p.vigente).length
+  const vencidasCount = todasPautas.filter((p) => !p.vigente).length
+
   const contratosFiltrados = useMemo(() => {
-    const activos = (pautasQuery.data ?? [])
-      .filter((p) => p.vigente)
-      .sort((a, b) => a.fecha_fin.localeCompare(b.fecha_fin))
+    const porEstado = todasPautas
+      .filter((p) => {
+        if (estadoFiltro === 'vigentes') return p.vigente
+        if (estadoFiltro === 'vencidos') return !p.vigente
+        return true
+      })
+      .sort((a, b) =>
+        estadoFiltro === 'vigentes'
+          ? a.fecha_fin.localeCompare(b.fecha_fin) // vigentes: próximas a vencer primero
+          : b.fecha_fin.localeCompare(a.fecha_fin), // vencidos/todos: más recientes primero
+      )
     const termino = search.trim().toLowerCase()
-    if (!termino) return activos
-    return activos.filter((p) => (clientsById.get(p.client_id) ?? '').toLowerCase().includes(termino))
-  }, [pautasQuery.data, clientsById, search])
+    if (!termino) return porEstado
+    return porEstado.filter((p) => (clientsById.get(p.client_id) ?? '').toLowerCase().includes(termino))
+  }, [todasPautas, clientsById, search, estadoFiltro])
 
   function openNew() {
     setEditing(null)
@@ -116,9 +147,9 @@ export function ContratosPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-lg font-semibold">Contratos activos</h1>
+          <h1 className="text-lg font-semibold">Contratos</h1>
           <p className="text-sm text-muted-foreground">
-            Cada pauta vigente, con su propio saldo — nunca se suman entre contratos
+            Cada pauta con su propio saldo — nunca se suman entre contratos
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -139,21 +170,44 @@ export function ContratosPage() {
         </div>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por cliente…"
-          className="pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Estado del contrato">
+          {ESTADO_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={estadoFiltro === tab.id}
+              onClick={() => setEstadoFiltro(tab.id)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                estadoFiltro === tab.id
+                  ? 'border-brand bg-brand/10 text-foreground'
+                  : 'border-border bg-card text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              {tab.label}
+              <span className="text-xs text-muted-foreground">
+                {tab.id === 'vigentes' ? vigentesCount : tab.id === 'vencidos' ? vencidasCount : todasPautas.length}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="relative max-w-sm flex-1 sm:flex-none">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por cliente…"
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       {pautasQuery.isLoading ? (
         <p className="p-6 text-center text-sm text-muted-foreground">Cargando…</p>
       ) : contratosFiltrados.length === 0 ? (
         <p className="p-6 text-center text-sm text-muted-foreground">
-          {search.trim() ? 'No se encontraron contratos con ese criterio.' : 'No hay contratos vigentes.'}
+          {search.trim() ? 'No se encontraron contratos con ese criterio.' : 'No hay contratos en este estado.'}
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -163,10 +217,19 @@ export function ContratosPage() {
                 ? Math.round((pauta.publicaciones_restantes / pauta.publicaciones_contratadas) * 100)
                 : 0
             const nivel = cupoNivel(pauta.publicaciones_restantes, pauta.publicaciones_contratadas, pauta.vigente)
+            const badge = pauta.vigente ? venceProntoBadge(diasHasta(pauta.fecha_fin)) : null
             return (
               <div key={pauta.id} className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-medium">{clientsById.get(pauta.client_id) ?? '(cliente desconocido)'}</h3>
+                  <button
+                    type="button"
+                    className="font-medium underline-offset-2 hover:underline"
+                    onClick={() =>
+                      navigate('/clientes', { state: { abrirFichaClientId: pauta.client_id } })
+                    }
+                  >
+                    {clientsById.get(pauta.client_id) ?? '(cliente desconocido)'}
+                  </button>
                   <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                     {PAUTA_TIPO_LABELS[pauta.tipo]}
                   </span>
@@ -174,6 +237,11 @@ export function ContratosPage() {
                 <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Calendar className="size-3.5" />
                   {formatFecha(pauta.fecha_inicio)} – {formatFecha(pauta.fecha_fin)}
+                  {badge && (
+                    <span className={`ml-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${badge.className}`}>
+                      {badge.label}
+                    </span>
+                  )}
                 </p>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                   <div
@@ -192,9 +260,22 @@ export function ContratosPage() {
                       Peso {formatMoneda(pauta.peso_comercial)}
                     </span>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(pauta)}>
-                    <Pencil /> Editar
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {pauta.vigente && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          navigate('/solicitudes', { state: { prefillClientId: pauta.client_id } })
+                        }
+                      >
+                        <Inbox /> Registrar
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(pauta)}>
+                      <Pencil /> Editar
+                    </Button>
+                  </div>
                 </div>
               </div>
             )

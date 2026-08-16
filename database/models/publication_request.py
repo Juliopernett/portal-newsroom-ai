@@ -9,7 +9,9 @@ from `core.entities.publication_request.PublicationRequest` — see
 request can exist before anyone links it to a `Pauta`. `titulo` and
 `fecha_cierre` are Sprint 4A additions (ADR-006, Increment 1), both
 nullable — see `core.entities.publication_request` for why neither is
-required at this layer yet.
+required at this layer yet. `client_id` is a later, separate optional
+reference to the originating `Client` — see that same module docstring
+for why it exists independently of `pauta_id`.
 """
 
 from __future__ import annotations
@@ -30,6 +32,9 @@ class PublicationRequestModel(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     pauta_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("pautas.id"), nullable=True, index=True
+    )
+    client_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("clients.id"), nullable=True, index=True
     )
     fecha_recepcion: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     titulo: Mapped[str | None] = mapped_column(String, nullable=True)

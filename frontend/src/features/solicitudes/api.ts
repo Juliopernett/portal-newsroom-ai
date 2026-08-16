@@ -5,6 +5,7 @@ export type SolicitudEstado = 'recibida' | 'aceptada' | 'cancelada'
 export interface Solicitud {
   id: string
   pauta_id: string | null
+  client_id: string | null
   fecha_recepcion: string
   titulo: string | null
   texto: string
@@ -16,6 +17,7 @@ export interface Solicitud {
 
 export interface SolicitudCreateInput {
   pauta_id: string | null
+  client_id: string | null
   titulo: string | null
   texto: string
   prioridad_manual: boolean

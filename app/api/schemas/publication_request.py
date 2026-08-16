@@ -25,6 +25,7 @@ class PublicationRequestCreate(BaseModel):
     """Request body for `POST /publication-requests`."""
 
     pauta_id: str | None = None
+    client_id: str | None = None
     titulo: str | None = None
     texto: str
     prioridad_manual: bool = False
@@ -60,6 +61,7 @@ class PublicationRequestOut(BaseModel):
 
     id: str
     pauta_id: str | None
+    client_id: str | None
     fecha_recepcion: datetime
     titulo: str | None
     texto: str

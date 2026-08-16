@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Inbox, Pencil, Phone, Plus, RefreshCw } from 'lucide-react'
 
@@ -44,6 +44,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+type FichaTab = 'actividad' | 'pautas' | 'solicitudes' | 'notas'
+
+const FICHA_TABS: { id: FichaTab; label: string }[] = [
+  { id: 'actividad', label: 'Actividad' },
+  { id: 'pautas', label: 'Pautas' },
+  { id: 'solicitudes', label: 'Solicitudes' },
+  { id: 'notas', label: 'Notas' },
+]
+
 export function ClienteFicha({
   open,
   onOpenChange,
@@ -64,6 +73,16 @@ export function ClienteFicha({
   onEditar: () => void
 }) {
   const navigate = useNavigate()
+  const [tab, setTab] = useState<FichaTab>('actividad')
+
+  // Actividad reciente is the default tab (not "Resumen" reordered into
+  // last place) — it's the closest thing to an executive summary and used
+  // to be buried at the bottom of a long scroll behind six other sections.
+  // Reset on every client switch so the panel doesn't reopen mid-scroll on
+  // whichever tab the previous client was left on.
+  useEffect(() => {
+    setTab('actividad')
+  }, [client?.id])
 
   const ingresosGenerados = useMemo(
     () => pautasCliente.reduce((acc, p) => acc + Number(p.valor_pagado), 0),
@@ -158,88 +177,117 @@ export function ClienteFicha({
           </div>
         </Section>
 
-        <Section title="Notas internas">
-          <p className={`text-sm ${client.observaciones ? '' : 'text-muted-foreground italic'}`}>
-            {client.observaciones || 'Sin notas internas todavía.'}
-          </p>
-        </Section>
+        <div className="flex gap-1 border-b border-border" role="tablist" aria-label="Detalle del cliente">
+          {FICHA_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`-mb-px border-b-2 px-2.5 py-2 text-sm font-medium transition-colors ${
+                tab === t.id
+                  ? 'border-brand text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-        <Section title="Historial de pautas">
-          {pautasCliente.length === 0 ? (
-            <p className="text-sm text-muted-foreground">📄 Este cliente todavía no tiene pautas.</p>
-          ) : (
-            <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
-              {pautasCliente.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-2 p-2.5 text-sm">
-                  <div>
-                    <p>
-                      {formatFecha(p.fecha_inicio)} – {formatFecha(p.fecha_fin)} · {PAUTA_TIPO_LABELS[p.tipo]}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {p.publicaciones_restantes}/{p.publicaciones_contratadas} ·{' '}
-                      <span className={p.vigente ? 'text-success' : 'text-muted-foreground'}>
-                        {p.vigente ? 'Vigente' : 'Vencido'}
-                      </span>
-                    </p>
+        {tab === 'actividad' && (
+          <Section title="Actividad reciente">
+            {eventos.length === 0 ? (
+              <p className="text-sm text-muted-foreground">🕐 Sin actividad todavía.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {eventos.map((e, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs">
+                    <span className="w-20 shrink-0 text-muted-foreground">{formatFecha(e.fecha)}</span>
+                    <span className="h-4 w-px shrink-0 bg-border" />
+                    <span className="pl-1">{e.texto}</span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate('/contratos', { state: { editPautaId: p.id } })}
-                  >
-                    <Pencil /> Editar
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
+                ))}
+              </div>
+            )}
+          </Section>
+        )}
 
-        <Section title="Solicitudes pendientes">
-          {solicitudesPendientes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">✅ Sin solicitudes pendientes.</p>
-          ) : (
-            <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
-              {solicitudesPendientes.map((s) => (
-                <div key={s.id} className="p-2.5 text-sm">
-                  <p>{truncarTexto(s.texto, 60)}</p>
-                  <p className="text-xs text-muted-foreground">{formatFechaHoraNegocio(s.fecha_recepcion)}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
+        {tab === 'pautas' && (
+          <Section title="Historial de pautas">
+            {pautasCliente.length === 0 ? (
+              <p className="text-sm text-muted-foreground">📄 Este cliente todavía no tiene pautas.</p>
+            ) : (
+              <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
+                {pautasCliente.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-2 p-2.5 text-sm">
+                    <div>
+                      <p>
+                        {formatFecha(p.fecha_inicio)} – {formatFecha(p.fecha_fin)} · {PAUTA_TIPO_LABELS[p.tipo]}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.publicaciones_restantes}/{p.publicaciones_contratadas} ·{' '}
+                        <span className={p.vigente ? 'text-success' : 'text-muted-foreground'}>
+                          {p.vigente ? 'Vigente' : 'Vencido'}
+                        </span>
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate('/contratos', { state: { editPautaId: p.id } })}
+                    >
+                      <Pencil /> Editar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+        )}
 
-        <Section title="Historial de publicaciones">
-          {publicadasVisibles.length === 0 ? (
-            <p className="text-sm text-muted-foreground">📭 Todavía no hay publicaciones.</p>
-          ) : (
-            <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
-              {publicadasVisibles.map((s) => (
-                <div key={s.id} className="p-2.5 text-sm">
-                  <p>{truncarTexto(s.texto, 40)}</p>
-                  <p className="text-xs text-muted-foreground">{formatFechaHoraNegocio(s.fecha_recepcion)}</p>
+        {tab === 'solicitudes' && (
+          <div className="flex flex-col gap-4">
+            <Section title="Solicitudes pendientes">
+              {solicitudesPendientes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">✅ Sin solicitudes pendientes.</p>
+              ) : (
+                <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
+                  {solicitudesPendientes.map((s) => (
+                    <div key={s.id} className="p-2.5 text-sm">
+                      <p>{truncarTexto(s.texto, 60)}</p>
+                      <p className="text-xs text-muted-foreground">{formatFechaHoraNegocio(s.fecha_recepcion)}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </Section>
+              )}
+            </Section>
 
-        <Section title="Actividad reciente">
-          {eventos.length === 0 ? (
-            <p className="text-sm text-muted-foreground">🕐 Sin actividad todavía.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {eventos.map((e, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs">
-                  <span className="w-20 shrink-0 text-muted-foreground">{formatFecha(e.fecha)}</span>
-                  <span className="h-4 w-px shrink-0 bg-border" />
-                  <span className="pl-1">{e.texto}</span>
+            <Section title="Historial de publicaciones">
+              {publicadasVisibles.length === 0 ? (
+                <p className="text-sm text-muted-foreground">📭 Todavía no hay publicaciones.</p>
+              ) : (
+                <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
+                  {publicadasVisibles.map((s) => (
+                    <div key={s.id} className="p-2.5 text-sm">
+                      <p>{truncarTexto(s.texto, 40)}</p>
+                      <p className="text-xs text-muted-foreground">{formatFechaHoraNegocio(s.fecha_recepcion)}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </Section>
+              )}
+            </Section>
+          </div>
+        )}
+
+        {tab === 'notas' && (
+          <Section title="Notas internas">
+            <p className={`text-sm ${client.observaciones ? '' : 'text-muted-foreground italic'}`}>
+              {client.observaciones || 'Sin notas internas todavía.'}
+            </p>
+          </Section>
+        )}
 
         {item && (
           <Button

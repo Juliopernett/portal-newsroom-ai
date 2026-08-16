@@ -20,6 +20,7 @@ def _to_model(solicitud: PublicationRequest) -> PublicationRequestModel:
     return PublicationRequestModel(
         id=solicitud.id,
         pauta_id=solicitud.pauta_id,
+        client_id=solicitud.client_id,
         fecha_recepcion=solicitud.fecha_recepcion,
         titulo=solicitud.titulo,
         texto=solicitud.texto,
@@ -45,6 +46,7 @@ def _to_domain(model: PublicationRequestModel) -> PublicationRequest:
     return PublicationRequest(
         id=model.id,
         pauta_id=model.pauta_id,
+        client_id=model.client_id,
         fecha_recepcion=fecha_recepcion,
         titulo=model.titulo,
         texto=model.texto,

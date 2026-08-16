@@ -30,24 +30,28 @@ export function SolicitudCard({
   esPublicada,
   pauta,
   clienteNombre,
+  clienteId,
   pautasVigentes,
   clientesById,
   onPublicar,
   onCancelar,
   onVincular,
   onGuardarEdicion,
+  onVerCliente,
   isActing,
 }: {
   solicitud: Solicitud
   esPublicada: boolean
   pauta: Pauta | null
   clienteNombre: string
+  clienteId: string | null
   pautasVigentes: Pauta[]
   clientesById: Map<string, string>
   onPublicar: (id: string) => void
   onCancelar: (id: string) => void
   onVincular: (id: string, pautaId: string) => void
   onGuardarEdicion: (id: string, payload: SolicitudEditInput) => void
+  onVerCliente: (clienteId: string) => void
   isActing: boolean
 }) {
   const [editing, setEditing] = useState(false)
@@ -123,7 +127,17 @@ export function SolicitudCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{clienteNombre}</span>
+          {clienteId ? (
+            <button
+              type="button"
+              className="text-sm font-medium underline-offset-2 hover:underline"
+              onClick={() => onVerCliente(clienteId)}
+            >
+              {clienteNombre}
+            </button>
+          ) : (
+            <span className="text-sm font-medium text-muted-foreground">{clienteNombre}</span>
+          )}
           {solicitud.prioridad_manual && <Flag className="size-3.5 text-warning" />}
           {score && (
             <span className="text-xs text-muted-foreground" title={score.label}>

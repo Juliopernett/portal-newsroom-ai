@@ -20,14 +20,34 @@ import { insightsApi } from '@/features/alertas/api'
 import { centroAlertaKey, useDismissedAlerts } from '@/features/alertas/utils'
 import logoMark from '@/assets/logo-mark.png'
 
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/alertas', label: 'Alertas', icon: Inbox, end: false },
-  { to: '/solicitudes', label: 'Solicitudes', icon: ClipboardList, end: false },
-  { to: '/clientes', label: 'Clientes', icon: Users, end: false },
-  { to: '/contratos', label: 'Contratos', icon: FileText, end: false },
-  { to: '/gastos', label: 'Gastos', icon: Wallet, end: false },
-  { to: '/reportes', label: 'Reportes', icon: Download, end: false },
+// Grouped by utility rather than one flat list: Dashboard/Alertas stay
+// ungrouped (analítica, se consultan solas), "Comercial" agrupa las tres
+// vistas que giran alrededor del mismo cliente (cliente → contrato →
+// solicitud), y "Finanzas" separa lo contable. Un label de grupo, no un
+// acordeón — no cuesta clics extra, solo hace explícito el parentesco.
+const NAV_GROUPS = [
+  {
+    label: null,
+    items: [
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/alertas', label: 'Alertas', icon: Inbox, end: false },
+    ],
+  },
+  {
+    label: 'Comercial',
+    items: [
+      { to: '/clientes', label: 'Clientes', icon: Users, end: false },
+      { to: '/contratos', label: 'Contratos', icon: FileText, end: false },
+      { to: '/solicitudes', label: 'Solicitudes', icon: ClipboardList, end: false },
+    ],
+  },
+  {
+    label: 'Finanzas',
+    items: [
+      { to: '/gastos', label: 'Gastos', icon: Wallet, end: false },
+      { to: '/reportes', label: 'Reportes', icon: Download, end: false },
+    ],
+  },
 ] as const
 
 export function Shell() {
@@ -110,28 +130,37 @@ export function Shell() {
           </button>
         </div>
         <nav className="flex flex-1 flex-col gap-1 px-2">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-brand text-brand-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                )
-              }
-            >
-              <Icon className="size-4" />
-              {label}
-              {to === '/alertas' && alertasCount > 0 && (
-                <span className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-danger text-xs font-semibold text-white">
-                  {alertasCount > 9 ? '9+' : alertasCount}
-                </span>
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label ?? 'root'} className="flex flex-col gap-1">
+              {group.label && (
+                <p className="px-3 pt-3 pb-1 text-[.68rem] font-semibold tracking-wide text-muted-foreground uppercase">
+                  {group.label}
+                </p>
               )}
-            </NavLink>
+              {group.items.map(({ to, label, icon: Icon, end }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={end}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-brand text-brand-foreground'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    )
+                  }
+                >
+                  <Icon className="size-4" />
+                  {label}
+                  {to === '/alertas' && alertasCount > 0 && (
+                    <span className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-danger text-xs font-semibold text-white">
+                      {alertasCount > 9 ? '9+' : alertasCount}
+                    </span>
+                  )}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="px-2 pb-4">

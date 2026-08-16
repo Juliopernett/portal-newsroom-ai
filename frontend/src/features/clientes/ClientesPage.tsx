@@ -28,6 +28,13 @@ const PAUTAS_KEY = ['pautas']
 const RANKING_KEY = ['dashboard', 'ranking']
 const KANBAN_KEY = ['solicitudes-kanban']
 
+const ESTADO_COMERCIAL_PRIORIDAD: Record<string, number> = {
+  vencido: 0,
+  atencion: 1,
+  renovacion: 2,
+  saludable: 3,
+}
+
 export function ClientesPage() {
   const queryClient = useQueryClient()
   const location = useLocation()
@@ -82,9 +89,17 @@ export function ClientesPage() {
   const clientesFiltrados = useMemo(() => {
     const clientes = clientsQuery.data ?? []
     const termino = search.trim().toLowerCase()
-    if (!termino) return clientes
-    return clientes.filter((c) => c.nombre.toLowerCase().includes(termino))
-  }, [clientsQuery.data, search])
+    const filtrados = termino ? clientes.filter((c) => c.nombre.toLowerCase().includes(termino)) : clientes
+    // Urgencia comercial primero — un cliente vencido no debería pesar
+    // igual que uno saludable solo porque el grid los lista en el mismo
+    // orden de inserción; "sin pauta" va al final porque no hay renovación
+    // que se esté por perder, es prospección, no urgencia.
+    return [...filtrados].sort((a, b) => {
+      const pa = ESTADO_COMERCIAL_PRIORIDAD[rankingByClientId.get(a.id)?.estado_comercial ?? ''] ?? 4
+      const pb = ESTADO_COMERCIAL_PRIORIDAD[rankingByClientId.get(b.id)?.estado_comercial ?? ''] ?? 4
+      return pa !== pb ? pa - pb : a.nombre.localeCompare(b.nombre)
+    })
+  }, [clientsQuery.data, search, rankingByClientId])
 
   function openNew() {
     setEditing(null)
@@ -108,11 +123,16 @@ export function ClientesPage() {
     .filter((p) => p.client_id === fichaClientId)
     .sort((a, b) => b.fecha_inicio.localeCompare(a.fecha_inicio))
   const pautaIdsFicha = new Set(pautasFicha.map((p) => p.id))
-  const pendientesFicha = (kanbanQuery.data?.pendientes ?? []).filter(
-    (s) => s.pauta_id && pautaIdsFicha.has(s.pauta_id),
-  )
+  // A solicitud belongs to this ficha either through its Pauta or, for one
+  // received before a Pauta was known, through the client_id captured
+  // directly at intake — otherwise a request like that would never show
+  // up on the client's own ficha even though it names them as the sender.
+  function esDeEsteCliente(s: { pauta_id: string | null; client_id: string | null }) {
+    return (s.pauta_id !== null && pautaIdsFicha.has(s.pauta_id)) || s.client_id === fichaClientId
+  }
+  const pendientesFicha = (kanbanQuery.data?.pendientes ?? []).filter(esDeEsteCliente)
   const publicadasFicha = (kanbanQuery.data?.publicadas ?? [])
-    .filter((s) => s.pauta_id && pautaIdsFicha.has(s.pauta_id))
+    .filter(esDeEsteCliente)
     .sort((a, b) => b.fecha_recepcion.localeCompare(a.fecha_recepcion))
 
   return (
