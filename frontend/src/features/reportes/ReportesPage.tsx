@@ -64,8 +64,8 @@ export function ReportesPage() {
         </p>
       </div>
 
-      <div className="flex max-w-2xl flex-col gap-4 rounded-lg border border-border p-4">
-        <div className="flex flex-col gap-2">
+      <div className="flex min-w-0 max-w-2xl flex-col gap-4 rounded-lg border border-border p-4">
+        <div className="flex min-w-0 flex-col gap-2">
           <Label htmlFor="reporte-select">Reporte</Label>
           <SelectNative
             id="reporte-select"
@@ -81,21 +81,29 @@ export function ReportesPage() {
           </SelectNative>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="flex w-full flex-col gap-2 sm:w-auto">
+        {/* min-w-0 at every flex level here on purpose: Safari's native
+            <input type=date> refuses to shrink below its own intrinsic
+            content width unless every ancestor flex container explicitly
+            overrides the default min-width:auto — otherwise the date
+            field pushes this whole card wider than its border (confirmed
+            on iPhone Safari; Chrome tolerates the same markup fine). */}
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="flex min-w-0 w-full flex-col gap-2 sm:w-auto">
             <Label htmlFor="reporte-desde">Desde</Label>
             <Input
               id="reporte-desde"
               type="date"
+              className="min-w-0 w-full"
               value={desde}
               onChange={(e) => setDesde(e.target.value)}
             />
           </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto">
+          <div className="flex min-w-0 w-full flex-col gap-2 sm:w-auto">
             <Label htmlFor="reporte-hasta">Hasta</Label>
             <Input
               id="reporte-hasta"
               type="date"
+              className="min-w-0 w-full"
               value={hasta}
               onChange={(e) => setHasta(e.target.value)}
             />

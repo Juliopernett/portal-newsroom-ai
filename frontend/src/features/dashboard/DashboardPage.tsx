@@ -174,15 +174,21 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div>
-          <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-            <div>
+        <div className="min-w-0">
+          <div className="mb-2 flex min-w-0 flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
+            <div className="min-w-0">
               <h3 className="text-sm font-medium text-muted-foreground">Rentabilidad mensual</h3>
               <p className="text-xs text-muted-foreground">
                 {desde || hasta ? 'Rango seleccionado' : 'Últimos 12 meses'} — ingresos cobrados menos gastos registrados
               </p>
             </div>
-            <div className="flex flex-wrap items-end gap-2">
+            {/* min-w-0 at every flex level here on purpose: Safari's native
+                <input type=date> refuses to shrink below its own intrinsic
+                content width unless every ancestor flex container explicitly
+                overrides the default min-width:auto — otherwise the date
+                field pushes this row wider than the page (confirmed on
+                iPhone Safari; Chrome tolerates the same markup fine). */}
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
               <div className="flex flex-wrap gap-1">
                 {RENTABILIDAD_PRESETS.map((p) => (
                   <Button
@@ -200,22 +206,22 @@ export function DashboardPage() {
                   </Button>
                 ))}
               </div>
-              <div className="flex w-full flex-col gap-1 sm:w-auto">
+              <div className="flex min-w-0 w-full flex-col gap-1 sm:w-auto">
                 <Label htmlFor="dashboard-rentabilidad-desde" className="text-xs">Desde</Label>
                 <Input
                   id="dashboard-rentabilidad-desde"
                   type="date"
-                  className="h-8"
+                  className="h-8 min-w-0 w-full"
                   value={desde}
                   onChange={(e) => setDesde(e.target.value)}
                 />
               </div>
-              <div className="flex w-full flex-col gap-1 sm:w-auto">
+              <div className="flex min-w-0 w-full flex-col gap-1 sm:w-auto">
                 <Label htmlFor="dashboard-rentabilidad-hasta" className="text-xs">Hasta</Label>
                 <Input
                   id="dashboard-rentabilidad-hasta"
                   type="date"
-                  className="h-8"
+                  className="h-8 min-w-0 w-full"
                   value={hasta}
                   onChange={(e) => setHasta(e.target.value)}
                 />
@@ -224,6 +230,7 @@ export function DashboardPage() {
                 <Button
                   variant="secondary"
                   size="sm"
+                  className="w-full sm:w-auto"
                   onClick={() => {
                     setDesde('')
                     setHasta('')
