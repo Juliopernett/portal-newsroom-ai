@@ -86,7 +86,7 @@ function DestinoRow({
     acciones = (
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          className="h-8 w-48 text-xs"
+          className="h-8 w-48 text-base sm:text-xs"
           placeholder="Enlace de la publicación"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
