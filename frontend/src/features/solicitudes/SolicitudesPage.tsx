@@ -314,7 +314,7 @@ export function SolicitudesPage() {
               <input
                 type="file"
                 accept="image/*,video/*"
-                className="text-xs"
+                className="text-base sm:text-xs"
                 onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
               />
               <button

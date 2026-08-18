@@ -83,7 +83,7 @@ export function MediaPanel({ solicitudId, esPublicada }: { solicitudId: string; 
             type="file"
             accept="image/*,video/*"
             disabled={uploadMutation.isPending}
-            className="text-xs"
+            className="text-base sm:text-xs"
             onChange={(e) => {
               const file = e.target.files?.[0]
               if (file) uploadMutation.mutate(file)
