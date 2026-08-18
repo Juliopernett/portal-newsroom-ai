@@ -256,6 +256,38 @@ export function SolicitudCard({
         </div>
       )}
 
+      {/* Retroactive fix, not a normal workflow action — an already
+          confirmed/published solicitud is otherwise immutable, but one
+          that never got a Pauta can't consume cupo and its cliente shows
+          as desconocido everywhere else in the app. Gated on !pauta_id
+          alone (works whether or not esRecibida) so this never appears
+          for a solicitud that's already correctly linked. */}
+      {!esRecibida && !solicitud.pauta_id && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md bg-warning-bg p-2">
+          <span className="text-xs text-warning">Sin pauta vinculada</span>
+          <SelectNative
+            className="h-8 w-auto max-w-[14rem] text-base sm:text-xs"
+            value={selectedPautaId}
+            onChange={(e) => setSelectedPautaId(e.target.value)}
+          >
+            <option value="">Elegir pauta…</option>
+            {pautasVigentes.map((p) => (
+              <option key={p.id} value={p.id}>
+                {pautaOptionLabel(p, clientesById.get(p.client_id) ?? '(cliente desconocido)')}
+              </option>
+            ))}
+          </SelectNative>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={isActing}
+            onClick={() => onVincular(solicitud.id, selectedPautaId)}
+          >
+            <Link2 /> Vincular
+          </Button>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2 pt-1">
         {!esPublicada && (
           <Button variant="secondary" size="sm" onClick={() => setDestinosOpen((v) => !v)}>

@@ -21,10 +21,16 @@ export function ActividadReciente({
   clientesById: Map<string, string>
 }) {
   const pautasById = new Map(pautas.map((p) => [p.id, p]))
+  // pauta_id wins when present; client_id is the fallback identity for a
+  // solicitud that was published without ever being linked to a Pauta —
+  // otherwise it always reads "(cliente desconocido)" here even though
+  // the client is known, same gap SolicitudesPage.tsx's clienteIdDe fixes.
   const nombreDeSolicitud = (s: Solicitud) => {
-    if (!s.pauta_id) return null
-    const pauta = pautasById.get(s.pauta_id)
-    return pauta ? (clientesById.get(pauta.client_id) ?? null) : null
+    if (s.pauta_id) {
+      const pauta = pautasById.get(s.pauta_id)
+      if (pauta) return clientesById.get(pauta.client_id) ?? null
+    }
+    return s.client_id ? (clientesById.get(s.client_id) ?? null) : null
   }
 
   const eventos: Evento[] = [

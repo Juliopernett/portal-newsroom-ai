@@ -131,7 +131,12 @@ export function SolicitudesPage() {
       solicitudesApi.linkPauta(id, pautaId),
     onSuccess: () => {
       invalidateKanban()
-      toast.success('Pauta vinculada. Ya se puede publicar.')
+      // Linking a pauta to a solicitud that's already completa consumes
+      // cupo immediately (publicaciones_consumidas is derived live from
+      // pauta_id + esta_completa) — invalidate pautas too so cupo badges
+      // refresh right away instead of only after the next unrelated fetch.
+      queryClient.invalidateQueries({ queryKey: PAUTAS_KEY })
+      toast.success('Pauta vinculada.')
     },
     onError: (err) => toast.error(errorMessage(err)),
   })
@@ -426,7 +431,13 @@ export function SolicitudesPage() {
                   isActing={isActing}
                   onPublicar={() => {}}
                   onCancelar={() => {}}
-                  onVincular={() => {}}
+                  onVincular={(id, pautaId) => {
+                    if (!pautaId) {
+                      toast.error('Elige una pauta antes de vincular.')
+                      return
+                    }
+                    linkMutation.mutate({ id, pautaId })
+                  }}
                   onGuardarEdicion={() => {}}
                   onVerCliente={(id) => navigate('/clientes', { state: { abrirFichaClientId: id } })}
                 />
