@@ -38,13 +38,18 @@ def _create_pauta(client: TestClient, client_id: str, **overrides: object) -> st
     return response.json()["id"]
 
 
-def _crear_solicitud_completa_multicanal(client: TestClient, pauta_id: str, titulo: str) -> str:
+def _crear_solicitud_completa_multicanal(
+    client: TestClient,
+    pauta_id: str,
+    titulo: str | None,
+    texto: str = "Contenido de la publicación",
+) -> str:
     """Create a PublicationRequest linked to `pauta_id`, published on
     WordPress + Facebook + Instagram — the "una solicitud con varios
     destinos" shape from the sprint's test list."""
     solicitud_resp = client.post(
         "/publication-requests",
-        json={"pauta_id": pauta_id, "titulo": titulo, "texto": "Contenido de la publicación"},
+        json={"pauta_id": pauta_id, "titulo": titulo, "texto": texto},
     )
     assert solicitud_resp.status_code == 201, solicitud_resp.text
     solicitud_id = solicitud_resp.json()["id"]
@@ -97,6 +102,20 @@ def test_informe_pauta_con_una_publicacion_multicanal(client: TestClient) -> Non
     # Un solo consumo (no tres) — GET /pautas/{id} usa el mismo PautaService.
     pauta_out = client.get(f"/pautas/{pauta_id}").json()
     assert pauta_out["publicaciones_consumidas"] == 1
+
+
+def test_informe_solicitud_sin_titulo_no_rompe_la_descarga(client: TestClient) -> None:
+    """La columna "Publicación" cae al texto cuando no hay título — nunca vacía."""
+    client_id = _create_client(client)
+    pauta_id = _create_pauta(client, client_id)
+    _crear_solicitud_completa_multicanal(
+        client, pauta_id, titulo=None, texto="Contenido sin título"
+    )
+
+    response = client.get(f"/pautas/{pauta_id}/informe.pdf")
+
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF")
 
 
 def test_informe_pauta_con_varias_publicaciones(client: TestClient) -> None:

@@ -19,6 +19,7 @@ otherwise a publication made late at night could print as the wrong day.
 from __future__ import annotations
 
 import io
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from xml.sax.saxutils import escape as _xml_escape
@@ -57,15 +58,17 @@ _PAUTA_TIPO_LABELS = {
 }
 
 _CANAL_LABELS = {
-    CanalPublicacion.WORDPRESS: "WordPress",
+    CanalPublicacion.WORDPRESS: "Página web",
     CanalPublicacion.FACEBOOK: "Facebook",
     CanalPublicacion.INSTAGRAM: "Instagram",
 }
 
-_COLOR_ENLACE = colors.HexColor("#1a73e8")
+_HEX_ENLACE = "#1a73e8"
 _COLOR_GRIS = colors.HexColor("#666666")
 _COLOR_BORDE = colors.HexColor("#dddddd")
 _COLOR_FONDO_ENCABEZADO = colors.HexColor("#f2f2f2")
+_URL_ABSOLUTA = re.compile(r"^https?://", re.IGNORECASE)
+_NOMBRE_SISTEMA = "Portal Vallenato Newsroom"
 
 
 def _escape(texto: str) -> str:
@@ -84,12 +87,82 @@ def _fmt_moneda(valor: Decimal) -> str:
     return "$" + f"{valor:,.0f}".replace(",", ".")
 
 
+def _titulo_o_fragmento(solicitud: ReporteSolicitud, max_len: int = 60) -> str:
+    """Return `solicitud.titulo`, or a fragment of `texto` when there is none.
+
+    `texto` is a required field (never empty — see
+    `core.entities.publication_request.PublicationRequest`), so the
+    "Publicación" column of the detalle table never renders blank. This is
+    real content, not an invented title — same "no inventar" discipline
+    the report follows everywhere else, just falling back to a different
+    real field instead of a placeholder.
+    """
+    if solicitud.titulo:
+        return _escape(solicitud.titulo)
+    texto = solicitud.texto.strip()
+    fragmento = texto if len(texto) <= max_len else texto[:max_len].rstrip() + "…"
+    return _escape(fragmento)
+
+
+def _link_texto(href: str, texto: str) -> str:
+    """A clickable reportlab inline link showing `texto`, never the raw `href`."""
+    href_escapado = _xml_escape(href, {'"': "&quot;"})
+    texto_escapado = _escape(texto)
+    return (
+        f'<link href="{href_escapado}"><u><font color="{_HEX_ENLACE}">'
+        f"{texto_escapado}</font></u></link>"
+    )
+
+
 def _enlace_o_guion(url: str | None) -> str:
     if not url:
         return "—"
-    href = _xml_escape(url, {'"': "&quot;"})
     visible = url if len(url) <= 42 else url[:39] + "…"
-    return f'<link href="{href}"><u><font color="#1a73e8">{_escape(visible)}</font></u></link>'
+    return _link_texto(url, visible)
+
+
+def _href_telefono(telefono: str) -> str:
+    return f"tel:{re.sub(r'[^0-9+]', '', telefono)}"
+
+
+def _href_sitio_web(url: str) -> str:
+    url = url.strip()
+    return url if _URL_ABSOLUTA.match(url) else f"https://{url}"
+
+
+def _href_red_social(valor: str, dominio: str) -> str:
+    """Build a full profile URL from a handle/path, or pass an already-absolute URL through.
+
+    Lets the operator type either a full link or just `@handle` in
+    Instagram/Facebook — the report always ends up with a real, clickable
+    URL either way, labeled with the platform's name, never the raw text
+    typed into Configuración.
+    """
+    valor = valor.strip()
+    if _URL_ABSOLUTA.match(valor):
+        return valor
+    return f"https://{dominio}/{valor.lstrip('@')}"
+
+
+def _lineas_otras_redes(texto: str) -> list[str]:
+    """Parse "Label: url, Label2: url2" into clickable links labeled by name.
+
+    Only wraps a segment when its value is already a full URL — this field
+    is free text (see `IdentidadForm`), so a segment without a colon or
+    with a non-URL value is shown exactly as typed instead of guessing a
+    domain for an unknown platform.
+    """
+    piezas: list[str] = []
+    for parte in texto.split(","):
+        parte = parte.strip()
+        if not parte:
+            continue
+        label, separador, valor = parte.partition(":")
+        if separador and _URL_ABSOLUTA.match(valor.strip()):
+            piezas.append(_link_texto(valor.strip(), label.strip()))
+        else:
+            piezas.append(_escape(parte))
+    return piezas
 
 
 class _Styles:
@@ -127,6 +200,14 @@ class _Styles:
             spaceBefore=4,
             spaceAfter=8,
         )
+        self.credito_sistema = ParagraphStyle(
+            "credito_sistema",
+            parent=base["Normal"],
+            fontSize=7.5,
+            textColor=_COLOR_GRIS,
+            alignment=TA_CENTER,
+            spaceBefore=10,
+        )
 
 
 def _imagen_logo(logo_bytes: bytes, lado_max: float = 2.4 * cm) -> Image | None:
@@ -144,6 +225,10 @@ def _imagen_logo(logo_bytes: bytes, lado_max: float = 2.4 * cm) -> Image | None:
 
 
 def _lineas_contacto(identidad: IdentidadComercial | None) -> list[str]:
+    """Build the identidad's contact/social lines, each social value as a
+    clickable link labeled by platform name (never the raw URL/handle) —
+    matches how the operator actually wants this to read on the printed
+    report, not how it's stored in Configuración."""
     if identidad is None:
         return []
     lineas: list[str] = []
@@ -151,21 +236,31 @@ def _lineas_contacto(identidad: IdentidadComercial | None) -> list[str]:
         lineas.append(_escape(identidad.razon_social))
     if identidad.nit:
         lineas.append(f"NIT {_escape(identidad.nit)}")
-    contacto = " · ".join(
-        _escape(v) for v in (identidad.telefono, identidad.email, identidad.sitio_web) if v
-    )
-    if contacto:
-        lineas.append(contacto)
+
+    contacto_partes = []
+    if identidad.telefono:
+        contacto_partes.append(_link_texto(_href_telefono(identidad.telefono), identidad.telefono))
+    if identidad.email:
+        contacto_partes.append(_link_texto(f"mailto:{identidad.email}", identidad.email))
+    if identidad.sitio_web:
+        contacto_partes.append(_link_texto(_href_sitio_web(identidad.sitio_web), "Sitio web"))
+    if contacto_partes:
+        lineas.append(" · ".join(contacto_partes))
+
     redes_partes = []
     if identidad.instagram:
-        redes_partes.append(f"IG {identidad.instagram}")
+        redes_partes.append(
+            _link_texto(_href_red_social(identidad.instagram, "instagram.com"), "Instagram")
+        )
     if identidad.facebook:
-        redes_partes.append(f"FB {identidad.facebook}")
+        redes_partes.append(
+            _link_texto(_href_red_social(identidad.facebook, "facebook.com"), "Facebook")
+        )
     if identidad.otras_redes:
-        redes_partes.append(identidad.otras_redes)
-    redes = " · ".join(_escape(v) for v in redes_partes)
-    if redes:
-        lineas.append(redes)
+        redes_partes.extend(_lineas_otras_redes(identidad.otras_redes))
+    if redes_partes:
+        lineas.append(" · ".join(redes_partes))
+
     return lineas
 
 
@@ -284,7 +379,7 @@ def _seccion_detalle_publicaciones(reporte: ReportePauta, styles: _Styles) -> li
     encabezado: list[Flowable | str] = [
         Paragraph("<b>Fecha</b>", styles.celda_tabla),
         Paragraph("<b>Publicación</b>", styles.celda_tabla),
-        Paragraph("<b>WordPress</b>", styles.celda_tabla),
+        Paragraph("<b>Página web</b>", styles.celda_tabla),
         Paragraph("<b>Facebook</b>", styles.celda_tabla),
         Paragraph("<b>Instagram</b>", styles.celda_tabla),
     ]
@@ -306,7 +401,7 @@ def _seccion_detalle_publicaciones(reporte: ReportePauta, styles: _Styles) -> li
     else:
         for solicitud in reporte.solicitudes:
             fecha_ref = solicitud.fecha_cierre or solicitud.fecha_recepcion
-            titulo = _escape(solicitud.titulo) if solicitud.titulo else "—"
+            titulo = _titulo_o_fragmento(solicitud)
             filas.append(
                 [
                     Paragraph(_fmt_fecha_negocio(fecha_ref), styles.celda_tabla),
@@ -345,6 +440,7 @@ def _seccion_cierre(
         Paragraph(f"Gracias por confiar en <b>{_escape(nombre)}</b>", styles.cierre_titulo),
     ]
     elementos.extend(_bloque_identidad(identidad, logo_bytes, styles))
+    elementos.append(Paragraph(f"Generado con {_escape(_NOMBRE_SISTEMA)}", styles.credito_sistema))
     return elementos
 
 
