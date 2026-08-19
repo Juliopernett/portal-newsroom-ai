@@ -123,6 +123,11 @@ export const solicitudesApi = {
     ),
   cancelarDestino: (id: string, destinoId: string) =>
     api.post<DestinoPublicacion>(`/publication-requests/${id}/destinos/${destinoId}/cancelar`),
+  corregirEnlaceDestino: (id: string, destinoId: string, canal: CanalPublicacion, enlace: string) =>
+    api.patch<DestinoPublicacion>(
+      `/publication-requests/${id}/destinos/${destinoId}/corregir-enlace`,
+      canal === 'wordpress' ? { wp_url: enlace } : { url_publicacion: enlace },
+    ),
 
   // Reporte (read-only, generated on demand, never persisted)
   getReporte: (id: string) => api.get<ReporteSolicitud>(`/publication-requests/${id}/reporte`),

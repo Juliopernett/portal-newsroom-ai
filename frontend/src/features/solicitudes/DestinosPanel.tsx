@@ -19,6 +19,8 @@ function DestinoRow({
   onChanged: () => void
 }) {
   const [url, setUrl] = useState('')
+  const [editandoEnlace, setEditandoEnlace] = useState(false)
+  const [enlaceCorregido, setEnlaceCorregido] = useState('')
   const canalLabel = CANALES_DESTINO.find((c) => c.value === destino.canal)?.label ?? destino.canal
 
   const crearBorradorMutation = useMutation({
@@ -48,16 +50,69 @@ function DestinoRow({
     onError: (err) => toast.error(errorMessage(err)),
   })
 
-  const acting = crearBorradorMutation.isPending || confirmarMutation.isPending || cancelarMutation.isPending
+  const corregirEnlaceMutation = useMutation({
+    mutationFn: () =>
+      solicitudesApi.corregirEnlaceDestino(solicitudId, destino.id, destino.canal, enlaceCorregido.trim()),
+    onSuccess: () => {
+      toast.success('Enlace corregido.')
+      setEditandoEnlace(false)
+      onChanged()
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
+  const acting =
+    crearBorradorMutation.isPending ||
+    confirmarMutation.isPending ||
+    cancelarMutation.isPending ||
+    corregirEnlaceMutation.isPending
 
   let acciones: React.ReactNode = null
   if (destino.estado === 'publicado') {
     const link = destino.canal === 'wordpress' ? destino.wp_url : destino.url_publicacion
-    acciones = link ? (
-      <a className="text-xs text-brand underline" href={link} target="_blank" rel="noopener">
-        Ver publicación
-      </a>
-    ) : null
+    acciones = editandoEnlace ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          className="h-8 w-48 text-base sm:text-xs"
+          placeholder="Enlace correcto"
+          value={enlaceCorregido}
+          onChange={(e) => setEnlaceCorregido(e.target.value)}
+        />
+        <Button
+          size="sm"
+          disabled={acting || !enlaceCorregido.trim()}
+          onClick={() => corregirEnlaceMutation.mutate()}
+        >
+          Guardar
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={acting}
+          onClick={() => setEditandoEnlace(false)}
+        >
+          Cancelar
+        </Button>
+      </div>
+    ) : (
+      <div className="flex flex-wrap items-center gap-2">
+        {link && (
+          <a className="text-xs text-brand underline" href={link} target="_blank" rel="noopener">
+            Ver publicación
+          </a>
+        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setEnlaceCorregido(link ?? '')
+            setEditandoEnlace(true)
+          }}
+        >
+          Editar enlace
+        </Button>
+      </div>
+    )
   } else if (destino.canal === 'wordpress') {
     acciones = (
       <div className="flex flex-wrap items-center gap-2">
