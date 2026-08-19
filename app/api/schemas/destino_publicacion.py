@@ -35,6 +35,20 @@ class DestinoPublicacionConfirmarPublicacion(BaseModel):
     url_publicacion: str | None = None
 
 
+class DestinoPublicacionCorregirEnlace(BaseModel):
+    """Request body for `PATCH .../destinos/{destino_id}/corregir-enlace`.
+
+    Fixes a data-entry mistake on an already-`PUBLICADO` destino (e.g. the
+    wrong Instagram link pasted while confirming several back-to-back) —
+    see `core.services.destino_publicacion_service.corregir_enlace`. Only
+    the field matching the destino's own canal is meaningful; the entity's
+    own validation rejects the other one.
+    """
+
+    wp_url: str | None = None
+    url_publicacion: str | None = None
+
+
 class DestinoPublicacionOut(BaseModel):
     """Response body for a `DestinoPublicacion`."""
 

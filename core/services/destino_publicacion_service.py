@@ -51,6 +51,38 @@ def marcar_publicado(
     )
 
 
+def corregir_enlace(
+    destino: DestinoPublicacion,
+    *,
+    wp_url: str | None = None,
+    url_publicacion: str | None = None,
+) -> DestinoPublicacion:
+    """Return a copy of `destino` with its link corrected — a data-entry fix,
+    not a state transition (see `marcar_publicado` for the real one).
+
+    Added after a real incident: an operator pasted the wrong Instagram
+    link while confirming several destinos back-to-back, and there was no
+    way to fix it short of editing the database directly. Only allowed
+    once already `PUBLICADO` — a destino that hasn't been confirmed yet
+    has nothing to correct, that's what `marcar_publicado` is for. Never
+    touches `estado` or `fecha_publicacion`: correcting *what* was
+    published is not the same as re-publishing it, so quota/`fecha_cierre`
+    never get recomputed by this. `__post_init__` still enforces that
+    `wp_url` only applies to WORDPRESS and `url_publicacion` only to
+    FACEBOOK/INSTAGRAM.
+    """
+    if destino.estado != EstadoDestino.PUBLICADO:
+        raise ValueError(
+            f"cannot correct the link of a destino that is not PUBLICADO "
+            f"(estado={destino.estado.value!r})"
+        )
+    return replace(
+        destino,
+        wp_url=wp_url if wp_url is not None else destino.wp_url,
+        url_publicacion=url_publicacion if url_publicacion is not None else destino.url_publicacion,
+    )
+
+
 def marcar_fallido(destino: DestinoPublicacion, *, error: str) -> DestinoPublicacion:
     """Return a copy of `destino` transitioned to `FALLIDO`, recording `error`.
 

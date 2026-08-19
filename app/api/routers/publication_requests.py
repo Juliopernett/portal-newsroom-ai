@@ -71,6 +71,7 @@ from app.api.dependencies import (
 )
 from app.api.schemas.destino_publicacion import (
     DestinoPublicacionConfirmarPublicacion,
+    DestinoPublicacionCorregirEnlace,
     DestinoPublicacionCreate,
     DestinoPublicacionOut,
 )
@@ -91,7 +92,7 @@ from core.entities.user import User
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.media_storage import MediaStorage
 from core.ports.unit_of_work import UnitOfWork
-from core.services.destino_publicacion_service import cancelar, marcar_publicado
+from core.services.destino_publicacion_service import cancelar, corregir_enlace, marcar_publicado
 from core.services.media_asset_service import (
     construir_storage_key,
     determinar_tipo,
@@ -353,6 +354,39 @@ def confirmar_publicacion_destino(
     uow.publication_requests.save(cerrada)
     uow.commit()
     return publicado
+
+
+@router.patch(
+    "/{request_id}/destinos/{destino_id}/corregir-enlace",
+    response_model=DestinoPublicacionOut,
+)
+def corregir_enlace_destino(
+    request_id: str,
+    destino_id: str,
+    payload: DestinoPublicacionCorregirEnlace,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> DestinoPublicacion:
+    """Fix a data-entry mistake on an already-`PUBLICADO` destino's link.
+
+    Unlike `confirmar_publicacion_destino`, this never touches `estado`,
+    `fecha_publicacion`, or the parent solicitud's `fecha_cierre` — the
+    destino was already correctly counted as consumiendo cuota; only the
+    link itself was wrong. See
+    `core.services.destino_publicacion_service.corregir_enlace`.
+    """
+    solicitud = uow.publication_requests.get_by_id(request_id)
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    destinos = uow.destinos_publicacion.list_by_publication_request_id(request_id)
+    destino = next((d for d in destinos if d.id == destino_id), None)
+    if destino is None:
+        raise HTTPException(status_code=404, detail="DestinoPublicacion not found")
+    corregido = corregir_enlace(
+        destino, wp_url=payload.wp_url, url_publicacion=payload.url_publicacion
+    )
+    uow.destinos_publicacion.save(corregido)
+    uow.commit()
+    return corregido
 
 
 @router.post(

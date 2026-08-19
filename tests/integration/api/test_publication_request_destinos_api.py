@@ -295,6 +295,106 @@ def test_confirmar_publicacion_does_not_close_while_another_destino_is_pending(
     assert solicitud["fecha_cierre"] is None
 
 
+def test_corregir_enlace_replaces_url_publicacion_on_a_published_destino(
+    client: TestClient,
+) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "instagram"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/confirmar-publicacion",
+        json={"url_publicacion": "https://instagram.com/p/wrong"},
+    )
+
+    response = client.patch(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/corregir-enlace",
+        json={"url_publicacion": "https://instagram.com/p/correct"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["url_publicacion"] == "https://instagram.com/p/correct"
+    assert body["estado"] == "publicado"
+
+
+def test_corregir_enlace_persists(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "instagram"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/confirmar-publicacion",
+        json={"url_publicacion": "https://instagram.com/p/wrong"},
+    )
+    client.patch(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/corregir-enlace",
+        json={"url_publicacion": "https://instagram.com/p/correct"},
+    )
+
+    destinos = client.get(f"/publication-requests/{solicitud_id}/destinos").json()
+
+    assert destinos[0]["url_publicacion"] == "https://instagram.com/p/correct"
+
+
+def test_corregir_enlace_does_not_reopen_fecha_cierre(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "instagram"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/confirmar-publicacion",
+        json={"url_publicacion": "https://instagram.com/p/wrong"},
+    )
+    fecha_cierre_original = next(
+        s for s in client.get("/publication-requests").json() if s["id"] == solicitud_id
+    )["fecha_cierre"]
+
+    client.patch(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/corregir-enlace",
+        json={"url_publicacion": "https://instagram.com/p/correct"},
+    )
+
+    solicitud = next(
+        s for s in client.get("/publication-requests").json() if s["id"] == solicitud_id
+    )
+    assert solicitud["fecha_cierre"] == fecha_cierre_original
+
+
+def test_corregir_enlace_rejects_a_destino_not_yet_publicado(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "instagram"}
+    ).json()["id"]
+
+    response = client.patch(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/corregir-enlace",
+        json={"url_publicacion": "https://instagram.com/p/correct"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_corregir_enlace_returns_404_when_solicitud_not_found(client: TestClient) -> None:
+    response = client.patch(
+        "/publication-requests/no-existe/destinos/no-existe/corregir-enlace",
+        json={"url_publicacion": "https://instagram.com/p/correct"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_corregir_enlace_returns_404_when_destino_not_found(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+
+    response = client.patch(
+        f"/publication-requests/{solicitud_id}/destinos/no-existe/corregir-enlace",
+        json={"url_publicacion": "https://instagram.com/p/correct"},
+    )
+
+    assert response.status_code == 404
+
+
 def test_cancelar_destino_pendiente(client: TestClient) -> None:
     solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
     destino_id = client.post(
