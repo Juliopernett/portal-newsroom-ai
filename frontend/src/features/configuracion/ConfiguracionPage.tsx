@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, RefreshCw, X } from 'lucide-react'
+import { Pencil, Plus, RefreshCw, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ApiError, errorMessage } from '@/api/client'
@@ -13,12 +13,17 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 import { formatMoneda } from '@/lib/format'
+import { identidadApi, LOGO_URL, type IdentidadComercialInput } from '@/features/identidad/api'
+import { IdentidadForm } from '@/features/identidad/IdentidadForm'
 import { planesPautaApi, type PlanPauta, type PlanPautaInput } from './api'
 import { PlanPautaForm } from './PlanPautaForm'
 
 const PLANES_KEY = ['planes-pauta']
+const IDENTIDAD_KEY = ['identidad-comercial']
 
-export function ConfiguracionPage() {
+type ConfiguracionTab = 'planes' | 'identidad'
+
+function PlanesPautaPanel() {
   const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<PlanPauta | null>(null)
@@ -74,13 +79,9 @@ export function ConfiguracionPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold">Configuración</h1>
-          <p className="text-sm text-muted-foreground">
-            Planes de Pauta — cantidad de publicaciones, valor y vigencia que se ofrecen al registrar
-            un contrato.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Cantidad de publicaciones, valor y vigencia que se ofrecen al registrar un contrato.
+        </p>
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={openNew}>
             <Plus /> Nuevo plan
@@ -152,6 +153,135 @@ export function ConfiguracionPage() {
           />
         </SheetContent>
       </Sheet>
+    </div>
+  )
+}
+
+function IdentidadPanel() {
+  const queryClient = useQueryClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [logoCacheBuster, setLogoCacheBuster] = useState(0)
+
+  const identidadQuery = useQuery({ queryKey: IDENTIDAD_KEY, queryFn: identidadApi.get })
+  const identidad = identidadQuery.data ?? null
+
+  const saveMutation = useMutation({
+    mutationFn: (payload: IdentidadComercialInput) => identidadApi.save(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: IDENTIDAD_KEY })
+      toast.success('Identidad comercial guardada.')
+    },
+  })
+
+  const uploadLogoMutation = useMutation({
+    mutationFn: (file: File) => identidadApi.uploadLogo(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: IDENTIDAD_KEY })
+      setLogoCacheBuster((v) => v + 1)
+      toast.success('Logo actualizado.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
+  const saveError = saveMutation.error instanceof ApiError ? saveMutation.error.message : null
+
+  return (
+    <div className="flex flex-col gap-6">
+      <p className="text-sm text-muted-foreground">
+        Datos del medio que aparecen en el encabezado y cierre de los informes PDF entregados a
+        clientes — no pertenecen a ningún Cliente ni Pauta en particular.
+      </p>
+
+      {identidadQuery.isLoading ? (
+        <p className="text-sm text-muted-foreground">Cargando…</p>
+      ) : (
+        <>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium">Logo</span>
+            <div className="flex items-center gap-3">
+              {identidad?.tiene_logo ? (
+                <img
+                  src={`${LOGO_URL}?v=${logoCacheBuster}`}
+                  alt="Logo comercial"
+                  className="size-16 rounded-md border border-border object-contain p-1"
+                />
+              ) : (
+                <div className="flex size-16 items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground">
+                  Sin logo
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Upload className="size-4 shrink-0 text-muted-foreground" />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  disabled={!identidad || uploadLogoMutation.isPending}
+                  className="text-base sm:text-xs"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) uploadLogoMutation.mutate(file)
+                  }}
+                />
+                {uploadLogoMutation.isPending && (
+                  <span className="text-xs text-muted-foreground">Subiendo…</span>
+                )}
+              </div>
+            </div>
+            {!identidad && (
+              <p className="text-xs text-muted-foreground">
+                Guarda primero los datos de abajo para poder subir el logo.
+              </p>
+            )}
+          </div>
+
+          <IdentidadForm
+            identidad={identidad}
+            onSubmit={(payload) => saveMutation.mutate(payload)}
+            isSubmitting={saveMutation.isPending}
+            error={saveError}
+          />
+        </>
+      )}
+    </div>
+  )
+}
+
+export function ConfiguracionPage() {
+  const [tab, setTab] = useState<ConfiguracionTab>('planes')
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-lg font-semibold">Configuración</h1>
+      </div>
+
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Sección de configuración">
+        {(
+          [
+            { id: 'planes', label: 'Planes de Pauta' },
+            { id: 'identidad', label: 'Identidad comercial' },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+              tab === t.id
+                ? 'border-brand bg-brand/10 text-foreground'
+                : 'border-border bg-card text-muted-foreground hover:bg-accent'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'planes' ? <PlanesPautaPanel /> : <IdentidadPanel />}
     </div>
   )
 }

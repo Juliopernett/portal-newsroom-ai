@@ -55,6 +55,7 @@ export default defineConfig({
       '/clients': backendProxy(),
       '/dashboard': backendProxy(),
       '/gastos': backendProxy(),
+      '/identidad-comercial': backendProxy(),
       '/insights': backendProxy(),
       '/pautas': backendProxy(),
       '/planes-pauta': backendProxy(),

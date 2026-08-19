@@ -19,8 +19,10 @@ from datetime import datetime
 
 from core.entities.client import Client
 from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
+from core.entities.pauta import Pauta
 from core.entities.publication_request import PublicationRequest
 from core.services.destino_publicacion_service import esta_completa
+from core.services.pauta_service import PautaService
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -102,4 +104,93 @@ def construir_reporte(
             )
             for destino in destinos
         ),
+    )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ReportePauta:
+    """The report for one Pauta (contrato): resumen ejecutivo + solicitudes consumidas.
+
+    `publicaciones_consumidas`/`restantes` and `vigente`/`vencida` are
+    never recomputed here — they come straight from `PautaService`, the
+    one place this codebase is allowed to answer those questions (see
+    `core.services.pauta_service`). `solicitudes` holds only the ones
+    `pauta_consumida` (Sprint — informe de cierre de contrato): a Pauta
+    with requests still pending or never linked shows none of those here,
+    same as `publicaciones_consumidas` not counting them.
+    """
+
+    pauta: Pauta
+    cliente_nombre: str | None
+    publicaciones_consumidas: int
+    publicaciones_restantes: int
+    vigente: bool
+    vencida: bool
+    cuota_agotada: bool
+    canales_utilizados: tuple[CanalPublicacion, ...]
+    fecha_primera_publicacion: datetime | None
+    fecha_ultima_publicacion: datetime | None
+    solicitudes: tuple[ReporteSolicitud, ...]
+
+
+def construir_reporte_pauta(
+    pauta: Pauta,
+    solicitudes: Sequence[PublicationRequest],
+    destinos: Sequence[DestinoPublicacion],
+    cliente: Client | None,
+    pauta_service: PautaService,
+) -> ReportePauta:
+    """Build `pauta`'s closing report from its own solicitudes/destinos history.
+
+    `solicitudes`/`destinos` may span more than one Pauta (the same shape
+    `PautaService`'s own methods accept) — this filters to `pauta.id`
+    internally, so a caller can pass exactly what
+    `uow.publication_requests.list_by_pauta_id`/
+    `uow.destinos_publicacion.list_by_publication_request_id` already
+    return without pre-filtering itself.
+
+    Every `ReporteSolicitud` here is built by `construir_reporte`, the same
+    function `GET /publication-requests/{id}/reporte` already uses — no
+    second way of deciding "what counts as a publicación", by construction
+    (see the module docstring's "compute, don't fetch" discipline).
+    """
+    destinos_por_solicitud: dict[str, list[DestinoPublicacion]] = {}
+    for destino in destinos:
+        destinos_por_solicitud.setdefault(destino.publication_request_id, []).append(destino)
+
+    solicitudes_de_pauta = [s for s in solicitudes if s.pauta_id == pauta.id]
+    reportes_solicitud = [
+        construir_reporte(s, destinos_por_solicitud.get(s.id, []), cliente)
+        for s in solicitudes_de_pauta
+    ]
+    consumidas = tuple(
+        sorted(
+            (r for r in reportes_solicitud if r.pauta_consumida),
+            key=lambda r: r.fecha_cierre or r.fecha_recepcion,
+        )
+    )
+
+    canales: set[CanalPublicacion] = set()
+    fechas_publicacion: list[datetime] = []
+    for reporte_solicitud in consumidas:
+        for reporte_destino in reporte_solicitud.destinos:
+            if reporte_destino.estado == EstadoDestino.PUBLICADO:
+                canales.add(reporte_destino.canal)
+                if reporte_destino.fecha_publicacion is not None:
+                    fechas_publicacion.append(reporte_destino.fecha_publicacion)
+
+    return ReportePauta(
+        pauta=pauta,
+        cliente_nombre=cliente.nombre if cliente is not None else None,
+        publicaciones_consumidas=pauta_service.publicaciones_consumidas(
+            pauta, solicitudes, destinos
+        ),
+        publicaciones_restantes=pauta_service.publicaciones_restantes(pauta, solicitudes, destinos),
+        vigente=pauta_service.esta_vigente(pauta),
+        vencida=pauta_service.esta_vencida(pauta),
+        cuota_agotada=pauta_service.cuota_agotada(pauta, solicitudes, destinos),
+        canales_utilizados=tuple(sorted(canales, key=lambda canal: canal.value)),
+        fecha_primera_publicacion=min(fechas_publicacion) if fechas_publicacion else None,
+        fecha_ultima_publicacion=max(fechas_publicacion) if fechas_publicacion else None,
+        solicitudes=consumidas,
     )

@@ -17,6 +17,9 @@ from database.repositories.destino_publicacion_repository import (
     SqlAlchemyDestinoPublicacionRepository,
 )
 from database.repositories.gasto_repository import SqlAlchemyGastoRepository
+from database.repositories.identidad_comercial_repository import (
+    SqlAlchemyIdentidadComercialRepository,
+)
 from database.repositories.media_asset_repository import SqlAlchemyMediaAssetRepository
 from database.repositories.otro_ingreso_repository import SqlAlchemyOtroIngresoRepository
 from database.repositories.pauta_repository import SqlAlchemyPautaRepository
@@ -46,6 +49,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.media_assets = SqlAlchemyMediaAssetRepository(self._session)
         self.gastos = SqlAlchemyGastoRepository(self._session)
         self.otros_ingresos = SqlAlchemyOtroIngresoRepository(self._session)
+        self.identidad_comercial = SqlAlchemyIdentidadComercialRepository(self._session)
         self.users = SqlAlchemyUserRepository(self._session)
         self.sessions = SqlAlchemySessionRepository(self._session)
         return self

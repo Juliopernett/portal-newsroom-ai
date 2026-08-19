@@ -12,17 +12,24 @@ protected automatically instead of by remembering to add it.
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 
-from app.api.dependencies import get_current_user, get_unit_of_work
+from app.api.dependencies import get_current_user, get_media_storage, get_unit_of_work
+from app.api.pdf_informe import generar_informe_pauta_pdf
 from app.api.schemas.pauta import PautaCreate, PautaOut
 from core.entities.pauta import Pauta
+from core.ports.media_storage import MediaStorage
 from core.ports.unit_of_work import UnitOfWork
 from core.services.pauta_service import PautaService
+from core.services.reporte_service import construir_reporte_pauta
 
 router = APIRouter(prefix="/pautas", tags=["pautas"], dependencies=[Depends(get_current_user)])
+
+_FILENAME_UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 def _to_out(pauta: Pauta, uow: UnitOfWork) -> PautaOut:
@@ -106,3 +113,52 @@ def get_pauta(pauta_id: str, uow: UnitOfWork = Depends(get_unit_of_work)) -> Pau
 def list_pautas(uow: UnitOfWork = Depends(get_unit_of_work)) -> list[PautaOut]:
     """Return every Pauta with its computed quota status — the admin screen's data."""
     return [_to_out(pauta, uow) for pauta in uow.pautas.list_all()]
+
+
+def _nombre_archivo_informe(pauta: Pauta, cliente_nombre: str | None) -> str:
+    base = f"informe-{cliente_nombre or 'cliente'}-{pauta.fecha_inicio.isoformat()}"
+    return _FILENAME_UNSAFE.sub("-", base).strip("-") + ".pdf"
+
+
+@router.get("/{pauta_id}/informe.pdf")
+def descargar_informe_pauta(
+    pauta_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    media_storage: MediaStorage = Depends(get_media_storage),
+) -> Response:
+    """Generate and download the client-facing closing report for one Pauta.
+
+    Built on demand from current data (Sprint — informe de cierre de
+    contrato) — nothing is persisted, there is no "reportes" table. Reuses
+    `construir_reporte_pauta` (pure aggregation over the exact same
+    `PautaService`/`esta_completa` logic every other quota view already
+    uses) and `app.api.pdf_informe.generar_informe_pauta_pdf` (rendering
+    only, no domain logic of its own).
+    """
+    pauta = uow.pautas.get_by_id(pauta_id)
+    if pauta is None:
+        raise HTTPException(status_code=404, detail="Pauta not found")
+    cliente = uow.clients.get_by_id(pauta.client_id)
+    solicitudes = uow.publication_requests.list_by_pauta_id(pauta_id)
+    destinos = [
+        destino
+        for solicitud in solicitudes
+        for destino in uow.destinos_publicacion.list_by_publication_request_id(solicitud.id)
+    ]
+    reporte = construir_reporte_pauta(pauta, solicitudes, destinos, cliente, PautaService())
+
+    identidad = uow.identidad_comercial.get()
+    logo_bytes: bytes | None = None
+    if identidad is not None and identidad.logo_storage_key is not None:
+        try:
+            logo_bytes = media_storage.leer(identidad.logo_storage_key)
+        except FileNotFoundError:
+            logo_bytes = None
+
+    pdf_bytes = generar_informe_pauta_pdf(reporte, identidad, logo_bytes)
+    filename = _nombre_archivo_informe(pauta, cliente.nombre if cliente else None)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Calendar, Inbox, Pencil, Plus, RefreshCw, Search } from 'lucide-react'
+import { Calendar, FileDown, Inbox, Pencil, Plus, RefreshCw, Search } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ApiError } from '@/api/client'
@@ -277,6 +277,11 @@ export function ContratosPage() {
                         <Inbox /> Registrar
                       </Button>
                     )}
+                    <Button variant="ghost" size="sm" asChild>
+                      <a href={`/pautas/${pauta.id}/informe.pdf`} target="_blank" rel="noopener">
+                        <FileDown /> Informe
+                      </a>
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => openEdit(pauta)}>
                       <Pencil /> Editar
                     </Button>
