@@ -57,6 +57,7 @@ export default defineConfig({
       '/gastos': backendProxy(),
       '/insights': backendProxy(),
       '/pautas': backendProxy(),
+      '/planes-pauta': backendProxy(),
       '/publication-requests': backendProxy(false),
       '/reportes': backendProxy('/reportes'),
     },

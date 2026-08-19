@@ -20,6 +20,7 @@ from database.repositories.gasto_repository import SqlAlchemyGastoRepository
 from database.repositories.media_asset_repository import SqlAlchemyMediaAssetRepository
 from database.repositories.otro_ingreso_repository import SqlAlchemyOtroIngresoRepository
 from database.repositories.pauta_repository import SqlAlchemyPautaRepository
+from database.repositories.plan_pauta_repository import SqlAlchemyPlanPautaRepository
 from database.repositories.publication_request_repository import (
     SqlAlchemyPublicationRequestRepository,
 )
@@ -39,6 +40,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self._session = self._session_factory()
         self.clients = SqlAlchemyClientRepository(self._session)
         self.pautas = SqlAlchemyPautaRepository(self._session)
+        self.planes_pauta = SqlAlchemyPlanPautaRepository(self._session)
         self.publication_requests = SqlAlchemyPublicationRequestRepository(self._session)
         self.destinos_publicacion = SqlAlchemyDestinoPublicacionRepository(self._session)
         self.media_assets = SqlAlchemyMediaAssetRepository(self._session)

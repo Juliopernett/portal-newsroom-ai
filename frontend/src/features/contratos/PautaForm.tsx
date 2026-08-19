@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import { CurrencyInput } from '@/components/ui/currency-input'
@@ -6,8 +7,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SelectNative } from '@/components/ui/select-native'
 import type { Client } from '@/features/clientes/api'
-import { fechaNegocioISO, sumarDiasFecha } from '@/lib/format'
-import { PLANES_CATALOGO, type Pauta, type PautaInput } from './api'
+import { planesPautaApi } from '@/features/configuracion/api'
+import { fechaNegocioISO, formatMoneda, sumarDiasFecha } from '@/lib/format'
+import type { Pauta, PautaInput } from './api'
 
 function emptyForm(preselectClientId?: string): PautaInput {
   return {
@@ -39,6 +41,8 @@ export function PautaForm({
 }) {
   const [form, setForm] = useState<PautaInput>(emptyForm(preselectClientId))
   const [plan, setPlan] = useState('')
+  const planesQuery = useQuery({ queryKey: ['planes-pauta'], queryFn: planesPautaApi.list })
+  const planes = planesQuery.data ?? []
 
   useEffect(() => {
     setPlan('')
@@ -60,15 +64,15 @@ export function PautaForm({
 
   function applyPlan(planId: string) {
     setPlan(planId)
-    const plan = PLANES_CATALOGO.find((p) => p.id === planId)
+    const plan = planes.find((p) => p.id === planId)
     if (!plan) return
     const inicio = form.fecha_inicio || fechaNegocioISO()
     setForm({
       ...form,
       fecha_inicio: inicio,
-      fecha_fin: sumarDiasFecha(inicio, plan.dias),
-      publicaciones_contratadas: plan.cantidad,
-      valor_pagado: String(plan.valor),
+      fecha_fin: sumarDiasFecha(inicio, plan.dias_vigencia),
+      publicaciones_contratadas: plan.cantidad_publicaciones,
+      valor_pagado: plan.valor,
     })
   }
 
@@ -88,9 +92,9 @@ export function PautaForm({
           <Label htmlFor="pauta-plan">Plan (opcional — autocompleta cantidad y valor)</Label>
           <SelectNative id="pauta-plan" value={plan} onChange={(e) => applyPlan(e.target.value)}>
             <option value="">Elegir del catálogo…</option>
-            {PLANES_CATALOGO.map((p) => (
+            {planes.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.label}
+                {p.nombre} — {formatMoneda(p.valor)}
               </option>
             ))}
           </SelectNative>

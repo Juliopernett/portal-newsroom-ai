@@ -18,6 +18,7 @@ from core.ports.gasto_repository import GastoRepository
 from core.ports.media_asset_repository import MediaAssetRepository
 from core.ports.otro_ingreso_repository import OtroIngresoRepository
 from core.ports.pauta_repository import PautaRepository
+from core.ports.plan_pauta_repository import PlanPautaRepository
 from core.ports.publication_request_repository import PublicationRequestRepository
 from core.ports.session_repository import SessionRepository
 from core.ports.user_repository import UserRepository
@@ -37,6 +38,7 @@ class UnitOfWork(ABC):
 
     clients: ClientRepository
     pautas: PautaRepository
+    planes_pauta: PlanPautaRepository
     publication_requests: PublicationRequestRepository
     destinos_publicacion: DestinoPublicacionRepository
     media_assets: MediaAssetRepository

@@ -11,6 +11,7 @@ import {
   Download,
   LogOut,
   Menu,
+  Settings,
   X,
 } from 'lucide-react'
 
@@ -47,6 +48,10 @@ const NAV_GROUPS = [
       { to: '/gastos', label: 'Ingresos y gastos', icon: Wallet, end: false },
       { to: '/reportes', label: 'Reportes', icon: Download, end: false },
     ],
+  },
+  {
+    label: 'Sistema',
+    items: [{ to: '/configuracion', label: 'Configuración', icon: Settings, end: false }],
   },
 ] as const
 

@@ -28,6 +28,7 @@ from app.api.routers import (
     insights,
     otros_ingresos,
     pautas,
+    plan_pauta,
     publication_requests,
     reportes,
 )
@@ -46,6 +47,7 @@ app.include_router(gastos.router)
 app.include_router(insights.router)
 app.include_router(otros_ingresos.router)
 app.include_router(pautas.router)
+app.include_router(plan_pauta.router)
 app.include_router(publication_requests.router)
 app.include_router(reportes.router)
 
