@@ -201,7 +201,11 @@ export function SolicitudesPage() {
     )
   }
   const pendientesVisibles = pendientes.filter(coincide)
-  const publicadasFiltradas = publicadasVisibles.filter(coincide)
+  // A search query must reach every publicada ever loaded, not just the
+  // 30 most recent — otherwise older matches (e.g. a client's earlier
+  // publications) silently vanish from the results despite the full list
+  // already sitting in memory. With no query, keep the cheap 30-item cap.
+  const publicadasFiltradas = (busquedaTrim ? publicadasTodas : publicadasVisibles).filter(coincide)
 
   return (
     <div className="flex flex-col gap-4">
