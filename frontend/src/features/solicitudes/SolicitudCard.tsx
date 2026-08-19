@@ -289,11 +289,9 @@ export function SolicitudCard({
       )}
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        {!esPublicada && (
-          <Button variant="secondary" size="sm" onClick={() => setDestinosOpen((v) => !v)}>
-            <Link2 /> {destinosOpen ? 'Ocultar destinos' : 'Destinos'}
-          </Button>
-        )}
+        <Button variant="secondary" size="sm" onClick={() => setDestinosOpen((v) => !v)}>
+          <Link2 /> {destinosOpen ? 'Ocultar destinos' : 'Destinos'}
+        </Button>
         <Button variant="secondary" size="sm" onClick={() => setReporteOpen((v) => !v)}>
           <FileText /> {reporteOpen ? 'Ocultar reporte' : 'Ver reporte'}
         </Button>
@@ -302,7 +300,7 @@ export function SolicitudCard({
         </Button>
       </div>
 
-      {destinosOpen && !esPublicada && <DestinosPanel solicitudId={solicitud.id} />}
+      {destinosOpen && <DestinosPanel solicitudId={solicitud.id} esPublicada={esPublicada} />}
       {reporteOpen && <ReportePanel solicitudId={solicitud.id} />}
       {mediaOpen && <MediaPanel solicitudId={solicitud.id} esPublicada={esPublicada} />}
     </div>
