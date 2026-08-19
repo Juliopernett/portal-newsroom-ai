@@ -169,13 +169,7 @@ function DestinoRow({
   )
 }
 
-export function DestinosPanel({
-  solicitudId,
-  esPublicada = false,
-}: {
-  solicitudId: string
-  esPublicada?: boolean
-}) {
+export function DestinosPanel({ solicitudId }: { solicitudId: string }) {
   const queryClient = useQueryClient()
   const [canal, setCanal] = useState<CanalPublicacion | ''>('')
   const key = ['destinos', solicitudId]
@@ -221,7 +215,7 @@ export function DestinosPanel({
         </div>
       )}
 
-      {!esPublicada && disponibles.length > 0 && (
+      {disponibles.length > 0 && (
         <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
           <SelectNative className="h-8 text-base sm:text-xs" value={canal} onChange={(e) => setCanal(e.target.value as CanalPublicacion)}>
             <option value="">Agregar destino…</option>

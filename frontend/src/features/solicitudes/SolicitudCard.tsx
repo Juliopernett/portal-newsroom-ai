@@ -300,7 +300,7 @@ export function SolicitudCard({
         </Button>
       </div>
 
-      {destinosOpen && <DestinosPanel solicitudId={solicitud.id} esPublicada={esPublicada} />}
+      {destinosOpen && <DestinosPanel solicitudId={solicitud.id} />}
       {reporteOpen && <ReportePanel solicitudId={solicitud.id} />}
       {mediaOpen && <MediaPanel solicitudId={solicitud.id} esPublicada={esPublicada} />}
     </div>
