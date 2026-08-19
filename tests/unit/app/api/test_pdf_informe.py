@@ -1,15 +1,20 @@
-"""Unit tests for app.api.pdf_informe's pure text-formatting helpers."""
+"""Unit tests for app.api.pdf_informe's pure text-formatting/icon helpers."""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from reportlab.platypus import Table
+
 from app.api.pdf_informe import (
+    LinkedImage,
+    _es_tiktok,
     _href_red_social,
     _href_sitio_web,
-    _href_telefono,
+    _href_whatsapp,
     _lineas_contacto,
-    _lineas_otras_redes,
+    _lineas_otras_redes_sin_iconos,
+    _Styles,
     _titulo_o_fragmento,
 )
 from core.entities.destino_publicacion import CanalPublicacion, EstadoDestino
@@ -82,8 +87,8 @@ def test_nunca_queda_vacio_ni_con_titulo_ni_con_texto_con_espacios() -> None:
     assert resultado.startswith("Texto con espacios")
 
 
-def test_href_telefono_conserva_digitos_y_signo_mas() -> None:
-    assert _href_telefono("+57 315 095 4255") == "tel:+573150954255"
+def test_href_whatsapp_usa_solo_digitos_sin_signo_mas() -> None:
+    assert _href_whatsapp("+57 315 095 4255") == "https://wa.me/573150954255"
 
 
 def test_href_sitio_web_agrega_esquema_si_falta() -> None:
@@ -105,22 +110,53 @@ def test_href_red_social_respeta_url_absoluta() -> None:
     assert _href_red_social(url, "instagram.com") == url
 
 
-def test_lineas_otras_redes_linkea_solo_cuando_el_valor_es_una_url() -> None:
-    piezas = _lineas_otras_redes("TikTok: https://www.tiktok.com/@portalvallenato")
+def test_es_tiktok_reconoce_label_tiktok_con_url() -> None:
+    assert _es_tiktok("TikTok", "https://www.tiktok.com/@x") is True
+
+
+def test_es_tiktok_falso_sin_url() -> None:
+    assert _es_tiktok("TikTok", "@x") is False
+
+
+def test_es_tiktok_falso_para_otra_plataforma() -> None:
+    assert _es_tiktok("YouTube", "https://youtube.com/@x") is False
+
+
+def test_lineas_otras_redes_sin_iconos_omite_tiktok() -> None:
+    """TikTok se convierte en un ícono aparte (ver `_lineas_contacto`) — no debe
+    duplicarse también como línea de texto."""
+    piezas = _lineas_otras_redes_sin_iconos("TikTok: https://www.tiktok.com/@portalvallenato")
+
+    assert piezas == []
+
+
+def test_lineas_otras_redes_sin_iconos_linkea_otra_plataforma_con_url() -> None:
+    piezas = _lineas_otras_redes_sin_iconos("YouTube: https://youtube.com/@portalvallenato")
 
     assert len(piezas) == 1
     assert "<link" in piezas[0]
-    assert ">TikTok<" in piezas[0]
-    assert ">https://www.tiktok.com/@portalvallenato<" not in piezas[0]
+    assert ">YouTube<" in piezas[0]
+    assert ">https://youtube.com/@portalvallenato<" not in piezas[0]
 
 
-def test_lineas_otras_redes_deja_texto_libre_sin_url_intacto() -> None:
-    piezas = _lineas_otras_redes("Nos escuchan en toda Colombia")
+def test_lineas_otras_redes_sin_iconos_deja_texto_libre_intacto() -> None:
+    piezas = _lineas_otras_redes_sin_iconos("Nos escuchan en toda Colombia")
 
     assert piezas == ["Nos escuchan en toda Colombia"]
 
 
-def test_lineas_contacto_muestra_nombres_no_urls_crudas() -> None:
+def _fila_de_iconos(lineas: list) -> Table:
+    filas = [
+        flowable
+        for flowable in lineas
+        if isinstance(flowable, Table)
+        and all(isinstance(celda, LinkedImage) for celda in flowable._cellvalues[0])
+    ]
+    assert len(filas) == 1, "se esperaba exactamente una fila de íconos de redes"
+    return filas[0]
+
+
+def test_lineas_contacto_arma_un_icono_gris_por_cada_red_configurada() -> None:
     identidad = IdentidadComercial(
         nombre_comercial="Portal Vallenato",
         telefono="+573150954255",
@@ -131,21 +167,44 @@ def test_lineas_contacto_muestra_nombres_no_urls_crudas() -> None:
         otras_redes="TikTok: https://www.tiktok.com/@portalvallenato",
     )
 
-    lineas = "\n".join(_lineas_contacto(identidad))
+    lineas = _lineas_contacto(identidad, _Styles())
 
-    def visible_texto(url: str) -> str:
-        # La URL cruda solo debe aparecer dentro de href="..." (para que el
-        # link funcione) — nunca como el texto visible entre `>` y `</font>`.
-        return f">{url}<"
+    fila_iconos = _fila_de_iconos(lineas)
+    hrefs = {celda._href for celda in fila_iconos._cellvalues[0]}
+    assert hrefs == {
+        "https://www.portalvallenato.com/",
+        "https://www.instagram.com/portalvallenatoelite",
+        "https://www.facebook.com/VallenatoPortal",
+        "https://www.tiktok.com/@portalvallenato",
+    }
 
-    assert "Sitio web" in lineas
-    assert visible_texto("https://www.portalvallenato.com/") not in lineas
-    assert "Instagram" in lineas
-    assert visible_texto("https://www.instagram.com/portalvallenatoelite") not in lineas
-    assert "Facebook" in lineas
-    assert visible_texto("https://www.facebook.com/VallenatoPortal") not in lineas
-    assert "TikTok" in lineas
-    assert visible_texto("https://www.tiktok.com/@portalvallenato") not in lineas
-    # El teléfono y el correo sí se muestran tal cual — ya son su propia etiqueta legible.
-    assert ">+573150954255<" in lineas
-    assert ">contacto@portalvallenato.com<" in lineas
+
+def test_lineas_contacto_telefono_muestra_numero_con_icono_whatsapp() -> None:
+    identidad = IdentidadComercial(nombre_comercial="Portal Vallenato", telefono="+573150954255")
+
+    lineas = _lineas_contacto(identidad, _Styles())
+
+    filas_con_icono = [
+        f
+        for f in lineas
+        if isinstance(f, Table) and any(isinstance(c, LinkedImage) for c in f._cellvalues[0])
+    ]
+    assert len(filas_con_icono) == 1
+    icono, _texto = filas_con_icono[0]._cellvalues[0]
+    assert isinstance(icono, LinkedImage)
+    assert icono._href == "https://wa.me/573150954255"
+
+
+def test_lineas_contacto_sin_identidad_no_rompe() -> None:
+    assert _lineas_contacto(None, _Styles()) == []
+
+
+def test_lineas_contacto_sin_redes_no_agrega_fila_de_iconos() -> None:
+    identidad = IdentidadComercial(nombre_comercial="Portal Vallenato")
+
+    lineas = _lineas_contacto(identidad, _Styles())
+
+    assert not any(
+        isinstance(f, Table) and any(isinstance(c, LinkedImage) for c in f._cellvalues[0])
+        for f in lineas
+    )

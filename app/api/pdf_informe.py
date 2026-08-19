@@ -18,12 +18,17 @@ otherwise a publication made late at night could print as the wrong day.
 
 from __future__ import annotations
 
+import functools
 import io
 import re
 from datetime import date, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from xml.sax.saxutils import escape as _xml_escape
 from zoneinfo import ZoneInfo
+
+if TYPE_CHECKING:
+    from PIL.ImageDraw import ImageDraw
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -121,8 +126,10 @@ def _enlace_o_guion(url: str | None) -> str:
     return _link_texto(url, visible)
 
 
-def _href_telefono(telefono: str) -> str:
-    return f"tel:{re.sub(r'[^0-9+]', '', telefono)}"
+def _href_whatsapp(telefono: str) -> str:
+    """Build a WhatsApp click-to-chat link — digits only, no `+`, per WhatsApp's
+    own `wa.me` spec (a `tel:` link would just open the dialer, not WhatsApp)."""
+    return f"https://wa.me/{re.sub(r'[^0-9]', '', telefono)}"
 
 
 def _href_sitio_web(url: str) -> str:
@@ -144,25 +151,202 @@ def _href_red_social(valor: str, dominio: str) -> str:
     return f"https://{dominio}/{valor.lstrip('@')}"
 
 
-def _lineas_otras_redes(texto: str) -> list[str]:
-    """Parse "Label: url, Label2: url2" into clickable links labeled by name.
-
-    Only wraps a segment when its value is already a full URL — this field
-    is free text (see `IdentidadForm`), so a segment without a colon or
-    with a non-URL value is shown exactly as typed instead of guessing a
-    domain for an unknown platform.
-    """
-    piezas: list[str] = []
+def _partes_otras_redes(texto: str) -> list[tuple[str, str]]:
+    """Split "Label: url, Label2: url2" into (label, value) pairs — value is
+    the raw remainder after the first `:`, unparsed further."""
+    piezas: list[tuple[str, str]] = []
     for parte in texto.split(","):
         parte = parte.strip()
         if not parte:
             continue
         label, separador, valor = parte.partition(":")
-        if separador and _URL_ABSOLUTA.match(valor.strip()):
-            piezas.append(_link_texto(valor.strip(), label.strip()))
-        else:
-            piezas.append(_escape(parte))
+        piezas.append((label.strip(), valor.strip() if separador else ""))
     return piezas
+
+
+def _es_tiktok(label: str, valor: str) -> bool:
+    return "tiktok" in label.lower() and bool(_URL_ABSOLUTA.match(valor))
+
+
+def _lineas_otras_redes_sin_iconos(texto: str) -> list[str]:
+    """Same as before, but skips whatever `_es_tiktok` already turned into an
+    icon — TikTok gets its own badge (see `_lineas_contacto`), everything
+    else in this free-text field keeps showing as a clickable link (when the
+    value is a URL) or as plain text (no domain guessed for an unknown
+    platform)."""
+    piezas: list[str] = []
+    for label, valor in _partes_otras_redes(texto):
+        if _es_tiktok(label, valor):
+            continue
+        if valor and _URL_ABSOLUTA.match(valor):
+            piezas.append(_link_texto(valor, label))
+        else:
+            piezas.append(_escape(f"{label}: {valor}" if valor else label))
+    return piezas
+
+
+_ICONO_LADO_PX = 128  # supersampled canvas — downscaled for anti-aliased edges
+_ICONO_LADO_FINAL_PX = 40
+_ICONO_COLOR_FONDO = "#666666"  # mismo gris que styles.contacto — nunca compite con el logo
+
+
+def _dibujar_globo(draw: ImageDraw, lado: int) -> None:
+    """Sitio web: a plain geometric globe — latitude line + meridian ellipse."""
+    pad = lado * 0.24
+    grosor = max(2, lado // 22)
+    draw.ellipse((pad, pad, lado - pad, lado - pad), outline="white", width=grosor)
+    cx, cy = lado / 2, lado / 2
+    r = (lado - 2 * pad) / 2
+    draw.ellipse((cx - r * 0.42, cy - r, cx + r * 0.42, cy + r), outline="white", width=grosor)
+    draw.line((cx - r, cy, cx + r, cy), fill="white", width=grosor)
+
+
+def _dibujar_camara(draw: ImageDraw, lado: int) -> None:
+    """Instagram: a rounded camera outline with a lens and a shutter dot."""
+    pad = lado * 0.22
+    grosor = max(2, lado // 22)
+    draw.rounded_rectangle(
+        (pad, pad, lado - pad, lado - pad), radius=lado * 0.14, outline="white", width=grosor
+    )
+    cx, cy = lado / 2, lado / 2
+    r = (lado - 2 * pad) * 0.22
+    draw.ellipse((cx - r, cy - r, cx + r, cy + r), outline="white", width=grosor)
+    punto_r = lado * 0.035
+    punto_cx, punto_cy = lado - pad - punto_r * 2.2, pad + punto_r * 2.2
+    draw.ellipse(
+        (punto_cx - punto_r, punto_cy - punto_r, punto_cx + punto_r, punto_cy + punto_r),
+        fill="white",
+    )
+
+
+def _dibujar_nota_musical(draw: ImageDraw, lado: int) -> None:
+    """TikTok: a simplified eighth-note glyph — universal "audio/video" mark."""
+    grosor = max(2, lado // 20)
+    cx, cy = lado * 0.42, lado * 0.64
+    r = lado * 0.13
+    draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill="white")
+    tallo_x = cx + r * 0.92
+    draw.line((tallo_x, cy, tallo_x, lado * 0.22), fill="white", width=grosor)
+    draw.line(
+        (tallo_x, lado * 0.22, tallo_x + lado * 0.16, lado * 0.30), fill="white", width=grosor
+    )
+
+
+def _dibujar_telefono(draw: ImageDraw, lado: int) -> None:
+    """WhatsApp / teléfono: a simple handset silhouette."""
+    grosor = max(2, lado // 18)
+    cx, cy = lado / 2, lado / 2
+    r = lado * 0.24
+    draw.arc((cx - r, cy - r, cx + r, cy + r), start=200, end=340, fill="white", width=grosor)
+    # Two small "ear" strokes at the arc's open ends, mirrored left/right.
+    extremos = ((cx - r * 0.94, cy - r * 0.34, -1), (cx + r * 0.94, cy - r * 0.34, 1))
+    for ex, ey, signo in extremos:
+        draw.line(
+            (ex, ey, ex + signo * lado * 0.06, ey - lado * 0.10), fill="white", width=grosor
+        )
+
+
+def _dibujar_letra_f(draw: ImageDraw, lado: int) -> None:
+    """Facebook: a plain "f" mark — the one glyph safe to render with Pillow's
+    built-in scalable default font (no external font file needed)."""
+    from PIL import ImageFont
+
+    fuente = ImageFont.load_default(size=int(lado * 0.62))
+    caja = draw.textbbox((0, 0), "f", font=fuente)
+    ancho, alto = caja[2] - caja[0], caja[3] - caja[1]
+    draw.text(
+        ((lado - ancho) / 2 - caja[0], (lado - alto) / 2 - caja[1]), "f", font=fuente, fill="white"
+    )
+
+
+_DIBUJANTES = {
+    "web": _dibujar_globo,
+    "instagram": _dibujar_camara,
+    "facebook": _dibujar_letra_f,
+    "tiktok": _dibujar_nota_musical,
+    "whatsapp": _dibujar_telefono,
+}
+
+
+@functools.cache
+def _icono_bytes(clave: str) -> bytes:
+    """Render a small circular gray badge icon in-memory — no external icon
+    assets, no brand colors (the identidad's own logo is the priority visual
+    element; these are neutral, gray, secondary marks). Drawn at 4x scale and
+    downsampled for anti-aliased edges, cached since the same handful of
+    icons is reused on every informe generated."""
+    from PIL import Image as PILImage
+    from PIL import ImageDraw
+
+    lado = _ICONO_LADO_PX
+    imagen = PILImage.new("RGBA", (lado, lado), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(imagen)
+    draw.ellipse((0, 0, lado - 1, lado - 1), fill=_ICONO_COLOR_FONDO)
+    _DIBUJANTES[clave](draw, lado)
+    imagen = imagen.resize(
+        (_ICONO_LADO_FINAL_PX, _ICONO_LADO_FINAL_PX), PILImage.Resampling.LANCZOS
+    )
+    buffer = io.BytesIO()
+    imagen.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+class LinkedImage(Image):  # type: ignore[misc]  # reportlab ships no type stubs
+    """An `Image` flowable that opens `href` when clicked in the rendered PDF.
+
+    `reportlab.platypus.Paragraph`'s `<link>` tag only wraps text/inline
+    content — an `Image` flowable placed in a `Table` cell needs its own
+    clickable region, added via `canvas.linkURL` after the image itself is
+    drawn. `relative=1` keeps the rect in the flowable's own coordinate
+    space, so it doesn't matter where this ends up laid out on the page.
+    """
+
+    def __init__(self, fileobj: object, href: str, **kwargs: object) -> None:
+        super().__init__(fileobj, **kwargs)
+        self._href = href
+
+    def draw(self) -> None:
+        super().draw()
+        self.canv.linkURL(self._href, (0, 0, self.drawWidth, self.drawHeight), relative=1)
+
+
+def _icono_link(clave: str, href: str, lado: float = 0.42 * cm) -> LinkedImage:
+    return LinkedImage(io.BytesIO(_icono_bytes(clave)), href, width=lado, height=lado)
+
+
+def _fila_icono_texto(icono: Flowable, texto: Paragraph, ancho_icono: float) -> Table:
+    """A tight [icon][text] pair, e.g. the WhatsApp badge next to the phone number."""
+    tabla = Table([[icono, texto]], colWidths=[ancho_icono, None])
+    tabla.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (0, -1), 4),
+                ("RIGHTPADDING", (1, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    return tabla
+
+
+def _fila_iconos(iconos: list[Flowable]) -> Table:
+    """A horizontal row of icon badges — Sitio web / Instagram / Facebook / TikTok."""
+    tabla = Table([iconos], colWidths=[None] * len(iconos))
+    tabla.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    return tabla
 
 
 class _Styles:
@@ -224,42 +408,55 @@ def _imagen_logo(logo_bytes: bytes, lado_max: float = 2.4 * cm) -> Image | None:
     return Image(io.BytesIO(logo_bytes), width=ancho_px * escala, height=alto_px * escala)
 
 
-def _lineas_contacto(identidad: IdentidadComercial | None) -> list[str]:
-    """Build the identidad's contact/social lines, each social value as a
-    clickable link labeled by platform name (never the raw URL/handle) —
-    matches how the operator actually wants this to read on the printed
-    report, not how it's stored in Configuración."""
+def _lineas_contacto(identidad: IdentidadComercial | None, styles: _Styles) -> list[Flowable]:
+    """Build the identidad's contact/social block.
+
+    Social values (sitio web, Instagram, Facebook, TikTok) render as small
+    gray icon badges, clickable, no visible URL/label — the logo is the one
+    branded visual, everything else stays neutral (see `_ICONO_COLOR_FONDO`).
+    Teléfono keeps showing as readable text (it's information on its own,
+    not just a link) with a WhatsApp badge as its click target. Email stays
+    plain clickable text — no widely-recognized neutral "envelope" glyph
+    was worth adding for one field.
+    """
     if identidad is None:
         return []
-    lineas: list[str] = []
+    lineas: list[Flowable] = []
     if identidad.razon_social:
-        lineas.append(_escape(identidad.razon_social))
+        lineas.append(Paragraph(_escape(identidad.razon_social), styles.contacto))
     if identidad.nit:
-        lineas.append(f"NIT {_escape(identidad.nit)}")
+        lineas.append(Paragraph(f"NIT {_escape(identidad.nit)}", styles.contacto))
 
-    contacto_partes = []
     if identidad.telefono:
-        contacto_partes.append(_link_texto(_href_telefono(identidad.telefono), identidad.telefono))
+        icono = _icono_link("whatsapp", _href_whatsapp(identidad.telefono))
+        texto = Paragraph(_escape(identidad.telefono), styles.contacto)
+        lineas.append(_fila_icono_texto(icono, texto, icono.drawWidth))
     if identidad.email:
-        contacto_partes.append(_link_texto(f"mailto:{identidad.email}", identidad.email))
-    if identidad.sitio_web:
-        contacto_partes.append(_link_texto(_href_sitio_web(identidad.sitio_web), "Sitio web"))
-    if contacto_partes:
-        lineas.append(" · ".join(contacto_partes))
+        lineas.append(
+            Paragraph(_link_texto(f"mailto:{identidad.email}", identidad.email), styles.contacto)
+        )
 
-    redes_partes = []
+    iconos_redes: list[Flowable] = []
+    if identidad.sitio_web:
+        iconos_redes.append(_icono_link("web", _href_sitio_web(identidad.sitio_web)))
     if identidad.instagram:
-        redes_partes.append(
-            _link_texto(_href_red_social(identidad.instagram, "instagram.com"), "Instagram")
+        iconos_redes.append(
+            _icono_link("instagram", _href_red_social(identidad.instagram, "instagram.com"))
         )
     if identidad.facebook:
-        redes_partes.append(
-            _link_texto(_href_red_social(identidad.facebook, "facebook.com"), "Facebook")
+        iconos_redes.append(
+            _icono_link("facebook", _href_red_social(identidad.facebook, "facebook.com"))
         )
+    texto_otras_redes: list[str] = []
     if identidad.otras_redes:
-        redes_partes.extend(_lineas_otras_redes(identidad.otras_redes))
-    if redes_partes:
-        lineas.append(" · ".join(redes_partes))
+        for label, valor in _partes_otras_redes(identidad.otras_redes):
+            if _es_tiktok(label, valor):
+                iconos_redes.append(_icono_link("tiktok", valor))
+        texto_otras_redes = _lineas_otras_redes_sin_iconos(identidad.otras_redes)
+    if iconos_redes:
+        lineas.append(_fila_iconos(iconos_redes))
+    if texto_otras_redes:
+        lineas.append(Paragraph(" · ".join(texto_otras_redes), styles.contacto))
 
     return lineas
 
@@ -268,9 +465,10 @@ def _bloque_identidad(
     identidad: IdentidadComercial | None, logo_bytes: bytes | None, styles: _Styles
 ) -> list[Flowable]:
     nombre = identidad.nombre_comercial if identidad else "Portal Vallenato"
-    columna_texto = [Paragraph(f"<b>{_escape(nombre)}</b>", styles.nombre_comercial)]
-    for linea in _lineas_contacto(identidad):
-        columna_texto.append(Paragraph(linea, styles.contacto))
+    columna_texto: list[Flowable] = [
+        Paragraph(f"<b>{_escape(nombre)}</b>", styles.nombre_comercial)
+    ]
+    columna_texto.extend(_lineas_contacto(identidad, styles))
 
     logo = _imagen_logo(logo_bytes) if logo_bytes else None
     if logo is not None:
