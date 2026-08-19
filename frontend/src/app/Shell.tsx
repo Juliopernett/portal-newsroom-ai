@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { insightsApi } from '@/features/alertas/api'
 import { centroAlertaKey, useDismissedAlerts } from '@/features/alertas/utils'
-import logoMark from '@/assets/logo-mark.png'
+import { AppLogo } from './AppLogo'
 
 // Grouped by utility rather than one flat list: Dashboard/Alertas stay
 // ungrouped (analítica, se consultan solas), "Comercial" agrupa las tres
@@ -82,7 +82,7 @@ export function Shell() {
     <div className="flex h-svh flex-col md:flex-row">
       <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3 md:hidden">
         <div className="flex items-center gap-2">
-          <img src={logoMark} alt="" className="size-6" />
+          <AppLogo alt="" className="size-6 object-contain" />
           <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
         </div>
         <button
@@ -111,7 +111,7 @@ export function Shell() {
         )}
       >
         <div className="hidden items-center gap-2 px-4 py-5 md:flex">
-          <img src={logoMark} alt="" className="size-8 shrink-0" />
+          <AppLogo alt="" className="size-8 shrink-0 object-contain" />
           <div>
             <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
             {user && <p className="truncate text-xs text-muted-foreground">{user.nombre}</p>}
@@ -119,7 +119,7 @@ export function Shell() {
         </div>
         <div className="flex items-center justify-between px-4 py-4 md:hidden">
           <div className="flex items-center gap-2">
-            <img src={logoMark} alt="" className="size-7 shrink-0" />
+            <AppLogo alt="" className="size-7 shrink-0 object-contain" />
             <div>
               <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
               {user && <p className="truncate text-xs text-muted-foreground">{user.nombre}</p>}

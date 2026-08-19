@@ -137,3 +137,32 @@ def test_logo_get_returns_404_when_never_uploaded(client: TestClient) -> None:
     response = client.get("/identidad-comercial/logo")
 
     assert response.status_code == 404
+
+
+def test_logo_get_works_without_a_session(client: TestClient) -> None:
+    """The logo is public branding (login screen, sidebar, favicon) — unlike
+    every other identidad-comercial field, it must render before login.
+
+    Configures it through the already-logged-in `client` fixture, then
+    drops its session cookie to simulate an unauthenticated request — the
+    same TestClient, just without the cookie `client`'s login left behind.
+    """
+    client.put("/identidad-comercial", json=_payload())
+    contenido = _tiny_png()
+    client.post(
+        "/identidad-comercial/logo",
+        files={"archivo": ("logo.png", io.BytesIO(contenido), "image/png")},
+    )
+
+    client.cookies.clear()
+    response = client.get("/identidad-comercial/logo")
+
+    assert response.status_code == 200
+    assert response.content == contenido
+
+
+def test_identidad_comercial_text_fields_still_require_a_session(client: TestClient) -> None:
+    client.cookies.clear()
+
+    assert client.get("/identidad-comercial").status_code == 401
+    assert client.put("/identidad-comercial", json=_payload()).status_code == 401

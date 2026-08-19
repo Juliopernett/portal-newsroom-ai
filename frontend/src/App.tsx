@@ -6,6 +6,7 @@ import { AuthProvider } from '@/features/auth/AuthProvider'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ProtectedRoute } from '@/features/auth/ProtectedRoute'
 import { Shell } from '@/app/Shell'
+import { useFaviconIdentidad } from '@/app/AppLogo'
 import { GastosPage } from '@/features/gastos/GastosPage'
 import { ClientesPage } from '@/features/clientes/ClientesPage'
 import { ReportesPage } from '@/features/reportes/ReportesPage'
@@ -25,6 +26,8 @@ const queryClient = new QueryClient({
 })
 
 export default function App() {
+  useFaviconIdentidad()
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

@@ -8,7 +8,12 @@ logo vive aparte, en `MediaStorage` — mismo Volume que ya usa `MediaAsset`
 navegador, así sobrevive a cualquier dispositivo/sesión.
 
 Every route requires an authenticated session — `dependencies=` at the
-`APIRouter` level, same convention as every other router in this package.
+`APIRouter` level, same convention as every other router in this package —
+**except** `GET /logo` (see `router_publico` below): the logo is used as
+the app's own branding (login screen, sidebar, favicon), which by
+definition must render before a session exists. It carries no sensitive
+data, so serving it unauthenticated is safe; every other field
+(NIT, teléfono, email, ...) stays behind `router`.
 """
 
 from __future__ import annotations
@@ -30,6 +35,7 @@ router = APIRouter(
     tags=["identidad-comercial"],
     dependencies=[Depends(get_current_user)],
 )
+router_publico = APIRouter(prefix="/identidad-comercial", tags=["identidad-comercial"])
 
 
 @router.get("", response_model=IdentidadComercialOut)
@@ -100,13 +106,15 @@ async def subir_logo(
     return actualizado
 
 
-@router.get("/logo")
+@router_publico.get("/logo")
 def descargar_logo(
     uow: UnitOfWork = Depends(get_unit_of_work),
     media_storage: MediaStorage = Depends(get_media_storage),
 ) -> Response:
-    """Stream the configured logo's raw bytes — used as an `<img>` src and by
-    `app.api.pdf_informe` to embed the logo in a generated PDF."""
+    """Stream the configured logo's raw bytes — unauthenticated (see module
+    docstring): used as the app's `<img>` src on the login screen, sidebar,
+    and dynamic favicon, and by `app.api.pdf_informe` to embed the logo in a
+    generated PDF."""
     identidad = uow.identidad_comercial.get()
     if identidad is None or identidad.logo_storage_key is None:
         raise HTTPException(status_code=404, detail="No hay logo configurado")
