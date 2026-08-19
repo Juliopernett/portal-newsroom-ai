@@ -232,18 +232,22 @@ def _dibujar_nota_musical(draw: ImageDraw, lado: int) -> None:
     )
 
 
-def _dibujar_telefono(draw: ImageDraw, lado: int) -> None:
-    """WhatsApp / teléfono: a simple handset silhouette."""
-    grosor = max(2, lado // 18)
-    cx, cy = lado / 2, lado / 2
-    r = lado * 0.24
-    draw.arc((cx - r, cy - r, cx + r, cy + r), start=200, end=340, fill="white", width=grosor)
-    # Two small "ear" strokes at the arc's open ends, mirrored left/right.
-    extremos = ((cx - r * 0.94, cy - r * 0.34, -1), (cx + r * 0.94, cy - r * 0.34, 1))
-    for ex, ey, signo in extremos:
-        draw.line(
-            (ex, ey, ex + signo * lado * 0.06, ey - lado * 0.10), fill="white", width=grosor
-        )
+def _dibujar_burbuja_chat(draw: ImageDraw, lado: int) -> None:
+    """WhatsApp: a filled speech bubble — reads clearly even at badge size,
+    unlike a thin handset outline (the previous design, illegible at 40px)."""
+    pad = lado * 0.24
+    ancho = lado - 2 * pad
+    alto = ancho * 0.76
+    x0 = pad
+    y0 = pad + (lado - 2 * pad - alto) / 2 - lado * 0.03
+    x1, y1 = x0 + ancho, y0 + alto
+    draw.rounded_rectangle((x0, y0, x1, y1), radius=alto * 0.3, fill="white")
+    cola = [
+        (x0 + ancho * 0.20, y1 - alto * 0.05),
+        (x0 + ancho * 0.20, y1 + alto * 0.32),
+        (x0 + ancho * 0.42, y1 - alto * 0.05),
+    ]
+    draw.polygon(cola, fill="white")
 
 
 def _dibujar_letra_f(draw: ImageDraw, lado: int) -> None:
@@ -264,7 +268,7 @@ _DIBUJANTES = {
     "instagram": _dibujar_camara,
     "facebook": _dibujar_letra_f,
     "tiktok": _dibujar_nota_musical,
-    "whatsapp": _dibujar_telefono,
+    "whatsapp": _dibujar_burbuja_chat,
 }
 
 
