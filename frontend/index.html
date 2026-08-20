@@ -6,6 +6,19 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Portal Vallenato Newsroom</title>
+
+    <!-- Open Graph — la vista previa que arman WhatsApp/redes al compartir el
+         link. Independiente del favicon (arriba): sin estas etiquetas el
+         crawler no tiene de dónde sacar imagen/título. og:image apunta a la
+         URL estable de Railway (no al subdominio nuevo, cuyo certificado aún
+         puede estar emitiéndose) — el crawler la resuelve aparte del
+         dominio que se comparta, así que funciona igual desde cualquiera. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Portal Vallenato Newsroom" />
+    <meta property="og:description" content="Sistema de gestión editorial y comercial de Portal Vallenato." />
+    <meta property="og:image" content="https://portal-newsroom-ai-production.up.railway.app/identidad-comercial/logo" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:image" content="https://portal-newsroom-ai-production.up.railway.app/identidad-comercial/logo" />
   </head>
   <body>
     <div id="root"></div>
