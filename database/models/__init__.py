@@ -12,6 +12,7 @@ from database.models.client import ClientModel
 from database.models.destino_publicacion import DestinoPublicacionModel
 from database.models.gasto import GastoModel
 from database.models.identidad_comercial import IdentidadComercialModel
+from database.models.informe_link import InformeLinkModel
 from database.models.media_asset import MediaAssetModel
 from database.models.pauta import PautaModel
 from database.models.plan_pauta import PlanPautaModel
@@ -24,6 +25,7 @@ __all__ = [
     "DestinoPublicacionModel",
     "GastoModel",
     "IdentidadComercialModel",
+    "InformeLinkModel",
     "MediaAssetModel",
     "PautaModel",
     "PlanPautaModel",

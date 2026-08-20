@@ -11,8 +11,15 @@ shape the sprint called out, and that it never 500s.
 from __future__ import annotations
 
 import io
+from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine
+from sqlalchemy.orm import sessionmaker
+
+from app.api.dependencies import hash_session_token
+from core.entities.informe_link import InformeLink
+from database.repositories.informe_link_repository import SqlAlchemyInformeLinkRepository
 
 
 def _create_client(client: TestClient) -> str:
@@ -185,3 +192,96 @@ def test_informe_funciona_sin_identidad_comercial_configurada(client: TestClient
 
     assert response.status_code == 200
     assert response.content.startswith(b"%PDF")
+
+
+# --- Enlace compartible (POST .../informe-link + GET .../informe-publico.pdf) ---
+
+
+def test_crear_informe_link_404_when_pauta_does_not_exist(client: TestClient) -> None:
+    response = client.post("/pautas/no-existe/informe-link")
+
+    assert response.status_code == 404
+
+
+def test_crear_informe_link_returns_a_public_url_and_expiry(client: TestClient) -> None:
+    client_id = _create_client(client)
+    pauta_id = _create_pauta(client, client_id)
+
+    response = client.post(f"/pautas/{pauta_id}/informe-link")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert f"/pautas/{pauta_id}/informe-publico.pdf?token=" in body["url"]
+    assert body["expira_en"]
+
+
+def test_informe_publico_pdf_works_without_any_session_cookie(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    """The whole point of the share link: it must be reachable by someone
+    who never logged in — proven with a *separate* `TestClient` instance
+    (its own, empty cookie jar) instead of the already-authenticated
+    `client`, which would prove nothing either way."""
+    client_id = _create_client(client)
+    pauta_id = _create_pauta(client, client_id)
+    _crear_solicitud_completa_multicanal(client, pauta_id, "Lanzamiento vía enlace compartido")
+    token = client.post(f"/pautas/{pauta_id}/informe-link").json()["url"].split("token=")[1]
+
+    from app.api.main import app as fastapi_app
+
+    with TestClient(fastapi_app) as publico:
+        response = publico.get(f"/pautas/{pauta_id}/informe-publico.pdf", params={"token": token})
+
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF")
+
+
+def test_informe_publico_pdf_404_with_a_garbage_token(client: TestClient) -> None:
+    client_id = _create_client(client)
+    pauta_id = _create_pauta(client, client_id)
+
+    response = client.get(
+        f"/pautas/{pauta_id}/informe-publico.pdf", params={"token": "no-es-un-token-real"}
+    )
+
+    assert response.status_code == 404
+
+
+def test_informe_publico_pdf_404_when_token_belongs_to_a_different_pauta(
+    client: TestClient,
+) -> None:
+    client_id = _create_client(client)
+    pauta_a = _create_pauta(client, client_id)
+    pauta_b = _create_pauta(client, client_id, fecha_inicio="2026-09-01", fecha_fin="2026-09-30")
+    token = client.post(f"/pautas/{pauta_a}/informe-link").json()["url"].split("token=")[1]
+
+    response = client.get(f"/pautas/{pauta_b}/informe-publico.pdf", params={"token": token})
+
+    assert response.status_code == 404
+
+
+def test_informe_publico_pdf_404_when_the_link_expired(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    client_id = _create_client(client)
+    pauta_id = _create_pauta(client, client_id)
+
+    session_factory = sessionmaker(bind=_test_engine, autoflush=False, autocommit=False)
+    session = session_factory()
+    now = datetime.now(UTC)
+    expired = InformeLink(
+        pauta_id=pauta_id,
+        token_hash=hash_session_token("a-token-issued-16-days-ago"),
+        created_at=now - timedelta(days=16),
+        expires_at=now - timedelta(days=1),
+    )
+    SqlAlchemyInformeLinkRepository(session).save(expired)
+    session.commit()
+    session.close()
+
+    response = client.get(
+        f"/pautas/{pauta_id}/informe-publico.pdf",
+        params={"token": "a-token-issued-16-days-ago"},
+    )
+
+    assert response.status_code == 404

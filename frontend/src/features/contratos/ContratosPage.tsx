@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Calendar, FileDown, Inbox, Pencil, Plus, RefreshCw, Search } from 'lucide-react'
+import { Calendar, FileDown, Inbox, MessageCircle, Pencil, Plus, RefreshCw, Search } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { ApiError } from '@/api/client'
+import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -85,6 +85,38 @@ export function ContratosPage() {
     for (const c of clientsQuery.data ?? []) map.set(c.id, c.nombre)
     return map
   }, [clientsQuery.data])
+
+  const clientsPhoneById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const c of clientsQuery.data ?? []) map.set(c.id, c.telefono)
+    return map
+  }, [clientsQuery.data])
+
+  const informeLinkMutation = useMutation({
+    mutationFn: pautasApi.crearInformeLink,
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
+  // wa.me's click-to-chat only pre-fills text — it cannot attach the PDF
+  // itself, so the message carries a link to it instead (see
+  // `POST /pautas/{id}/informe-link` — a fresh, time-limited token every
+  // click, no login required to open it). The number must be digits only,
+  // country code included, no "+"/spaces/dashes.
+  function enviarInformePorWhatsapp(pauta: Pauta) {
+    const telefono = clientsPhoneById.get(pauta.client_id)
+    if (!telefono) {
+      toast.error('Este cliente no tiene teléfono registrado.')
+      return
+    }
+    const digits = telefono.replace(/\D/g, '')
+    const nombre = clientsById.get(pauta.client_id) ?? ''
+    informeLinkMutation.mutate(pauta.id, {
+      onSuccess: (link) => {
+        const mensaje = `Hola ${nombre}, aquí tienes el informe de resultados de tu campaña con Portal Vallenato: ${link.url}`
+        window.open(`https://wa.me/${digits}?text=${encodeURIComponent(mensaje)}`, '_blank', 'noopener')
+      },
+    })
+  }
 
   const createMutation = useMutation({
     mutationFn: pautasApi.create,
@@ -281,6 +313,14 @@ export function ContratosPage() {
                       <a href={`/pautas/${pauta.id}/informe.pdf`} target="_blank" rel="noopener">
                         <FileDown /> Informe
                       </a>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={informeLinkMutation.isPending}
+                      onClick={() => enviarInformePorWhatsapp(pauta)}
+                    >
+                      <MessageCircle /> WhatsApp
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => openEdit(pauta)}>
                       <Pencil /> Editar

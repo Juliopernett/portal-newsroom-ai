@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # --- Auth (login MVP — see docs/adr/ADR-005-authentication.md) ---
     session_ttl_hours: int = 24 * 7
 
+    # --- Informe compartido (enlace de WhatsApp — ver core.entities.informe_link) ---
+    informe_link_ttl_dias: int = 15
+
     # --- WordPress (used by the future WordPress agent) ---
     wordpress_site_url: str | None = None
     wordpress_username: str | None = None

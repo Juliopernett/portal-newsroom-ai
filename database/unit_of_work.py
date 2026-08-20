@@ -20,6 +20,7 @@ from database.repositories.gasto_repository import SqlAlchemyGastoRepository
 from database.repositories.identidad_comercial_repository import (
     SqlAlchemyIdentidadComercialRepository,
 )
+from database.repositories.informe_link_repository import SqlAlchemyInformeLinkRepository
 from database.repositories.media_asset_repository import SqlAlchemyMediaAssetRepository
 from database.repositories.otro_ingreso_repository import SqlAlchemyOtroIngresoRepository
 from database.repositories.pauta_repository import SqlAlchemyPautaRepository
@@ -33,7 +34,8 @@ from database.repositories.user_repository import SqlAlchemyUserRepository
 
 class SqlAlchemyUnitOfWork(UnitOfWork):
     """Groups `Client`/`Pauta`/`PublicationRequest`/`DestinoPublicacion`/
-    `MediaAsset`/`Gasto`/`OtroIngreso`/`User`/`Session` repos in one transaction."""
+    `MediaAsset`/`Gasto`/`OtroIngreso`/`IdentidadComercial`/`InformeLink`/
+    `User`/`Session` repos in one transaction."""
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
@@ -50,6 +52,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.gastos = SqlAlchemyGastoRepository(self._session)
         self.otros_ingresos = SqlAlchemyOtroIngresoRepository(self._session)
         self.identidad_comercial = SqlAlchemyIdentidadComercialRepository(self._session)
+        self.informe_links = SqlAlchemyInformeLinkRepository(self._session)
         self.users = SqlAlchemyUserRepository(self._session)
         self.sessions = SqlAlchemySessionRepository(self._session)
         return self

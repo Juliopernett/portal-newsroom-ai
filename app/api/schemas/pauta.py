@@ -55,3 +55,10 @@ class PautaOut(BaseModel):
     cuota_agotada: bool
     peso_comercial: Decimal
     tipo: PautaTipo
+
+
+class InformeLinkOut(BaseModel):
+    """Response body for `POST /pautas/{pauta_id}/informe-link`."""
+
+    url: str
+    expira_en: datetime

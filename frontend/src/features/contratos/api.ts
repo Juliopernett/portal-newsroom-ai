@@ -42,8 +42,14 @@ export interface PautaInput {
   observaciones: string | null
 }
 
+export interface InformeLink {
+  url: string
+  expira_en: string
+}
+
 export const pautasApi = {
   list: () => api.get<Pauta[]>('/pautas'),
   create: (payload: PautaInput) => api.post<Pauta>('/pautas', payload),
   update: (id: string, payload: PautaInput) => api.put<Pauta>(`/pautas/${id}`, payload),
+  crearInformeLink: (id: string) => api.post<InformeLink>(`/pautas/${id}/informe-link`),
 }
