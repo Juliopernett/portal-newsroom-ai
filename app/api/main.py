@@ -68,6 +68,27 @@ app.include_router(reportes.router)
 _ALWAYS_BACKEND_PREFIXES = ("/publication-requests", "/docs", "/redoc", "/openapi.json")
 _HAS_FILE_EXTENSION = re.compile(r"\.[A-Za-z0-9]{2,5}$")
 
+# Baseline security headers on every response (security audit 2026-08-20,
+# finding M3): `nosniff` closes the MIME-sniffing angle a mislabeled
+# upload could otherwise exploit (see H1/M2 — a closed content-type
+# allow-list on every upload route, not this header alone, is the actual
+# fix for those); `X-Frame-Options` blocks clickjacking (this app was
+# never meant to be framed by anything); HSTS is safe to always send —
+# Railway serves everything over HTTPS in production, and a browser
+# ignores the header over plain HTTP dev anyway.
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+}
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next) -> Response:
+    response = await call_next(request)
+    response.headers.update(_SECURITY_HEADERS)
+    return response
+
 
 @app.middleware("http")
 async def serve_frontend(request: Request, call_next) -> Response:

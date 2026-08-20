@@ -15,6 +15,16 @@ from datetime import datetime, timedelta
 from core.entities.media_asset import MediaAssetType
 from core.entities.publication_request import PublicationRequest
 
+# Closed allow-list, not `startswith("image/")` — that would also accept
+# `image/svg+xml`, which is XML, not a raster image: a SVG can carry
+# `<script>`/`onload`, and a route that serves it back with
+# `Content-Disposition: inline` (`descargar_media` here, and
+# `identidad_comercial.descargar_logo`, which reuses this same set) would
+# render — and run — it in the browser at this same origin instead of
+# downloading as a file (security audit 2026-08-20, findings H1/M2).
+TIPOS_IMAGEN_PERMITIDOS = frozenset({"image/jpeg", "image/png", "image/gif", "image/webp"})
+_TIPOS_VIDEO_PREFIX = "video/"
+
 
 def determinar_tipo(content_type: str) -> MediaAssetType:
     """Return the `MediaAssetType` for `content_type`, or raise `ValueError`.
@@ -24,9 +34,9 @@ def determinar_tipo(content_type: str) -> MediaAssetType:
     trusts a client-supplied `tipo` directly — it's always derived from
     the file's own MIME type.
     """
-    if content_type.startswith("image/"):
+    if content_type in TIPOS_IMAGEN_PERMITIDOS:
         return MediaAssetType.IMAGEN
-    if content_type.startswith("video/"):
+    if content_type.startswith(_TIPOS_VIDEO_PREFIX):
         return MediaAssetType.VIDEO
     raise ValueError(f"content_type no soportado: {content_type!r} (solo imagen o video)")
 

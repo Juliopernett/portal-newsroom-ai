@@ -44,12 +44,71 @@ def test_login_rejects_the_wrong_password(
     assert response.status_code == 401
 
 
+def test_login_rejects_an_oversized_password(unauthenticated_client: TestClient) -> None:
+    """security audit 2026-08-20, L1 — rejected before it ever reaches Argon2id."""
+    response = unauthenticated_client.post(
+        "/auth/login", json={"email": TEST_USER_EMAIL, "password": "x" * 257}
+    )
+
+    assert response.status_code == 422
+
+
 def test_login_rejects_an_unknown_email(unauthenticated_client: TestClient) -> None:
     response = unauthenticated_client.post(
         "/auth/login", json={"email": "no-existe@portalvallenato.com", "password": "anything"}
     )
 
     assert response.status_code == 401
+
+
+def test_login_blocks_after_too_many_failed_attempts(
+    seeded_user: User, unauthenticated_client: TestClient
+) -> None:
+    for _ in range(5):
+        response = unauthenticated_client.post(
+            "/auth/login", json={"email": TEST_USER_EMAIL, "password": "wrong-password"}
+        )
+        assert response.status_code == 401
+
+    blocked = unauthenticated_client.post(
+        "/auth/login", json={"email": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD}
+    )
+
+    assert blocked.status_code == 429
+
+
+def test_login_rate_limit_is_scoped_to_the_email(
+    seeded_user: User, unauthenticated_client: TestClient
+) -> None:
+    for _ in range(5):
+        unauthenticated_client.post(
+            "/auth/login", json={"email": TEST_USER_EMAIL, "password": "wrong-password"}
+        )
+
+    response = unauthenticated_client.post(
+        "/auth/login", json={"email": "otra-cuenta@portalvallenato.com", "password": "anything"}
+    )
+
+    assert response.status_code == 401  # no 429 — un email distinto no está bloqueado
+
+
+def test_successful_login_resets_the_failure_count(
+    seeded_user: User, unauthenticated_client: TestClient
+) -> None:
+    for _ in range(4):
+        unauthenticated_client.post(
+            "/auth/login", json={"email": TEST_USER_EMAIL, "password": "wrong-password"}
+        )
+
+    ok = unauthenticated_client.post(
+        "/auth/login", json={"email": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD}
+    )
+    assert ok.status_code == 200
+
+    another_attempt = unauthenticated_client.post(
+        "/auth/login", json={"email": TEST_USER_EMAIL, "password": "wrong-password"}
+    )
+    assert another_attempt.status_code == 401  # no 429 — el contador se limpió al entrar
 
 
 def test_me_without_a_session_returns_401(unauthenticated_client: TestClient) -> None:

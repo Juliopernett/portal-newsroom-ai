@@ -6,14 +6,20 @@ ever cross the HTTP boundary for a `User`.
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LoginRequest(BaseModel):
-    """Request body for `POST /auth/login`."""
+    """Request body for `POST /auth/login`.
 
-    email: str
-    password: str
+    `max_length` on both fields (security audit 2026-08-20, L1) — without
+    it, an oversized body reaches Argon2id (deliberately slow) or the rate
+    limiter's dict key before anything rejects it. 254 is the practical
+    RFC 5321 email limit; 256 is generous for any real password.
+    """
+
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=256)
 
 
 class UserOut(BaseModel):

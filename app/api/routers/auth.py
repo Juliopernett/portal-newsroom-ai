@@ -17,6 +17,7 @@ from app.api.dependencies import (
     SESSION_COOKIE_NAME,
     get_current_session,
     get_current_user,
+    get_login_rate_limiter,
     get_password_hasher,
     get_unit_of_work,
     hash_session_token,
@@ -27,6 +28,7 @@ from core.entities.session import Session as SessionEntity
 from core.entities.user import User
 from core.ports.password_hasher import PasswordHasher
 from core.ports.unit_of_work import UnitOfWork
+from security.login_rate_limiter import LoginRateLimiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -64,15 +66,31 @@ def login(
     response: Response,
     uow: UnitOfWork = Depends(get_unit_of_work),
     password_hasher: PasswordHasher = Depends(get_password_hasher),
+    rate_limiter: LoginRateLimiter = Depends(get_login_rate_limiter),
 ) -> User:
-    """Verify credentials, open a session, and set its cookie."""
+    """Verify credentials, open a session, and set its cookie.
+
+    Rate-limited by email (security audit 2026-08-20, M1) — 429 once an
+    address has racked up too many failures within the window, checked
+    before touching the database at all.
+    """
+    clave = payload.email.strip().lower()
+    if rate_limiter.esta_bloqueado(clave):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.",
+        )
+
     user = uow.users.get_by_email(payload.email)
     if user is None:
         password_hasher.verify(payload.password, _DUMMY_HASH)  # constant-time-ish decoy
+        rate_limiter.registrar_intento_fallido(clave)
         raise _invalid_credentials()
     if not password_hasher.verify(payload.password, user.password_hash):
+        rate_limiter.registrar_intento_fallido(clave)
         raise _invalid_credentials()
 
+    rate_limiter.limpiar(clave)
     settings = get_settings()
     token = secrets.token_urlsafe(32)
     now = datetime.now(UTC)

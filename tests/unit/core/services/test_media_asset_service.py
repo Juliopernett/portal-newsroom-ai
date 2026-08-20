@@ -53,6 +53,8 @@ def test_es_purgable_true_well_past_retencion_dias() -> None:
     [
         ("image/jpeg", MediaAssetType.IMAGEN),
         ("image/png", MediaAssetType.IMAGEN),
+        ("image/gif", MediaAssetType.IMAGEN),
+        ("image/webp", MediaAssetType.IMAGEN),
         ("video/mp4", MediaAssetType.VIDEO),
         ("video/quicktime", MediaAssetType.VIDEO),
     ],
@@ -67,6 +69,14 @@ def test_determinar_tipo_accepts_image_and_video(
 def test_determinar_tipo_rejects_anything_else(content_type: str) -> None:
     with pytest.raises(ValueError, match="no soportado"):
         determinar_tipo(content_type)
+
+
+def test_determinar_tipo_rejects_svg() -> None:
+    """A closed allow-list, not `startswith("image/")` — `image/svg+xml` is
+    XML that can carry `<script>`/`onload`, and would otherwise be
+    accepted as a plain image (security audit 2026-08-20, finding H1)."""
+    with pytest.raises(ValueError, match="no soportado"):
+        determinar_tipo("image/svg+xml")
 
 
 def test_validar_tamano_accepts_within_limit() -> None:

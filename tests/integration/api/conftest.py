@@ -17,13 +17,14 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import database.models  # noqa: F401  (registers tables on Base.metadata)
-from app.api.dependencies import get_unit_of_work
+from app.api.dependencies import get_login_rate_limiter, get_unit_of_work
 from app.api.main import app
 from core.entities.user import User
 from database.base import Base
 from database.engine import enable_sqlite_foreign_keys
 from database.repositories.user_repository import SqlAlchemyUserRepository
 from database.unit_of_work import SqlAlchemyUnitOfWork
+from security.login_rate_limiter import LoginRateLimiter
 from security.password_hasher import Argon2IdPasswordHasher
 
 TEST_USER_EMAIL = "test@portalvallenato.com"
@@ -57,7 +58,15 @@ def unauthenticated_client(_test_engine: Engine) -> Iterator[TestClient]:
         with SqlAlchemyUnitOfWork(session_factory) as uow:
             yield uow
 
+    # One `LoginRateLimiter` per test, not per request — the lambda closes
+    # over it so every call within this test returns the same instance
+    # (state must accumulate across requests to do its job), but the next
+    # test gets a brand new one. The real dependency is a process-wide
+    # `lru_cache` singleton, which would otherwise leak failed-login counts
+    # between tests that all log in as `TEST_USER_EMAIL`.
+    test_rate_limiter = LoginRateLimiter()
     app.dependency_overrides[get_unit_of_work] = _get_test_unit_of_work
+    app.dependency_overrides[get_login_rate_limiter] = lambda: test_rate_limiter
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

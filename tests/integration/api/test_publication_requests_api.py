@@ -73,6 +73,21 @@ def test_create_publication_request_rejects_empty_texto(client: TestClient) -> N
     assert response.status_code == 422
 
 
+def test_create_publication_request_rejects_an_oversized_texto(client: TestClient) -> None:
+    """security audit 2026-08-20, L1 — a size cap at the HTTP boundary."""
+    response = client.post("/publication-requests", json={"texto": "x" * 5001})
+
+    assert response.status_code == 422
+
+
+def test_create_publication_request_rejects_an_oversized_titulo(client: TestClient) -> None:
+    response = client.post(
+        "/publication-requests", json={"texto": "Anuncio", "titulo": "x" * 301}
+    )
+
+    assert response.status_code == 422
+
+
 def test_create_publication_request_rejects_an_unknown_pauta_id(client: TestClient) -> None:
     response = client.post(
         "/publication-requests", json={"pauta_id": "no-existe", "texto": "Anuncio"}

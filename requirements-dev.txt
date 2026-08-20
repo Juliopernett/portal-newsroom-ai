@@ -12,3 +12,8 @@ httpx>=0.27,<1
 # --- Calidad de código ---
 ruff>=0.4,<1
 mypy>=1.10,<2
+
+# --- Dependencias fijadas (security audit 2026-08-20, L3) ---
+# Regenera requirements.lock.txt con:
+#   pip-compile requirements.txt -o requirements.lock.txt
+pip-tools>=7.4,<8

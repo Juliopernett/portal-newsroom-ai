@@ -17,8 +17,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# requirements.txt is the human-edited source (version ranges) pip-compile
+# reads; requirements.lock.txt is what actually gets installed — every
+# version pinned exactly, regenerated with `pip-compile requirements.txt
+# -o requirements.lock.txt` whenever requirements.txt changes, so a given
+# build is reproducible/auditable instead of resolving afresh each time
+# (security audit 2026-08-20, L3). No `--generate-hashes`/`--require-hashes`
+# here: this file is generated on a Python 3.14 host, this image runs
+# 3.13 — a hash pins the exact wheel file, which can differ by
+# interpreter/ABI, so enforcing hashes here could break a build over a
+# wheel mismatch that isn't actually a supply-chain problem.
+COPY requirements.txt requirements.lock.txt ./
+RUN pip install --no-cache-dir -r requirements.lock.txt
 
 COPY . .
 COPY --from=frontend-build /frontend/dist ./frontend/dist

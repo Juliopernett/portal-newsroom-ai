@@ -29,6 +29,7 @@ from app.api.schemas.identidad_comercial import IdentidadComercialCreate, Identi
 from core.entities.identidad_comercial import ID_UNICO, IdentidadComercial
 from core.ports.media_storage import MediaStorage
 from core.ports.unit_of_work import UnitOfWork
+from core.services.media_asset_service import TIPOS_IMAGEN_PERMITIDOS
 
 router = APIRouter(
     prefix="/identidad-comercial",
@@ -87,8 +88,10 @@ async def subir_logo(
             status_code=404,
             detail="Configura primero los datos de Identidad comercial antes de subir el logo",
         )
-    if not (archivo.content_type or "").startswith("image/"):
-        raise HTTPException(status_code=422, detail="El logo debe ser una imagen")
+    if (archivo.content_type or "") not in TIPOS_IMAGEN_PERMITIDOS:
+        raise HTTPException(
+            status_code=422, detail="El logo debe ser una imagen (jpeg, png, gif o webp)"
+        )
     contenido = await archivo.read()
     if not contenido:
         raise HTTPException(status_code=422, detail="El archivo está vacío")

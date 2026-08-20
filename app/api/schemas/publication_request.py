@@ -16,9 +16,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from core.entities.publication_request import PublicationRequestStatus
+
+# security audit 2026-08-20, L1 — generous enough for any real solicitud
+# (`texto` is a social-post caption, not an article body), but bounded so
+# an oversized body doesn't reach the PDF renderer or the database
+# unchecked. The entity itself (`core.entities.publication_request`) only
+# checks non-empty; this is the size cap, kept at the HTTP boundary.
+_TEXTO_MAX = 5000
+_TITULO_MAX = 300
+_OBSERVACIONES_MAX = 2000
 
 
 class PublicationRequestCreate(BaseModel):
@@ -26,10 +35,10 @@ class PublicationRequestCreate(BaseModel):
 
     pauta_id: str | None = None
     client_id: str | None = None
-    titulo: str | None = None
-    texto: str
+    titulo: str | None = Field(default=None, max_length=_TITULO_MAX)
+    texto: str = Field(max_length=_TEXTO_MAX)
     prioridad_manual: bool = False
-    observaciones: str | None = None
+    observaciones: str | None = Field(default=None, max_length=_OBSERVACIONES_MAX)
 
 
 class PublicationRequestLinkPauta(BaseModel):
@@ -49,8 +58,8 @@ class PublicationRequestUpdate(BaseModel):
     docstring for why).
     """
 
-    titulo: str | None = None
-    texto: str | None = None
+    titulo: str | None = Field(default=None, max_length=_TITULO_MAX)
+    texto: str | None = Field(default=None, max_length=_TEXTO_MAX)
     prioridad_manual: bool | None = None
 
 

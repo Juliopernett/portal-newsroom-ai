@@ -80,6 +80,26 @@ def test_logo_upload_rejects_non_image_content_type(client: TestClient) -> None:
     assert response.status_code == 422
 
 
+def test_logo_upload_rejects_svg(client: TestClient) -> None:
+    """`descargar_logo` is public and serves the logo inline — an accepted
+    SVG would run in the browser for anyone visiting the login page
+    (security audit 2026-08-20, finding M2)."""
+    client.put("/identidad-comercial", json=_payload())
+
+    response = client.post(
+        "/identidad-comercial/logo",
+        files={
+            "archivo": (
+                "logo.svg",
+                io.BytesIO(b"<svg onload=\"alert('xss')\"></svg>"),
+                "image/svg+xml",
+            )
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_logo_upload_then_download_round_trips_bytes(client: TestClient) -> None:
     client.put("/identidad-comercial", json=_payload())
     contenido = _tiny_png()

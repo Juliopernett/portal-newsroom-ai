@@ -86,6 +86,27 @@ def test_subir_media_rejects_unsupported_content_type(client: TestClient) -> Non
     assert response.status_code == 422
 
 
+def test_subir_media_rejects_svg(client: TestClient) -> None:
+    """`image/svg+xml` can carry `<script>`/`onload`, and `descargar_media`
+    serves media back with `Content-Disposition: inline` — a closed
+    allow-list rejects it before it ever reaches storage (security audit
+    2026-08-20, finding H1)."""
+    solicitud_id = _crear_solicitud(client)
+
+    response = client.post(
+        f"/publication-requests/{solicitud_id}/media",
+        files={
+            "archivo": (
+                "logo.svg",
+                b"<svg onload=\"alert('xss')\"></svg>",
+                "image/svg+xml",
+            )
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_subir_media_rejects_a_file_over_the_imagen_limit(client: TestClient) -> None:
     solicitud_id = _crear_solicitud(client)
     contenido_grande = b"x" * (10 * 1024 * 1024 + 1)  # 1 byte over the 10 MB default

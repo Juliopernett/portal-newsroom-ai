@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from functools import lru_cache
 
 from fastapi import Cookie, Depends, HTTPException, status
 
@@ -26,6 +27,7 @@ from core.ports.password_hasher import PasswordHasher
 from core.ports.unit_of_work import UnitOfWork
 from database.engine import get_session_factory
 from database.unit_of_work import SqlAlchemyUnitOfWork
+from security.login_rate_limiter import LoginRateLimiter
 from security.password_hasher import Argon2IdPasswordHasher
 
 SESSION_COOKIE_NAME = "session_token"
@@ -46,6 +48,16 @@ def get_unit_of_work() -> Iterator[UnitOfWork]:
 def get_password_hasher() -> PasswordHasher:
     """Return the password hasher used to check credentials at login."""
     return Argon2IdPasswordHasher()
+
+
+@lru_cache
+def get_login_rate_limiter() -> LoginRateLimiter:
+    """Return the process-wide login rate limiter (security audit
+    2026-08-20, M1) — a singleton via `lru_cache`, the same pattern
+    `config.settings.get_settings` already uses, so its state persists
+    across requests within this process without needing a database table.
+    """
+    return LoginRateLimiter()
 
 
 def get_cms_publisher() -> CMSPublisher:
