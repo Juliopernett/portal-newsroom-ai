@@ -318,33 +318,46 @@ def _icono_link(clave: str, href: str, lado: float = 0.42 * cm) -> LinkedImage:
     return LinkedImage(io.BytesIO(_icono_bytes(clave)), href, width=lado, height=lado)
 
 
-def _fila_icono_texto(icono: Flowable, texto: Paragraph, ancho_icono: float) -> Table:
-    """A tight [icon][text] pair, e.g. the WhatsApp badge next to the phone number."""
-    tabla = Table([[icono, texto]], colWidths=[ancho_icono, None])
+_ANCHO_ESPACIADOR_CONTACTO = 0.35 * cm
+
+
+def _fila_contacto_horizontal(
+    telefono_icono: LinkedImage | None,
+    telefono_texto: Paragraph | None,
+    email_texto: Paragraph | None,
+    iconos_redes: list[Flowable],
+) -> Table:
+    """Teléfono, correo e iconos de redes en una sola línea, con un
+    espaciador chico entre cada grupo — antes cada uno ocupaba su propia
+    fila y el ancho disponible (todo texto/iconos pequeños) sobraba sin
+    usarse. Cualquier grupo puede faltar (ej. sin email configurado) sin
+    dejar un espaciador colgado de más.
+    """
+    grupos: list[tuple[list[Flowable | str], list[float | None]]] = []
+    if telefono_icono is not None and telefono_texto is not None:
+        grupos.append(([telefono_icono, telefono_texto], [telefono_icono.drawWidth, None]))
+    if email_texto is not None:
+        grupos.append(([email_texto], [None]))
+    if iconos_redes:
+        anchos_iconos = [icono.drawWidth for icono in iconos_redes]
+        grupos.append((list(iconos_redes), list(anchos_iconos)))
+
+    celdas: list[Flowable | str] = []
+    anchos: list[float | None] = []
+    for indice, (celdas_grupo, anchos_grupo) in enumerate(grupos):
+        if indice > 0:
+            celdas.append("")
+            anchos.append(_ANCHO_ESPACIADOR_CONTACTO)
+        celdas.extend(celdas_grupo)
+        anchos.extend(anchos_grupo)
+
+    tabla = Table([celdas], colWidths=anchos)
     tabla.setStyle(
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (0, -1), 4),
-                ("RIGHTPADDING", (1, 0), (-1, -1), 0),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-            ]
-        )
-    )
-    return tabla
-
-
-def _fila_iconos(iconos: list[Flowable]) -> Table:
-    """A horizontal row of icon badges — Sitio web / Instagram / Facebook / TikTok."""
-    tabla = Table([iconos], colWidths=[None] * len(iconos))
-    tabla.setStyle(
-        TableStyle(
-            [
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 2),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ]
@@ -431,13 +444,16 @@ def _lineas_contacto(identidad: IdentidadComercial | None, styles: _Styles) -> l
     if identidad.nit:
         lineas.append(Paragraph(f"NIT {_escape(identidad.nit)}", styles.contacto))
 
+    telefono_icono: LinkedImage | None = None
+    telefono_texto: Paragraph | None = None
     if identidad.telefono:
-        icono = _icono_link("whatsapp", _href_whatsapp(identidad.telefono))
-        texto = Paragraph(_escape(identidad.telefono), styles.contacto)
-        lineas.append(_fila_icono_texto(icono, texto, icono.drawWidth))
+        telefono_icono = _icono_link("whatsapp", _href_whatsapp(identidad.telefono))
+        telefono_texto = Paragraph(_escape(identidad.telefono), styles.contacto)
+
+    email_texto: Paragraph | None = None
     if identidad.email:
-        lineas.append(
-            Paragraph(_link_texto(f"mailto:{identidad.email}", identidad.email), styles.contacto)
+        email_texto = Paragraph(
+            _link_texto(f"mailto:{identidad.email}", identidad.email), styles.contacto
         )
 
     iconos_redes: list[Flowable] = []
@@ -457,8 +473,10 @@ def _lineas_contacto(identidad: IdentidadComercial | None, styles: _Styles) -> l
             if _es_tiktok(label, valor):
                 iconos_redes.append(_icono_link("tiktok", valor))
         texto_otras_redes = _lineas_otras_redes_sin_iconos(identidad.otras_redes)
-    if iconos_redes:
-        lineas.append(_fila_iconos(iconos_redes))
+    if telefono_texto is not None or email_texto is not None or iconos_redes:
+        lineas.append(
+            _fila_contacto_horizontal(telefono_icono, telefono_texto, email_texto, iconos_redes)
+        )
     if texto_otras_redes:
         lineas.append(Paragraph(" · ".join(texto_otras_redes), styles.contacto))
 

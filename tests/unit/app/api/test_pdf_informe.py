@@ -223,9 +223,9 @@ def _fila_de_iconos(lineas: list) -> Table:
         flowable
         for flowable in lineas
         if isinstance(flowable, Table)
-        and all(isinstance(celda, LinkedImage) for celda in flowable._cellvalues[0])
+        and any(isinstance(celda, LinkedImage) for celda in flowable._cellvalues[0])
     ]
-    assert len(filas) == 1, "se esperaba exactamente una fila de íconos de redes"
+    assert len(filas) == 1, "se esperaba exactamente una fila de contacto con íconos"
     return filas[0]
 
 
@@ -243,7 +243,12 @@ def test_lineas_contacto_arma_un_icono_gris_por_cada_red_configurada() -> None:
     lineas = _lineas_contacto(identidad, _Styles())
 
     fila_iconos = _fila_de_iconos(lineas)
-    hrefs = {celda._href for celda in fila_iconos._cellvalues[0]}
+    href_whatsapp = _href_whatsapp(identidad.telefono)
+    hrefs = {
+        celda._href
+        for celda in fila_iconos._cellvalues[0]
+        if isinstance(celda, LinkedImage) and celda._href != href_whatsapp
+    }
     assert hrefs == {
         "https://www.portalvallenato.com/",
         "https://www.instagram.com/portalvallenatoelite",
