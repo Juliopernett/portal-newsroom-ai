@@ -34,6 +34,7 @@ export function SolicitudesPage() {
   const [adjuntoAbierto, setAdjuntoAbierto] = useState(false)
   const [archivo, setArchivo] = useState<File | null>(null)
   const [busqueda, setBusqueda] = useState('')
+  const [soloSinDestino, setSoloSinDestino] = useState(false)
   const textoRef = useRef<HTMLTextAreaElement>(null)
 
   const kanbanQuery = useQuery({ queryKey: KANBAN_KEY, queryFn: solicitudesApi.loadKanban })
@@ -177,6 +178,36 @@ export function SolicitudesPage() {
   const publicadasTodas = kanbanQuery.data?.publicadas ?? []
   const publicadasVisibles = publicadasTodas.slice(0, PUBLICADAS_VISIBLES)
 
+  // "Publicaciones sin destino" (filtro rápido, 2026-08-20): acotado a
+  // contratos activos a propósito — repasar los ~1000+ registros
+  // históricos no tiene sentido operativo, solo lo que aún se puede
+  // corregir. No hay endpoint que traiga destinos en lote, así que esto
+  // pide uno por solicitud candidata (siempre un puñado, nunca la lista
+  // completa) solo mientras el filtro está activo.
+  const pautasVigentesIds = useMemo(
+    () => new Set(pautasVigentes.map((p) => p.id)),
+    [pautasVigentes],
+  )
+  const candidatosSinDestino = useMemo(
+    () => publicadasTodas.filter((s) => s.pauta_id && pautasVigentesIds.has(s.pauta_id)),
+    [publicadasTodas, pautasVigentesIds],
+  )
+  const sinDestinoQuery = useQuery({
+    queryKey: ['solicitudes-sin-destino-social', candidatosSinDestino.map((s) => s.id)],
+    queryFn: async () => {
+      const resultados = await Promise.all(
+        candidatosSinDestino.map(async (s) => {
+          const destinos = await solicitudesApi.listDestinos(s.id)
+          const tieneRedSocial = destinos.some((d) => d.canal === 'facebook' || d.canal === 'instagram')
+          return tieneRedSocial ? null : s.id
+        }),
+      )
+      return new Set(resultados.filter((id): id is string => id !== null))
+    },
+    enabled: soloSinDestino && candidatosSinDestino.length > 0,
+  })
+  const idsSinDestino = sinDestinoQuery.data ?? new Set<string>()
+
   // pauta_id wins when both are present (it's the authoritative link once a
   // contrato is known); client_id is the fallback identity captured at
   // intake, so a request that hasn't been linked to a Pauta yet still has
@@ -201,11 +232,13 @@ export function SolicitudesPage() {
     )
   }
   const pendientesVisibles = pendientes.filter(coincide)
-  // A search query must reach every publicada ever loaded, not just the
-  // 30 most recent — otherwise older matches (e.g. a client's earlier
-  // publications) silently vanish from the results despite the full list
-  // already sitting in memory. With no query, keep the cheap 30-item cap.
-  const publicadasFiltradas = (busquedaTrim ? publicadasTodas : publicadasVisibles).filter(coincide)
+  // A search query (or the "sin destino" filter) must reach every
+  // publicada ever loaded, not just the 30 most recent — otherwise older
+  // matches silently vanish despite the full list already sitting in
+  // memory. With neither active, keep the cheap 30-item cap.
+  const publicadasFiltradas = (busquedaTrim || soloSinDestino ? publicadasTodas : publicadasVisibles)
+    .filter(coincide)
+    .filter((s) => !soloSinDestino || idsSinDestino.has(s.id))
 
   return (
     <div className="flex flex-col gap-4">
@@ -346,14 +379,25 @@ export function SolicitudesPage() {
         </form>
       )}
 
-      <div className="relative max-w-sm">
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por cliente o texto…"
-          className="pl-9"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative max-w-sm flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por cliente o texto…"
+            className="pl-9"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
+        <Button
+          type="button"
+          variant={soloSinDestino ? 'default' : 'secondary'}
+          size="sm"
+          onClick={() => setSoloSinDestino((v) => !v)}
+          title="Publicadas de contratos activos sin Facebook ni Instagram registrado"
+        >
+          Sin destino (contratos activos)
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_16rem_1fr]">
@@ -419,8 +463,18 @@ export function SolicitudesPage() {
               <p className="p-6 text-center text-sm text-muted-foreground">Cargando…</p>
             ) : publicadasVisibles.length === 0 ? (
               <p className="p-6 text-center text-sm text-muted-foreground">Todavía no hay publicadas.</p>
+            ) : soloSinDestino && sinDestinoQuery.isFetching ? (
+              <p className="p-6 text-center text-sm text-muted-foreground">
+                Revisando destinos de {candidatosSinDestino.length} publicaciones…
+              </p>
             ) : publicadasFiltradas.length === 0 ? (
-              <p className="p-6 text-center text-sm text-muted-foreground">Nada coincide con "{busqueda}".</p>
+              <p className="p-6 text-center text-sm text-muted-foreground">
+                {soloSinDestino
+                  ? busquedaTrim
+                    ? `Nada coincide con "${busqueda}".`
+                    : 'Ninguna publicación de un contrato activo está sin Facebook/Instagram.'
+                  : `Nada coincide con "${busqueda}".`}
+              </p>
             ) : (
               publicadasFiltradas.map((s) => (
                 <SolicitudCard

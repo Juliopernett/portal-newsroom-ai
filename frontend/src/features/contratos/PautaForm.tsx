@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { SelectNative } from '@/components/ui/select-native'
 import type { Client } from '@/features/clientes/api'
 import { planesPautaApi } from '@/features/configuracion/api'
+import { ClienteCombobox } from '@/features/solicitudes/ClienteCombobox'
 import { fechaNegocioISO, formatMoneda, sumarDiasFecha } from '@/lib/format'
 import type { Pauta, PautaInput } from './api'
 
@@ -43,6 +44,10 @@ export function PautaForm({
   const [plan, setPlan] = useState('')
   const planesQuery = useQuery({ queryKey: ['planes-pauta'], queryFn: planesPautaApi.list })
   const planes = planesQuery.data ?? []
+  const clientesOrdenados = useMemo(
+    () => [...clients].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+    [clients],
+  )
 
   useEffect(() => {
     setPlan('')
@@ -101,20 +106,26 @@ export function PautaForm({
         </div>
       )}
       <div className="flex flex-col gap-2">
-        <Label htmlFor="pauta-cliente">Cliente</Label>
-        <SelectNative
-          id="pauta-cliente"
+        <Label>Cliente</Label>
+        <ClienteCombobox
+          clients={clientesOrdenados}
+          value={form.client_id}
+          onChange={(clientId) => setForm({ ...form, client_id: clientId })}
+          placeholder="Busca un cliente…"
+          className="w-full"
+        />
+        {/* ClienteCombobox has no native input to attach `required` to —
+            this keeps the browser's "completa este campo" validation
+            working when the operator tries to submit without picking one. */}
+        <input
+          type="text"
           required
           value={form.client_id}
-          onChange={(e) => setForm({ ...form, client_id: e.target.value })}
-        >
-          <option value="">Selecciona un cliente…</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </SelectNative>
+          readOnly
+          aria-hidden="true"
+          tabIndex={-1}
+          className="sr-only"
+        />
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="pauta-fecha-inicio">Fecha de inicio</Label>

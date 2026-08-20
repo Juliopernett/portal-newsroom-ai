@@ -8,10 +8,14 @@ export function ClienteCombobox({
   clients,
   value,
   onChange,
+  placeholder = '¿De quién es este material? (opcional)',
+  className = 'w-full sm:w-64',
 }: {
   clients: Client[]
   value: string
   onChange: (clientId: string) => void
+  placeholder?: string
+  className?: string
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -34,11 +38,11 @@ export function ClienteCombobox({
   const displayValue = open ? query : (selected ? selected.nombre : '')
 
   return (
-    <div ref={containerRef} className="relative w-full sm:w-64">
+    <div ref={containerRef} className={`relative ${className}`}>
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
         className="h-9 pr-7 pl-8 text-base sm:text-xs"
-        placeholder="¿De quién es este material? (opcional)"
+        placeholder={placeholder}
         value={displayValue}
         onFocus={() => {
           setQuery('')
