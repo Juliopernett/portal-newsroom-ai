@@ -13,6 +13,7 @@ does not.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 import requests
 
@@ -46,6 +47,8 @@ class MetaGraphSocialMediaReader:
         self._token = settings.meta_access_token
         self._page_id = settings.meta_page_id
         self._ig_id = settings.meta_instagram_business_account_id
+        # Lazily exchanged and cached — see `_facebook_page_token`.
+        self._page_access_token: str | None = None
 
     def posts_recientes(self, canal: CanalPublicacion, *, limite: int = 20) -> list[PostRedSocial]:
         if canal is CanalPublicacion.FACEBOOK:
@@ -54,27 +57,48 @@ class MetaGraphSocialMediaReader:
             return self._posts_instagram(limite)
         raise ValueError(f"no hay posts recientes para canal={canal.value!r}")
 
-    def _get(self, path: str, *, fields: str, limite: int) -> list[dict[str, str]]:
-        params: dict[str, str | int] = {
-            "fields": fields,
-            "limit": limite,
-            "access_token": self._token,
-        }
+    def _get(
+        self, path: str, *, fields: str, token: str, limite: int | None = None
+    ) -> dict[str, Any]:
+        params: dict[str, str | int] = {"fields": fields, "access_token": token}
+        if limite is not None:
+            params["limit"] = limite
         response = requests.get(
             f"{_GRAPH_API_BASE}/{path}",
             params=params,
             timeout=_REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
-        data: list[dict[str, str]] = response.json().get("data", [])
-        return data
+        result: dict[str, Any] = response.json()
+        return result
+
+    def _facebook_page_token(self) -> str:
+        """Exchange the System User token for a Page-scoped one.
+
+        Reading a Page's own `/posts` — unlike Instagram's `/media`, which
+        the System User token handles directly — gets rejected with a 400
+        `OAuthException` (code 190, "requires a token de acceso a la nueva
+        experiencia de las páginas") unless the request carries a token
+        issued *for that Page specifically*. `GET /{page-id}?fields=
+        access_token`, authenticated with the System User token, is how
+        Meta hands that Page token back (discovered 2026-08-20 debugging
+        a live 400 the System User token alone couldn't get past). Cached
+        on the instance: a Page token derived from a non-expiring System
+        User token doesn't expire or rotate independently of it, so
+        there's nothing to invalidate mid-process.
+        """
+        if self._page_access_token is None:
+            data = self._get(self._page_id, fields="access_token", token=self._token)
+            self._page_access_token = data["access_token"]
+        return self._page_access_token
 
     def _posts_facebook(self, limite: int) -> list[PostRedSocial]:
         data = self._get(
             f"{self._page_id}/posts",
             fields="id,message,permalink_url,created_time,full_picture",
+            token=self._facebook_page_token(),
             limite=limite,
-        )
+        ).get("data", [])
         return [
             PostRedSocial(
                 id=item["id"],
@@ -91,8 +115,9 @@ class MetaGraphSocialMediaReader:
         data = self._get(
             f"{self._ig_id}/media",
             fields="id,caption,permalink,timestamp,media_url,thumbnail_url",
+            token=self._token,
             limite=limite,
-        )
+        ).get("data", [])
         return [
             PostRedSocial(
                 id=item["id"],
