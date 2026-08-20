@@ -46,7 +46,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from core.entities.destino_publicacion import CanalPublicacion
+from core.entities.destino_publicacion import CanalPublicacion, EstadoDestino
 from core.entities.identidad_comercial import IdentidadComercial
 from core.entities.pauta import PautaTipo
 from core.services.reporte_service import ReportePauta, ReporteSolicitud
@@ -571,10 +571,21 @@ def _seccion_contrato(reporte: ReportePauta, styles: _Styles) -> list[Flowable]:
 def _enlace_canal(
     solicitud: ReporteSolicitud, canal: CanalPublicacion, styles: _Styles
 ) -> Paragraph:
-    for destino in solicitud.destinos:
-        if destino.canal == canal:
-            return Paragraph(_enlace_o_guion(destino.enlace), styles.celda_tabla)
-    return Paragraph("—", styles.celda_tabla)
+    """Return `canal`'s link, preferring a `PUBLICADO` destino when `canal`
+    has more than one (e.g. one cancelled by mistake and a second one
+    added afterward to correct it — `DestinosPanel`'s "Agregar destino"
+    no longer treats a cancelled destino's canal as taken, see the
+    2026-08-20 fix). Without this, whichever destino for `canal` happened
+    to come first would win — for a mistakenly-cancelled-then-corrected
+    one, that is reliably the wrong entry: it was never confirmed, so its
+    `enlace` is always empty.
+    """
+    candidatos = [destino for destino in solicitud.destinos if destino.canal == canal]
+    if not candidatos:
+        return Paragraph("—", styles.celda_tabla)
+    publicado = next((d for d in candidatos if d.estado == EstadoDestino.PUBLICADO), None)
+    elegido = publicado or candidatos[-1]
+    return Paragraph(_enlace_o_guion(elegido.enlace), styles.celda_tabla)
 
 
 def _seccion_detalle_publicaciones(reporte: ReportePauta, styles: _Styles) -> list[Flowable]:

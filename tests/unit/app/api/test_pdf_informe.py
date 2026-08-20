@@ -8,6 +8,7 @@ from reportlab.platypus import Table
 
 from app.api.pdf_informe import (
     LinkedImage,
+    _enlace_canal,
     _es_tiktok,
     _href_red_social,
     _href_sitio_web,
@@ -76,6 +77,78 @@ def test_fragmento_largo_se_trunca_con_elipsis() -> None:
 
     assert resultado.endswith("…")
     assert len(resultado) == 61  # 60 chars + el carácter de elipsis
+
+
+def test_enlace_canal_prefiere_el_destino_publicado_sobre_uno_cancelado() -> None:
+    """Reproduce el caso real (Didier Varón, 2026-08-20): un Facebook
+    cancelado por error, corregido agregando un segundo destino Facebook
+    que sí se publicó. El informe debe mostrar el enlace real, no "—"."""
+    solicitud = ReporteSolicitud(
+        publication_request_id="solicitud-1",
+        titulo=None,
+        texto="texto",
+        cliente_nombre=None,
+        pauta_id="pauta-1",
+        fecha_recepcion=datetime(2026, 8, 19, tzinfo=UTC),
+        fecha_cierre=None,
+        completa=True,
+        pauta_consumida=True,
+        destinos=(
+            ReporteDestino(
+                canal=CanalPublicacion.FACEBOOK,
+                estado=EstadoDestino.CANCELADO,
+                enlace=None,
+                fecha_publicacion=None,
+                ultimo_error=None,
+            ),
+            ReporteDestino(
+                canal=CanalPublicacion.FACEBOOK,
+                estado=EstadoDestino.PUBLICADO,
+                enlace="https://www.facebook.com/reel/1104219988954059/",
+                fecha_publicacion=datetime(2026, 8, 20, tzinfo=UTC),
+                ultimo_error=None,
+            ),
+        ),
+    )
+
+    resultado = _enlace_canal(solicitud, CanalPublicacion.FACEBOOK, _Styles())
+
+    assert "https://www.facebook.com/reel/1104219988954059/" in resultado.text
+
+
+def test_enlace_canal_muestra_guion_cuando_ningun_destino_del_canal_esta_publicado() -> None:
+    solicitud = ReporteSolicitud(
+        publication_request_id="solicitud-1",
+        titulo=None,
+        texto="texto",
+        cliente_nombre=None,
+        pauta_id="pauta-1",
+        fecha_recepcion=datetime(2026, 8, 19, tzinfo=UTC),
+        fecha_cierre=None,
+        completa=False,
+        pauta_consumida=False,
+        destinos=(
+            ReporteDestino(
+                canal=CanalPublicacion.FACEBOOK,
+                estado=EstadoDestino.CANCELADO,
+                enlace=None,
+                fecha_publicacion=None,
+                ultimo_error=None,
+            ),
+        ),
+    )
+
+    resultado = _enlace_canal(solicitud, CanalPublicacion.FACEBOOK, _Styles())
+
+    assert resultado.text == "—"
+
+
+def test_enlace_canal_muestra_guion_cuando_el_canal_no_tiene_destino() -> None:
+    solicitud = _solicitud(titulo=None, texto="texto")  # solo tiene WORDPRESS
+
+    resultado = _enlace_canal(solicitud, CanalPublicacion.INSTAGRAM, _Styles())
+
+    assert resultado.text == "—"
 
 
 def test_nunca_queda_vacio_ni_con_titulo_ni_con_texto_con_espacios() -> None:
