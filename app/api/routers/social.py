@@ -24,7 +24,7 @@ router = APIRouter(prefix="/social", tags=["social"], dependencies=[Depends(get_
 @router.get("/posts-recientes", response_model=list[PostRedSocialOut])
 def get_posts_recientes(
     canal: CanalPublicacion,
-    limite: int = 20,
+    limite: int = 100,
     solicitud_titulo: str | None = None,
     solicitud_texto: str | None = None,
     solicitud_cliente_nombre: str | None = None,
