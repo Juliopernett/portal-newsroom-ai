@@ -198,7 +198,11 @@ export function DestinosPanel({ solicitudId }: { solicitudId: string }) {
   })
 
   const destinos = destinosQuery.data ?? []
-  const usados = new Set(destinos.map((d) => d.canal))
+  // Un destino cancelado nunca vuelve a publicarse (marcar_publicado lo
+  // rechaza por ser un estado terminal) — así que su canal no debe seguir
+  // bloqueando "Agregar destino"; si no, cancelar por error deja ese canal
+  // inalcanzable para siempre en esta solicitud.
+  const usados = new Set(destinos.filter((d) => d.estado !== 'cancelado').map((d) => d.canal))
   const disponibles = CANALES_DESTINO.filter((c) => !usados.has(c.value))
 
   return (
