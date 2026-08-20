@@ -112,9 +112,14 @@ export function DashboardPage() {
         {resumenQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
         ) : pendientes === 0 ? (
-          <p className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
-            <CheckCircle2 className="size-4" /> No tienes solicitudes pendientes.
-          </p>
+          <div className="flex flex-wrap items-center gap-3 p-4">
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="size-4" /> No tienes solicitudes pendientes.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => navigate('/solicitudes')}>
+              <Inbox /> Ir a solicitudes
+            </Button>
+          </div>
         ) : (
           <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-card p-4">
             <div className="flex flex-col">
