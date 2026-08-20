@@ -694,6 +694,7 @@ def test_ranking_comercial_uses_only_the_current_contract_not_a_sum() -> None:
     assert item.fecha_vencimiento == date(2026, 8, 30)
     assert item.vigente is True
     assert item.estado_comercial == EstadoComercial.SALUDABLE
+    assert item.pauta_id == "p1"
 
 
 def test_ranking_comercial_falls_back_to_the_most_recent_pauta_when_none_vigente() -> None:
@@ -725,6 +726,7 @@ def test_ranking_comercial_falls_back_to_the_most_recent_pauta_when_none_vigente
     assert item.fecha_vencimiento == date(2026, 4, 1)
     assert item.vigente is False
     assert item.estado_comercial == EstadoComercial.VENCIDO
+    assert item.pauta_id == "p2"
 
 
 def test_ranking_comercial_prefers_the_most_recently_started_vigente_pauta() -> None:

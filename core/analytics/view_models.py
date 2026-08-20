@@ -102,6 +102,11 @@ class RankingComercialItem:
     fecha_vencimiento: date
     vigente: bool
     estado_comercial: EstadoComercial
+    # The contrato de referencia's own id — lets a caller (e.g. the
+    # renewal-nudge WhatsApp message) fetch that specific Pauta's own
+    # resources (its informe PDF) instead of guessing which of the
+    # client's Pautas this row is even about.
+    pauta_id: str
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

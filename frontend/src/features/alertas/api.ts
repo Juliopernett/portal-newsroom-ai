@@ -97,6 +97,7 @@ export interface RankingComercialItem {
   fecha_vencimiento: string
   vigente: boolean
   estado_comercial: string
+  pauta_id: string
 }
 
 export const dashboardApi = {

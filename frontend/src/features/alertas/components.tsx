@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useMutation } from '@tanstack/react-query'
 import { ChevronDown, Eye, Phone, PlusCircle, RefreshCw, X } from 'lucide-react'
+import { toast } from 'sonner'
 
+import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import type { Client } from '@/features/clientes/api'
-import { PAUTA_TIPO_LABELS, type PautaTipo } from '@/features/contratos/api'
+import { PAUTA_TIPO_LABELS, pautasApi } from '@/features/contratos/api'
 import { formatFecha } from '@/lib/format'
-import type { AccionSugerida } from './api'
+import type { AccionSugerida, RankingComercialItem } from './api'
 import { NIVEL_SALUD_BADGE, NIVEL_SALUD_LABELS, renderEstrellas, waLink, type RenewalBucket } from './utils'
 import type { NivelSalud } from './api'
 
@@ -131,7 +134,26 @@ export function AccionSugeridaButtons({
   )
 }
 
-export function RenewalCard({ item, dias }: { item: { cliente: Client; tipo: PautaTipo; fecha_vencimiento: string }; dias: number }) {
+export function RenewalCard({ item, dias }: { item: RankingComercialItem; dias: number }) {
+  // The plain wa.me link every other ContactarButton uses can't include the
+  // informe: that link is per-Pauta and minted on demand (a fresh, 15-day
+  // token each time — see `pautasApi.crearInformeLink`), not a static URL,
+  // so this one button needs its own async step before it can open wa.me.
+  const informeLinkMutation = useMutation({
+    mutationFn: pautasApi.crearInformeLink,
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
+  function enviarRecordatorio() {
+    informeLinkMutation.mutate(item.pauta_id, {
+      onSuccess: (link) => {
+        const mensaje = `Hola ${item.cliente.nombre}, tu plan ${PAUTA_TIPO_LABELS[item.tipo]} vence el ${formatFecha(item.fecha_vencimiento)}. Aquí tienes tu informe de resultados: ${link.url} ¿Quieres renovarlo?`
+        const wa = waLink(item.cliente.telefono, mensaje)
+        if (wa) window.open(wa, '_blank', 'noopener')
+      },
+    })
+  }
+
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
       <p className="text-sm font-medium">{item.cliente.nombre}</p>
@@ -141,10 +163,9 @@ export function RenewalCard({ item, dias }: { item: { cliente: Client; tipo: Pau
       <div className="flex flex-wrap gap-2">
         <VerClienteButton clienteId={item.cliente.id} />
         <RenovarButton clienteId={item.cliente.id} label="Renovar" />
-        <ContactarButton
-          telefono={item.cliente.telefono}
-          mensaje={`Hola ${item.cliente.nombre}, tu plan ${PAUTA_TIPO_LABELS[item.tipo]} vence el ${formatFecha(item.fecha_vencimiento)}. ¿Quieres renovarlo?`}
-        />
+        <Button size="sm" disabled={informeLinkMutation.isPending} onClick={enviarRecordatorio}>
+          <Phone /> Contactar
+        </Button>
       </div>
     </div>
   )

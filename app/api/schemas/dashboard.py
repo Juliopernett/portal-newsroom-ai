@@ -80,6 +80,7 @@ class RankingComercialOut(BaseModel):
     fecha_vencimiento: date
     vigente: bool
     estado_comercial: EstadoComercial
+    pauta_id: str
 
 
 class RentabilidadMensualOut(BaseModel):

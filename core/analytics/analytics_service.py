@@ -407,6 +407,7 @@ class AnalyticsService:
                     fecha_vencimiento=contrato.fecha_fin,
                     vigente=self._pauta_service.esta_vigente(contrato),
                     estado_comercial=self._estado_comercial(pautas_cliente),
+                    pauta_id=contrato.id,
                 )
             )
         return ranking

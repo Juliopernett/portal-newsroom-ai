@@ -105,6 +105,7 @@ def get_ranking(uow: UnitOfWork = Depends(get_unit_of_work)) -> list[RankingCome
             fecha_vencimiento=item.fecha_vencimiento,
             vigente=item.vigente,
             estado_comercial=item.estado_comercial,
+            pauta_id=item.pauta_id,
         )
         for item in analytics.ranking_comercial()
     ]

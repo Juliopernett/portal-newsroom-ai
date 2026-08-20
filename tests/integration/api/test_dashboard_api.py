@@ -183,7 +183,9 @@ def test_alertas_lists_an_old_pending_solicitud(client: TestClient) -> None:
 
 def test_ranking_reflects_a_clients_pauta(client: TestClient) -> None:
     client_id = _create_client(client)
-    _create_pauta(client, client_id, valor_pagado="200000.00", publicaciones_contratadas=10)
+    pauta_id = _create_pauta(
+        client, client_id, valor_pagado="200000.00", publicaciones_contratadas=10
+    )
 
     response = client.get("/dashboard/ranking")
 
@@ -199,6 +201,7 @@ def test_ranking_reflects_a_clients_pauta(client: TestClient) -> None:
     assert body[0]["publicaciones_restantes"] == 10
     assert body[0]["vigente"] is True
     assert body[0]["estado_comercial"] == "saludable"
+    assert body[0]["pauta_id"] == pauta_id
 
 
 def test_ranking_excludes_clients_without_a_pauta(client: TestClient) -> None:
