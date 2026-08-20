@@ -290,14 +290,14 @@ export function ContratosPage() {
                     Debe {formatMoneda(pauta.saldo_pendiente)}
                   </span>
                 )}
-                <div className="mt-1 flex items-center justify-between">
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{formatMoneda(pauta.valor_pagado)}</span>
                     <span className="text-xs text-muted-foreground" title="Peso comercial — uso interno">
                       Peso {formatMoneda(pauta.peso_comercial)}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center justify-end gap-1">
                     {pauta.vigente && (
                       <Button
                         variant="ghost"
@@ -320,7 +320,7 @@ export function ContratosPage() {
                       disabled={informeLinkMutation.isPending}
                       onClick={() => enviarInformePorWhatsapp(pauta)}
                     >
-                      <MessageCircle /> WhatsApp
+                      <MessageCircle /> Enviar al cliente
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => openEdit(pauta)}>
                       <Pencil /> Editar
