@@ -17,7 +17,8 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import database.models  # noqa: F401  (registers tables on Base.metadata)
-from app.api.dependencies import get_login_rate_limiter, get_unit_of_work
+from agents.meta_social.fake_reader import FakeSocialMediaReader
+from app.api.dependencies import get_login_rate_limiter, get_social_media_reader, get_unit_of_work
 from app.api.main import app
 from core.entities.user import User
 from database.base import Base
@@ -67,6 +68,11 @@ def unauthenticated_client(_test_engine: Engine) -> Iterator[TestClient]:
     test_rate_limiter = LoginRateLimiter()
     app.dependency_overrides[get_unit_of_work] = _get_test_unit_of_work
     app.dependency_overrides[get_login_rate_limiter] = lambda: test_rate_limiter
+    # The real dependency needs META_ACCESS_TOKEN/META_PAGE_ID/
+    # META_INSTAGRAM_BUSINESS_ACCOUNT_ID (see agents.meta_social) — none of
+    # which exist in the test environment, so every test gets the demo
+    # reader instead of a 503.
+    app.dependency_overrides[get_social_media_reader] = lambda: FakeSocialMediaReader()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

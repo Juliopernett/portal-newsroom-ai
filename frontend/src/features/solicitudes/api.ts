@@ -63,6 +63,15 @@ export interface MediaAsset {
   subido_por_user_id: string | null
 }
 
+export interface PostRedSocial {
+  id: string
+  canal: CanalPublicacion
+  permalink: string
+  texto: string
+  miniatura_url: string | null
+  fecha_publicacion: string
+}
+
 export interface ReporteDestino {
   canal: CanalPublicacion
   estado: EstadoDestino
@@ -128,6 +137,8 @@ export const solicitudesApi = {
       `/publication-requests/${id}/destinos/${destinoId}/corregir-enlace`,
       canal === 'wordpress' ? { wp_url: enlace } : { url_publicacion: enlace },
     ),
+  postsRecientes: (canal: Exclude<CanalPublicacion, 'wordpress'>) =>
+    api.get<PostRedSocial[]>(`/social/posts-recientes?canal=${canal}`),
 
   // Reporte (read-only, generated on demand, never persisted)
   getReporte: (id: string) => api.get<ReporteSolicitud>(`/publication-requests/${id}/reporte`),

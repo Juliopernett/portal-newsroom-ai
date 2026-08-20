@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     wordpress_username: str | None = None
     wordpress_app_password: str | None = None
 
+    # --- Meta Graph API (Facebook Page + Instagram Business Account —
+    # "elegir de posts recientes", 2026-08-20 automation conversation).
+    # A System User access token, not a personal user token — see
+    # agents/meta_social/__init__.py for the permissions it needs
+    # (pages_read_engagement, pages_show_list, instagram_basic). ---
+    meta_access_token: str | None = None
+    meta_page_id: str | None = None
+    meta_instagram_business_account_id: str | None = None
+
     # --- Media storage (MediaAsset — see docs/adr/ADR-007-media-assets.md) ---
     # `media_storage_dir` points at a Railway Volume in production; a
     # plain local directory otherwise (see `agents/storage/local_disk.py`).

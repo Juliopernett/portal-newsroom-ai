@@ -16,6 +16,7 @@ from functools import lru_cache
 
 from fastapi import Cookie, Depends, HTTPException, status
 
+from agents.meta_social.client import MetaGraphSocialMediaReader
 from agents.storage.local_disk import LocalDiskMediaStorage
 from agents.wordpress.client import WordPressCMSPublisher
 from config.settings import get_settings
@@ -24,6 +25,7 @@ from core.entities.user import User
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.media_storage import MediaStorage
 from core.ports.password_hasher import PasswordHasher
+from core.ports.social_media_reader import SocialMediaReader
 from core.ports.unit_of_work import UnitOfWork
 from database.engine import get_session_factory
 from database.unit_of_work import SqlAlchemyUnitOfWork
@@ -69,6 +71,18 @@ def get_cms_publisher() -> CMSPublisher:
     are not set in `.env` — Sprint 4A, Increment 3.
     """
     return WordPressCMSPublisher(get_settings())
+
+
+def get_social_media_reader() -> SocialMediaReader:
+    """Return the reader behind "elegir de posts recientes".
+
+    Raises `agents.meta_social.client.MetaGraphConfigurationError` (handled
+    in `app.api.errors`, translated to a 503) when
+    `META_ACCESS_TOKEN`/`META_PAGE_ID`/`META_INSTAGRAM_BUSINESS_ACCOUNT_ID`
+    aren't set in `.env` — same convention `get_cms_publisher` already
+    uses for `WordPressCMSPublisher`.
+    """
+    return MetaGraphSocialMediaReader(get_settings())
 
 
 def get_media_storage() -> MediaStorage:

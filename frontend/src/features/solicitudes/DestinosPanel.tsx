@@ -1,13 +1,66 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ListChecks } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SelectNative } from '@/components/ui/select-native'
+import { formatFechaHoraNegocio } from '@/lib/format'
 import { solicitudesApi, type CanalPublicacion, type DestinoPublicacion } from './api'
 import { CANALES_DESTINO, DESTINO_ESTADO_BADGE, DESTINO_ESTADO_LABELS } from './utils'
+
+// "elegir de posts recientes" (conversación de automatización 2026-08-20):
+// en vez de salir de la app a buscar el link publicado, se elige de una
+// lista corta de los últimos posts del canal. Hoy trae datos de
+// demostración (marcados "[DEMO]" — ver agents/meta_social/fake_reader.py)
+// hasta que haya credenciales reales de Meta Graph API.
+function PostsRecientesPicker({
+  canal,
+  onElegir,
+}: {
+  canal: Exclude<CanalPublicacion, 'wordpress'>
+  onElegir: (permalink: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const query = useQuery({
+    queryKey: ['posts-recientes', canal],
+    queryFn: () => solicitudesApi.postsRecientes(canal),
+    enabled: open,
+  })
+
+  return (
+    <div className="relative">
+      <Button type="button" size="sm" variant="secondary" onClick={() => setOpen((v) => !v)}>
+        <ListChecks /> Elegir de posts recientes
+      </Button>
+      {open && (
+        <div className="absolute top-full left-0 z-10 mt-1 max-h-64 w-72 overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
+          {query.isLoading && <p className="p-2 text-xs text-muted-foreground">Cargando…</p>}
+          {query.isError && <p className="p-2 text-xs text-danger">{errorMessage(query.error)}</p>}
+          {query.data?.length === 0 && (
+            <p className="p-2 text-xs text-muted-foreground">Sin posts recientes.</p>
+          )}
+          {query.data?.map((post) => (
+            <button
+              key={post.id}
+              type="button"
+              className="flex w-full flex-col gap-0.5 rounded p-2 text-left text-xs hover:bg-accent"
+              onClick={() => {
+                onElegir(post.permalink)
+                setOpen(false)
+              }}
+            >
+              <span className="text-muted-foreground">{formatFechaHoraNegocio(post.fecha_publicacion)}</span>
+              <span className="line-clamp-2">{post.texto}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function DestinoRow({
   solicitudId,
@@ -78,6 +131,9 @@ function DestinoRow({
           value={enlaceCorregido}
           onChange={(e) => setEnlaceCorregido(e.target.value)}
         />
+        {destino.canal !== 'wordpress' && (
+          <PostsRecientesPicker canal={destino.canal} onElegir={setEnlaceCorregido} />
+        )}
         <Button
           size="sm"
           disabled={acting || !enlaceCorregido.trim()}
@@ -146,6 +202,7 @@ function DestinoRow({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
+        <PostsRecientesPicker canal={destino.canal} onElegir={setUrl} />
         <Button size="sm" disabled={acting} onClick={() => confirmarMutation.mutate()}>
           Confirmar
         </Button>

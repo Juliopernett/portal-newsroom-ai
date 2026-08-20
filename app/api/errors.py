@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
+from agents.meta_social.client import MetaGraphConfigurationError
 from agents.wordpress.client import WordPressConfigurationError
 
 
@@ -39,9 +40,17 @@ def register_exception_handlers(app: FastAPI) -> None:
         """WordPress credentials are not set in `.env` yet (Sprint 4A, Increment 3)."""
         return JSONResponse(status_code=503, content={"detail": str(exc)})
 
+    @app.exception_handler(MetaGraphConfigurationError)
+    async def handle_meta_graph_configuration_error(
+        _request: Request, exc: MetaGraphConfigurationError
+    ) -> JSONResponse:
+        """Meta Graph API credentials are not set in `.env` yet (see agents.meta_social)."""
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
     @app.exception_handler(requests.RequestException)
-    async def handle_wordpress_request_error(
+    async def handle_external_request_error(
         _request: Request, exc: requests.RequestException
     ) -> JSONResponse:
-        """The real WordPress site rejected the request or was unreachable."""
-        return JSONResponse(status_code=502, content={"detail": f"WordPress request failed: {exc}"})
+        """An external HTTP integration (WordPress, Meta Graph API) rejected the
+        request or was unreachable."""
+        return JSONResponse(status_code=502, content={"detail": f"External request failed: {exc}"})

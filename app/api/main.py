@@ -32,6 +32,7 @@ from app.api.routers import (
     plan_pauta,
     publication_requests,
     reportes,
+    social,
 )
 
 FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
@@ -54,6 +55,7 @@ app.include_router(pautas.router_publico)
 app.include_router(plan_pauta.router)
 app.include_router(publication_requests.router)
 app.include_router(reportes.router)
+app.include_router(social.router)
 
 # Some React Router client routes share their exact top-level path with an
 # API router prefix (`/gastos`, `/reportes`) — the same collision the dev
