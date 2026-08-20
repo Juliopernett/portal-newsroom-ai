@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from core.entities.destino_publicacion import DestinoPublicacion, EstadoDestino
+from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
 
 
 def marcar_publicado(
@@ -139,6 +139,21 @@ def puede_eliminarse_sin_afectar_completitud(
     un-consume its pauta's cupo) nor, for symmetry, from `False` to `True`.
     """
     return esta_completa([destino, *otros_destinos]) == esta_completa(otros_destinos)
+
+
+def tiene_destino_social(destinos: Sequence[DestinoPublicacion]) -> bool:
+    """Return whether any of `destinos` is a Facebook or Instagram one, in any estado.
+
+    Backs the "Sin destino (contratos activos)" filter in Solicitudes —
+    a solicitud published only through the WordPress placeholder (see
+    `app.api.routers.publication_requests.publish_publication_request`)
+    has no real social-media link yet, regardless of that WordPress
+    destino's own estado.
+    """
+    return any(
+        destino.canal in (CanalPublicacion.FACEBOOK, CanalPublicacion.INSTAGRAM)
+        for destino in destinos
+    )
 
 
 def esta_completa(destinos: Sequence[DestinoPublicacion]) -> bool:

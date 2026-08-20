@@ -172,6 +172,29 @@ def list_publication_requests(
     return solicitudes
 
 
+@router.get("/sin-destino-social", response_model=list[PublicationRequestOut])
+def list_sin_destino_social(
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> list[PublicationRequest]:
+    """Return publicadas of a vigente Pauta with no Facebook/Instagram destino yet.
+
+    Backs the "Sin destino (contratos activos)" filter in Solicitudes.
+    One query per repository (same shape `/dashboard/resumen` already
+    uses), computed in `AnalyticsService.solicitudes_sin_destino_social`
+    — replaces what used to be one `GET .../destinos` call per candidate
+    solicitud from the frontend (up to ~180 concurrent requests, enough
+    to saturate the connection pool and even knock out an unrelated
+    `/auth/me` check mid-burst, 2026-08-20) with this single endpoint.
+    """
+    analytics = AnalyticsService(
+        clients=uow.clients.list_all(),
+        pautas=uow.pautas.list_all(),
+        solicitudes=uow.publication_requests.list_all(),
+        destinos=uow.destinos_publicacion.list_all(),
+    )
+    return analytics.solicitudes_sin_destino_social()
+
+
 @router.post("/{request_id}/publish", response_model=PublicationRequestOut)
 def publish_publication_request(
     request_id: str,

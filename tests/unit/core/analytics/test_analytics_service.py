@@ -377,6 +377,69 @@ def test_solicitudes_pendientes_and_publicadas() -> None:
     assert service.solicitudes_publicadas() == [publicada]
 
 
+def test_solicitudes_sin_destino_social_finds_wordpress_only_publicada() -> None:
+    pauta_vigente = _pauta(id="p1", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 30))
+    (solo_wordpress,), destinos = _solicitudes_completas(1, id="s1", pauta_id="p1")
+
+    resultado = _service(
+        pautas=[pauta_vigente], solicitudes=[solo_wordpress], destinos=destinos
+    ).solicitudes_sin_destino_social()
+
+    assert resultado == [solo_wordpress]
+
+
+def test_solicitudes_sin_destino_social_excludes_one_with_facebook_already() -> None:
+    pauta_vigente = _pauta(id="p1", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 30))
+    (con_facebook,), destinos = _solicitudes_completas(1, id="s1", pauta_id="p1")
+    destinos.append(
+        _destino_publicado(
+            con_facebook,
+            canal=CanalPublicacion.FACEBOOK,
+            url_publicacion="https://facebook.com/post/1",
+        )
+    )
+
+    resultado = _service(
+        pautas=[pauta_vigente], solicitudes=[con_facebook], destinos=destinos
+    ).solicitudes_sin_destino_social()
+
+    assert resultado == []
+
+
+def test_solicitudes_sin_destino_social_excludes_a_vencida_pauta() -> None:
+    pauta_vencida = _pauta(id="p1", fecha_inicio=date(2025, 1, 1), fecha_fin=date(2025, 2, 1))
+    (solo_wordpress,), destinos = _solicitudes_completas(1, id="s1", pauta_id="p1")
+
+    resultado = _service(
+        pautas=[pauta_vencida], solicitudes=[solo_wordpress], destinos=destinos
+    ).solicitudes_sin_destino_social()
+
+    assert resultado == []
+
+
+def test_solicitudes_sin_destino_social_excludes_a_solicitud_with_no_pauta() -> None:
+    (sin_pauta,), destinos = _solicitudes_completas(
+        1, id="s1", pauta_id=None, estado=PublicationRequestStatus.RECIBIDA
+    )
+
+    resultado = _service(
+        solicitudes=[sin_pauta], destinos=destinos
+    ).solicitudes_sin_destino_social()
+
+    assert resultado == []
+
+
+def test_solicitudes_sin_destino_social_excludes_a_solicitud_that_is_not_yet_completa() -> None:
+    pauta_vigente = _pauta(id="p1", fecha_inicio=date(2026, 7, 1), fecha_fin=date(2026, 8, 30))
+    pendiente = _solicitud(id="s1", pauta_id="p1", estado=PublicationRequestStatus.ACEPTADA)
+
+    resultado = _service(
+        pautas=[pauta_vigente], solicitudes=[pendiente], destinos=[]
+    ).solicitudes_sin_destino_social()
+
+    assert resultado == []
+
+
 def test_solicitudes_pendientes_excludes_a_recibida_solicitud_that_is_already_completa() -> None:
     """Sprint 4A, Incremento 5: reachable when a destino is confirmed directly
     on a still-RECIBIDA solicitud (e.g. Instagram-only, no aceptar() call) —

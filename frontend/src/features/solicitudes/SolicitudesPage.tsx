@@ -181,32 +181,18 @@ export function SolicitudesPage() {
   // "Publicaciones sin destino" (filtro rápido, 2026-08-20): acotado a
   // contratos activos a propósito — repasar los ~1000+ registros
   // históricos no tiene sentido operativo, solo lo que aún se puede
-  // corregir. No hay endpoint que traiga destinos en lote, así que esto
-  // pide uno por solicitud candidata (siempre un puñado, nunca la lista
-  // completa) solo mientras el filtro está activo.
-  const pautasVigentesIds = useMemo(
-    () => new Set(pautasVigentes.map((p) => p.id)),
-    [pautasVigentes],
-  )
-  const candidatosSinDestino = useMemo(
-    () => publicadasTodas.filter((s) => s.pauta_id && pautasVigentesIds.has(s.pauta_id)),
-    [publicadasTodas, pautasVigentesIds],
-  )
+  // corregir. Una sola llamada al backend — antes esto pedía un
+  // GET .../destinos por solicitud candidata (hasta ~180 en paralelo),
+  // suficiente para saturar la conexión un momento.
   const sinDestinoQuery = useQuery({
-    queryKey: ['solicitudes-sin-destino-social', candidatosSinDestino.map((s) => s.id)],
-    queryFn: async () => {
-      const resultados = await Promise.all(
-        candidatosSinDestino.map(async (s) => {
-          const destinos = await solicitudesApi.listDestinos(s.id)
-          const tieneRedSocial = destinos.some((d) => d.canal === 'facebook' || d.canal === 'instagram')
-          return tieneRedSocial ? null : s.id
-        }),
-      )
-      return new Set(resultados.filter((id): id is string => id !== null))
-    },
-    enabled: soloSinDestino && candidatosSinDestino.length > 0,
+    queryKey: ['solicitudes-sin-destino-social'],
+    queryFn: solicitudesApi.sinDestinoSocial,
+    enabled: soloSinDestino,
   })
-  const idsSinDestino = sinDestinoQuery.data ?? new Set<string>()
+  const idsSinDestino = useMemo(
+    () => new Set((sinDestinoQuery.data ?? []).map((s) => s.id)),
+    [sinDestinoQuery.data],
+  )
 
   // pauta_id wins when both are present (it's the authoritative link once a
   // contrato is known); client_id is the fallback identity captured at
@@ -464,9 +450,7 @@ export function SolicitudesPage() {
             ) : publicadasVisibles.length === 0 ? (
               <p className="p-6 text-center text-sm text-muted-foreground">Todavía no hay publicadas.</p>
             ) : soloSinDestino && sinDestinoQuery.isFetching ? (
-              <p className="p-6 text-center text-sm text-muted-foreground">
-                Revisando destinos de {candidatosSinDestino.length} publicaciones…
-              </p>
+              <p className="p-6 text-center text-sm text-muted-foreground">Revisando destinos…</p>
             ) : publicadasFiltradas.length === 0 ? (
               <p className="p-6 text-center text-sm text-muted-foreground">
                 {soloSinDestino

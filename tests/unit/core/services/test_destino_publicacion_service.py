@@ -14,6 +14,7 @@ from core.services.destino_publicacion_service import (
     marcar_fallido,
     marcar_publicado,
     puede_eliminarse_sin_afectar_completitud,
+    tiene_destino_social,
 )
 
 
@@ -327,6 +328,25 @@ def test_puede_eliminarse_es_false_cuando_es_el_unico_destino_publicado() -> Non
     )
 
     assert puede_eliminarse_sin_afectar_completitud(wordpress, [instagram_cancelado]) is False
+
+
+def test_tiene_destino_social_es_true_con_un_facebook_pendiente() -> None:
+    """Cualquier estado cuenta — no solo PUBLICADO, ver el docstring de la
+    función: lo que importa es que el destino exista, no si ya se
+    confirmó."""
+    assert tiene_destino_social([_destino(canal=CanalPublicacion.FACEBOOK)]) is True
+
+
+def test_tiene_destino_social_es_true_con_un_instagram() -> None:
+    assert tiene_destino_social([_destino(canal=CanalPublicacion.INSTAGRAM)]) is True
+
+
+def test_tiene_destino_social_es_false_con_solo_wordpress() -> None:
+    assert tiene_destino_social([_destino(canal=CanalPublicacion.WORDPRESS)]) is False
+
+
+def test_tiene_destino_social_es_false_sin_destinos() -> None:
+    assert tiene_destino_social([]) is False
 
 
 def test_puede_eliminarse_es_true_cuando_ya_estaba_incompleta_sin_el() -> None:

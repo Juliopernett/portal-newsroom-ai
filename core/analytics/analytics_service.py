@@ -35,7 +35,7 @@ from core.entities.destino_publicacion import DestinoPublicacion
 from core.entities.otro_ingreso import OtroIngreso
 from core.entities.pauta import Pauta, PautaTipo
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
-from core.services.destino_publicacion_service import esta_completa
+from core.services.destino_publicacion_service import esta_completa, tiene_destino_social
 from core.services.pauta_service import PautaService
 
 _CUPO_BAJO_UMBRAL = Decimal("0.2")
@@ -495,6 +495,28 @@ class AnalyticsService:
             s
             for s in self._solicitudes
             if esta_completa([d for d in self._destinos if d.publication_request_id == s.id])
+        ]
+
+    def solicitudes_sin_destino_social(self) -> list[PublicationRequest]:
+        """Return publicadas of a currently-vigente Pauta with no Facebook/Instagram destino.
+
+        Backs the "Sin destino (contratos activos)" filter in
+        Solicitudes — scoped to vigente Pautas on purpose (2026-08-20):
+        repasar el historial completo no tiene sentido operativo, solo lo
+        que un contrato activo aún puede corregir. A solicitud with no
+        `pauta_id` at all can't be "de un contrato activo" either way, so
+        it's excluded the same as one linked to a vencida Pauta.
+        """
+        pautas_por_id = {p.id: p for p in self._pautas}
+        return [
+            s
+            for s in self.solicitudes_publicadas()
+            if s.pauta_id is not None
+            and (pauta := pautas_por_id.get(s.pauta_id)) is not None
+            and self._pauta_service.esta_vigente(pauta)
+            and not tiene_destino_social(
+                [d for d in self._destinos if d.publication_request_id == s.id]
+            )
         ]
 
     def solicitudes_antiguas(self, horas: int = 4) -> list[PublicationRequest]:

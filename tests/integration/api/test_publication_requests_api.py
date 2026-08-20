@@ -199,6 +199,81 @@ def test_list_publication_requests_filters_by_completa_false(client: TestClient)
     assert ids == {pendiente_id}
 
 
+def test_sin_destino_social_finds_a_wordpress_only_publicada_of_a_vigente_pauta(
+    client: TestClient,
+) -> None:
+    pauta_id = _create_client_and_pauta(client)
+    solicitud_id = client.post(
+        "/publication-requests", json={"pauta_id": pauta_id, "texto": "Se publica"}
+    ).json()["id"]
+    client.post(f"/publication-requests/{solicitud_id}/publish")
+
+    response = client.get("/publication-requests/sin-destino-social")
+
+    assert response.status_code == 200
+    ids = {s["id"] for s in response.json()}
+    assert ids == {solicitud_id}
+
+
+def test_sin_destino_social_excludes_a_solicitud_that_already_has_facebook(
+    client: TestClient,
+) -> None:
+    pauta_id = _create_client_and_pauta(client)
+    solicitud_id = client.post(
+        "/publication-requests", json={"pauta_id": pauta_id, "texto": "Se publica"}
+    ).json()["id"]
+    client.post(f"/publication-requests/{solicitud_id}/publish")
+    facebook_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "facebook"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{facebook_id}/confirmar-publicacion",
+        json={"url_publicacion": "https://facebook.com/post/1"},
+    )
+
+    response = client.get("/publication-requests/sin-destino-social")
+
+    assert response.status_code == 200
+    assert solicitud_id not in {s["id"] for s in response.json()}
+
+
+def test_sin_destino_social_excludes_a_vencida_pauta(client: TestClient) -> None:
+    client_id = client.post(
+        "/clients",
+        json={"nombre": "Contrato vencido", "tipo": "artista", "telefono": "+573001112233"},
+    ).json()["id"]
+    pauta_id = client.post(
+        "/pautas",
+        json={
+            "client_id": client_id,
+            "fecha_inicio": "2025-01-01",
+            "fecha_fin": "2025-02-01",
+            "publicaciones_contratadas": 10,
+            "valor_pagado": "500000.00",
+            "fecha_pago": "2025-01-01",
+        },
+    ).json()["id"]
+    solicitud_id = client.post(
+        "/publication-requests", json={"pauta_id": pauta_id, "texto": "Se publica"}
+    ).json()["id"]
+    client.post(f"/publication-requests/{solicitud_id}/publish")
+
+    response = client.get("/publication-requests/sin-destino-social")
+
+    assert response.status_code == 200
+    assert solicitud_id not in {s["id"] for s in response.json()}
+
+
+def test_sin_destino_social_excludes_a_solicitud_still_pending(client: TestClient) -> None:
+    pauta_id = _create_client_and_pauta(client)
+    client.post("/publication-requests", json={"pauta_id": pauta_id, "texto": "Sin publicar"})
+
+    response = client.get("/publication-requests/sin-destino-social")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_list_publication_requests_finds_an_en_curso_solicitud(client: TestClient) -> None:
     """A solicitud already ACEPTADA (via the old one-click Publicar) but with
     another destino still pending (e.g. Instagram, added separately) must be

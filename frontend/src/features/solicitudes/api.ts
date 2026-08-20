@@ -119,6 +119,12 @@ export const solicitudesApi = {
     publicadas.sort((a, b) => (b.fecha_cierre ?? '').localeCompare(a.fecha_cierre ?? ''))
     return { pendientes: [...recibidas, ...enCurso], publicadas }
   },
+  // Publicadas de un contrato vigente sin Facebook/Instagram todavía —
+  // una sola consulta al backend (core.analytics.AnalyticsService
+  // .solicitudes_sin_destino_social) en vez de un GET .../destinos por
+  // solicitud candidata, que llegó a mandar ~180 peticiones simultáneas
+  // y saturó la conexión un momento (2026-08-20).
+  sinDestinoSocial: () => api.get<Solicitud[]>('/publication-requests/sin-destino-social'),
   create: (payload: SolicitudCreateInput) => api.post<Solicitud>('/publication-requests', payload),
   edit: (id: string, payload: SolicitudEditInput) =>
     api.patch<Solicitud>(`/publication-requests/${id}`, payload),
