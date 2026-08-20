@@ -83,3 +83,9 @@ class SqlAlchemyDestinoPublicacionRepository:
         """Return every destino in the system."""
         models = self._session.execute(select(DestinoPublicacionModel)).scalars().all()
         return [_to_domain(model) for model in models]
+
+    def delete(self, id: str) -> None:
+        """Remove the `DestinoPublicacion` identified by `id`, if it exists."""
+        model = self._session.get(DestinoPublicacionModel, id)
+        if model is not None:
+            self._session.delete(model)

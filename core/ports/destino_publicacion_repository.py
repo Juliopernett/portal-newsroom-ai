@@ -39,3 +39,17 @@ class DestinoPublicacionRepository(Protocol):
     def list_all(self) -> list[DestinoPublicacion]:
         """Return every destino in the system."""
         ...
+
+    def delete(self, id: str) -> None:
+        """Remove the `DestinoPublicacion` identified by `id`.
+
+        A no-op if no such destino exists. Reserved for destinos that
+        turned out redundant (e.g. the WordPress placeholder every
+        `PublicationRequest.publish` created before the multi-destino
+        model existed, once a real Facebook/Instagram destino already
+        covers the same solicitud) — never used to undo a genuine
+        publication; see `core.services.destino_publicacion_service.
+        puede_eliminarse_sin_afectar_completitud`, which every caller of
+        this must check first.
+        """
+        ...

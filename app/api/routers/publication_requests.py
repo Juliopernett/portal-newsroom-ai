@@ -92,7 +92,12 @@ from core.entities.user import User
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.media_storage import MediaStorage
 from core.ports.unit_of_work import UnitOfWork
-from core.services.destino_publicacion_service import cancelar, corregir_enlace, marcar_publicado
+from core.services.destino_publicacion_service import (
+    cancelar,
+    corregir_enlace,
+    marcar_publicado,
+    puede_eliminarse_sin_afectar_completitud,
+)
 from core.services.media_asset_service import (
     construir_storage_key,
     determinar_tipo,
@@ -426,6 +431,42 @@ def cancelar_destino(
     uow.publication_requests.save(cerrada)
     uow.commit()
     return cancelado
+
+
+@router.delete("/{request_id}/destinos/{destino_id}", status_code=204)
+def eliminar_destino(
+    request_id: str,
+    destino_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> None:
+    """Delete a redundant destino — never a genuine publication.
+
+    Not a state transition (`cancelar` already covers walking back a
+    destino that hasn't gone out); this is for a row that should not have
+    existed as a separate destino at all — the clearest case being the
+    WordPress placeholder `publish_publication_request` stamps on every
+    solicitud for compatibility with the old single-click flow, once a
+    real Facebook/Instagram destino already covers the same solicitud.
+    `puede_eliminarse_sin_afectar_completitud` is the one guard: refuses
+    (`ValueError` → 422) if deleting `destino_id` would change
+    `esta_completa` for what's left, so this can never silently reopen a
+    solicitud, clear its `fecha_cierre`, or un-consume a pauta's cupo.
+    """
+    solicitud = uow.publication_requests.get_by_id(request_id)
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    destinos = uow.destinos_publicacion.list_by_publication_request_id(request_id)
+    destino = next((d for d in destinos if d.id == destino_id), None)
+    if destino is None:
+        raise HTTPException(status_code=404, detail="DestinoPublicacion not found")
+    otros = [d for d in destinos if d.id != destino_id]
+    if not puede_eliminarse_sin_afectar_completitud(destino, otros):
+        raise ValueError(
+            "no se puede eliminar: dejaría la solicitud sin completar o la completaría "
+            "sin una publicación real"
+        )
+    uow.destinos_publicacion.delete(destino_id)
+    uow.commit()
 
 
 @router.get("/{request_id}/reporte", response_model=ReporteSolicitudOut)

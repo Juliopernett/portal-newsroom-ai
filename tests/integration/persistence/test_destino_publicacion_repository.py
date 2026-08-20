@@ -51,6 +51,26 @@ def test_save_and_get_by_id_round_trips_a_pendiente_destino(session: Session) ->
     assert repository.get_by_id(destino.id) == destino
 
 
+def test_delete_removes_a_persisted_destino(session: Session) -> None:
+    solicitud = _create_solicitud(session)
+    repository = SqlAlchemyDestinoPublicacionRepository(session)
+    destino = _destino(publication_request_id=solicitud.id)
+    repository.save(destino)
+    session.commit()
+
+    repository.delete(destino.id)
+    session.commit()
+
+    assert repository.get_by_id(destino.id) is None
+
+
+def test_delete_is_a_no_op_for_an_id_that_does_not_exist(session: Session) -> None:
+    repository = SqlAlchemyDestinoPublicacionRepository(session)
+
+    repository.delete("no-existe")
+    session.commit()
+
+
 def test_save_and_get_by_id_round_trips_a_publicado_wordpress_destino(session: Session) -> None:
     solicitud = _create_solicitud(session)
     repository = SqlAlchemyDestinoPublicacionRepository(session)

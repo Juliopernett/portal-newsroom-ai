@@ -121,6 +121,26 @@ def cancelar(destino: DestinoPublicacion) -> DestinoPublicacion:
     return replace(destino, estado=EstadoDestino.CANCELADO)
 
 
+def puede_eliminarse_sin_afectar_completitud(
+    destino: DestinoPublicacion, otros_destinos: Sequence[DestinoPublicacion]
+) -> bool:
+    """Return whether removing `destino` (not in `otros_destinos`) leaves
+    `esta_completa` unchanged for the rest of the solicitud's destinos.
+
+    There is no domain-level "eliminar" transition — deleting a row is a
+    persistence concern (`DestinoPublicacionRepository.delete`), not a
+    state one. This is the one check every caller of that delete must run
+    first: it exists for cases like a WordPress destino `publish()`
+    stamped automatically (see `app.api.routers.publication_requests.
+    publish_publication_request`) that turned out redundant once a real
+    Facebook/Instagram destino was registered for the same solicitud —
+    removing it must never flip `esta_completa` from `True` to `False`
+    (would silently reopen a solicitud, clear `fecha_cierre`, and
+    un-consume its pauta's cupo) nor, for symmetry, from `False` to `True`.
+    """
+    return esta_completa([destino, *otros_destinos]) == esta_completa(otros_destinos)
+
+
 def esta_completa(destinos: Sequence[DestinoPublicacion]) -> bool:
     """Return whether a PublicationRequest's destinos add up to "complete".
 

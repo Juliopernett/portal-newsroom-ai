@@ -493,6 +493,83 @@ def test_cancelar_returns_404_when_destino_not_found(client: TestClient) -> None
     assert response.status_code == 404
 
 
+def test_eliminar_destino_redundante_junto_a_otro_ya_publicado(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    wordpress_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{wordpress_id}/confirmar-publicacion",
+        json={},
+    )
+    client.post(f"/publication-requests/{solicitud_id}/destinos", json={"canal": "facebook"})
+    facebook_id = client.get(f"/publication-requests/{solicitud_id}/destinos").json()[1]["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{facebook_id}/confirmar-publicacion",
+        json={"url_publicacion": "https://facebook.com/post/1"},
+    )
+
+    response = client.delete(f"/publication-requests/{solicitud_id}/destinos/{wordpress_id}")
+
+    assert response.status_code == 204
+    destinos = client.get(f"/publication-requests/{solicitud_id}/destinos").json()
+    assert len(destinos) == 1
+    assert destinos[0]["canal"] == "facebook"
+
+
+def test_eliminar_destino_rejects_when_it_is_the_only_published_one(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    wordpress_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{wordpress_id}/confirmar-publicacion",
+        json={},
+    )
+
+    response = client.delete(f"/publication-requests/{solicitud_id}/destinos/{wordpress_id}")
+
+    assert response.status_code == 422
+    assert len(client.get(f"/publication-requests/{solicitud_id}/destinos").json()) == 1
+
+
+def test_eliminar_destino_no_reabre_fecha_cierre(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    wordpress_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{wordpress_id}/confirmar-publicacion",
+        json={},
+    )
+    client.post(f"/publication-requests/{solicitud_id}/destinos", json={"canal": "instagram"})
+    instagram_id = client.get(f"/publication-requests/{solicitud_id}/destinos").json()[1]["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{instagram_id}/confirmar-publicacion",
+        json={"url_publicacion": "https://instagram.com/p/abc"},
+    )
+
+    client.delete(f"/publication-requests/{solicitud_id}/destinos/{wordpress_id}")
+
+    solicitudes = client.get("/publication-requests").json()
+    solicitud = next(s for s in solicitudes if s["id"] == solicitud_id)
+    assert solicitud["fecha_cierre"] is not None
+
+
+def test_eliminar_destino_returns_404_when_solicitud_not_found(client: TestClient) -> None:
+    response = client.delete("/publication-requests/no-existe/destinos/no-existe")
+
+    assert response.status_code == 404
+
+
+def test_eliminar_destino_returns_404_when_destino_not_found(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+
+    response = client.delete(f"/publication-requests/{solicitud_id}/destinos/no-existe")
+
+    assert response.status_code == 404
+
+
 def test_crear_borrador_wordpress_returns_503_when_not_configured(client: TestClient) -> None:
     """Overrides get_cms_publisher with an explicitly unconfigured Settings —
     deliberately never reads the real get_settings()/.env here. This suite

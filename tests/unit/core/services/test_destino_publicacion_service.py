@@ -13,6 +13,7 @@ from core.services.destino_publicacion_service import (
     esta_completa,
     marcar_fallido,
     marcar_publicado,
+    puede_eliminarse_sin_afectar_completitud,
 )
 
 
@@ -294,3 +295,45 @@ def test_esta_completa_is_true_when_all_terminal_and_one_published() -> None:
     ]
 
     assert esta_completa(destinos) is True
+
+
+def test_puede_eliminarse_es_true_cuando_otro_destino_ya_deja_completa() -> None:
+    """El caso real: WordPress publicado sin URL (placeholder de
+    `publish_publication_request`) junto a un Facebook real — borrar el
+    WordPress no cambia nada, Facebook por sí solo ya completaba."""
+    wordpress = _destino(
+        canal=CanalPublicacion.WORDPRESS,
+        estado=EstadoDestino.PUBLICADO,
+        fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC),
+    )
+    facebook = _destino(
+        canal=CanalPublicacion.FACEBOOK,
+        estado=EstadoDestino.PUBLICADO,
+        fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC),
+        url_publicacion="https://facebook.com/post/1",
+    )
+
+    assert puede_eliminarse_sin_afectar_completitud(wordpress, [facebook]) is True
+
+
+def test_puede_eliminarse_es_false_cuando_es_el_unico_destino_publicado() -> None:
+    wordpress = _destino(
+        canal=CanalPublicacion.WORDPRESS,
+        estado=EstadoDestino.PUBLICADO,
+        fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC),
+    )
+    instagram_cancelado = _destino(
+        canal=CanalPublicacion.INSTAGRAM, estado=EstadoDestino.CANCELADO
+    )
+
+    assert puede_eliminarse_sin_afectar_completitud(wordpress, [instagram_cancelado]) is False
+
+
+def test_puede_eliminarse_es_true_cuando_ya_estaba_incompleta_sin_el() -> None:
+    wordpress_pendiente = _destino(canal=CanalPublicacion.WORDPRESS)
+    instagram_pendiente = _destino(canal=CanalPublicacion.INSTAGRAM)
+
+    assert (
+        puede_eliminarse_sin_afectar_completitud(wordpress_pendiente, [instagram_pendiente])
+        is True
+    )
