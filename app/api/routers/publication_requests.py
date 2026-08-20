@@ -346,7 +346,10 @@ def confirmar_publicacion_destino(
     if destino is None:
         raise HTTPException(status_code=404, detail="DestinoPublicacion not found")
     publicado = marcar_publicado(
-        destino, registrado_por_user_id=current_user.id, url_publicacion=payload.url_publicacion
+        destino,
+        registrado_por_user_id=current_user.id,
+        url_publicacion=payload.url_publicacion,
+        meta_post_id=payload.meta_post_id,
     )
     destinos_actualizados = [publicado if d.id == destino_id else d for d in destinos]
     cerrada = cerrar_si_completa(solicitud, destinos_actualizados)
@@ -382,7 +385,10 @@ def corregir_enlace_destino(
     if destino is None:
         raise HTTPException(status_code=404, detail="DestinoPublicacion not found")
     corregido = corregir_enlace(
-        destino, wp_url=payload.wp_url, url_publicacion=payload.url_publicacion
+        destino,
+        wp_url=payload.wp_url,
+        url_publicacion=payload.url_publicacion,
+        meta_post_id=payload.meta_post_id,
     )
     uow.destinos_publicacion.save(corregido)
     uow.commit()

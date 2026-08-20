@@ -28,6 +28,7 @@ def test_create_destino_assigns_defaults() -> None:
     assert destino.wp_post_id is None
     assert destino.wp_url is None
     assert destino.url_publicacion is None
+    assert destino.meta_post_id is None
     assert destino.registrado_por_user_id is None
     assert destino.fecha_publicacion is None
     assert destino.ultimo_error is None
@@ -59,6 +60,24 @@ def test_url_publicacion_accepted_for_social_channels(canal: CanalPublicacion) -
     )
 
     assert destino.url_publicacion == "https://example.com/post/1"
+
+
+def test_meta_post_id_rejected_for_wordpress() -> None:
+    with pytest.raises(ValueError, match="meta_post_id"):
+        _build(canal=CanalPublicacion.WORDPRESS, meta_post_id="123_456")
+
+
+@pytest.mark.parametrize("canal", [CanalPublicacion.FACEBOOK, CanalPublicacion.INSTAGRAM])
+def test_meta_post_id_accepted_for_social_channels(canal: CanalPublicacion) -> None:
+    destino = _build(
+        canal=canal,
+        estado=EstadoDestino.PUBLICADO,
+        url_publicacion="https://example.com/post/1",
+        meta_post_id="123_456",
+        fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC),
+    )
+
+    assert destino.meta_post_id == "123_456"
 
 
 @pytest.mark.parametrize("canal", [CanalPublicacion.FACEBOOK, CanalPublicacion.INSTAGRAM])

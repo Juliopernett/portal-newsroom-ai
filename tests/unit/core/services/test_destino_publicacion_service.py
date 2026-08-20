@@ -69,6 +69,27 @@ def test_marcar_publicado_sets_url_publicacion_for_social_channel() -> None:
     assert resultado.url_publicacion == "https://facebook.com/post/1"
 
 
+def test_marcar_publicado_sets_meta_post_id_when_given() -> None:
+    destino = _destino(canal=CanalPublicacion.FACEBOOK)
+
+    resultado = marcar_publicado(
+        destino, url_publicacion="https://facebook.com/post/1", meta_post_id="123_456"
+    )
+
+    assert resultado.meta_post_id == "123_456"
+
+
+def test_marcar_publicado_leaves_meta_post_id_none_when_not_given() -> None:
+    """A manually-typed link (not picked from the posts-recientes picker)
+    never gets a meta_post_id — it was never associated with a real Meta
+    id in the first place."""
+    destino = _destino(canal=CanalPublicacion.FACEBOOK)
+
+    resultado = marcar_publicado(destino, url_publicacion="https://facebook.com/post/1")
+
+    assert resultado.meta_post_id is None
+
+
 def test_marcar_publicado_allows_retry_from_fallido() -> None:
     destino = _destino(estado=EstadoDestino.FALLIDO, ultimo_error="timeout")
 
@@ -190,6 +211,35 @@ def test_corregir_enlace_does_not_mutate_the_original() -> None:
     corregir_enlace(destino, url_publicacion="https://instagram.com/p/correct")
 
     assert destino.url_publicacion == "https://instagram.com/p/wrong"
+
+
+def test_corregir_enlace_sets_meta_post_id_when_given() -> None:
+    destino = _destino(
+        canal=CanalPublicacion.INSTAGRAM,
+        estado=EstadoDestino.PUBLICADO,
+        fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC),
+        url_publicacion="https://instagram.com/p/wrong",
+    )
+
+    resultado = corregir_enlace(
+        destino, url_publicacion="https://instagram.com/p/correct", meta_post_id="789"
+    )
+
+    assert resultado.meta_post_id == "789"
+
+
+def test_corregir_enlace_leaves_meta_post_id_unchanged_when_not_given() -> None:
+    destino = _destino(
+        canal=CanalPublicacion.INSTAGRAM,
+        estado=EstadoDestino.PUBLICADO,
+        fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC),
+        url_publicacion="https://instagram.com/p/wrong",
+        meta_post_id="original-id",
+    )
+
+    resultado = corregir_enlace(destino, url_publicacion="https://instagram.com/p/correct")
+
+    assert resultado.meta_post_id == "original-id"
 
 
 def test_corregir_enlace_rejects_a_destino_not_yet_publicado() -> None:

@@ -24,6 +24,7 @@ def marcar_publicado(
     wp_post_id: str | None = None,
     wp_url: str | None = None,
     url_publicacion: str | None = None,
+    meta_post_id: str | None = None,
 ) -> DestinoPublicacion:
     """Return a copy of `destino` transitioned to `PUBLICADO`.
 
@@ -31,7 +32,10 @@ def marcar_publicado(
     succeed) — raises `ValueError` if `destino` is already terminal
     (`PUBLICADO`/`CANCELADO`). `fecha_publicacion` defaults to now (UTC)
     when not given, same convention as `Pauta.fecha_registro`'s own
-    `default_factory`.
+    `default_factory`. `meta_post_id` is only ever set when the operator
+    "relacionó" a real Meta post via the posts-recientes picker — a plain
+    manually-typed `url_publicacion` (Facebook/Instagram) or a WordPress
+    destino leaves it `None`, same as before this field existed.
     """
     if destino.es_terminal:
         raise ValueError(
@@ -48,6 +52,7 @@ def marcar_publicado(
         wp_post_id=wp_post_id if wp_post_id is not None else destino.wp_post_id,
         wp_url=wp_url if wp_url is not None else destino.wp_url,
         url_publicacion=url_publicacion if url_publicacion is not None else destino.url_publicacion,
+        meta_post_id=meta_post_id if meta_post_id is not None else destino.meta_post_id,
     )
 
 
@@ -56,6 +61,7 @@ def corregir_enlace(
     *,
     wp_url: str | None = None,
     url_publicacion: str | None = None,
+    meta_post_id: str | None = None,
 ) -> DestinoPublicacion:
     """Return a copy of `destino` with its link corrected — a data-entry fix,
     not a state transition (see `marcar_publicado` for the real one).
@@ -68,8 +74,10 @@ def corregir_enlace(
     touches `estado` or `fecha_publicacion`: correcting *what* was
     published is not the same as re-publishing it, so quota/`fecha_cierre`
     never get recomputed by this. `__post_init__` still enforces that
-    `wp_url` only applies to WORDPRESS and `url_publicacion` only to
-    FACEBOOK/INSTAGRAM.
+    `wp_url` only applies to WORDPRESS and `url_publicacion`/`meta_post_id`
+    only to FACEBOOK/INSTAGRAM. `meta_post_id` re-picking a post from the
+    picker keeps the dedup record in sync with the corrected link — a
+    plain manual retype leaves it as it was (never cleared implicitly).
     """
     if destino.estado != EstadoDestino.PUBLICADO:
         raise ValueError(
@@ -80,6 +88,7 @@ def corregir_enlace(
         destino,
         wp_url=wp_url if wp_url is not None else destino.wp_url,
         url_publicacion=url_publicacion if url_publicacion is not None else destino.url_publicacion,
+        meta_post_id=meta_post_id if meta_post_id is not None else destino.meta_post_id,
     )
 
 

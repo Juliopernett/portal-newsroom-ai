@@ -74,6 +74,14 @@ class DestinoPublicacion:
     wp_post_id: str | None = None
     wp_url: str | None = None
     url_publicacion: str | None = None
+    # The Meta Graph API post/media id (e.g. `137967556315253_1521505290021833`)
+    # behind `url_publicacion`, captured when an operator "relaciona" a
+    # DestinoPublicacion with a real post via the posts-recientes picker
+    # (2026-08-20, conciliación inteligente de publicaciones) — never
+    # entered by hand. Only applies to FACEBOOK/INSTAGRAM, same as
+    # `url_publicacion`; it is what lets the picker mark a post "✓ Ya
+    # relacionada" instead of comparing URL strings.
+    meta_post_id: str | None = None
     registrado_por_user_id: str | None = None
     fecha_publicacion: datetime | None = None
     ultimo_error: str | None = None
@@ -92,6 +100,12 @@ class DestinoPublicacion:
             canales_validos = sorted(c.value for c in _CANALES_CON_URL_MANUAL)
             raise ValueError(
                 f"url_publicacion only applies to canal in {canales_validos}, "
+                f"got canal={self.canal.value!r}"
+            )
+        if self.canal not in _CANALES_CON_URL_MANUAL and self.meta_post_id is not None:
+            canales_validos = sorted(c.value for c in _CANALES_CON_URL_MANUAL)
+            raise ValueError(
+                f"meta_post_id only applies to canal in {canales_validos}, "
                 f"got canal={self.canal.value!r}"
             )
         if self.estado == EstadoDestino.PUBLICADO and self.fecha_publicacion is None:

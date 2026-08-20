@@ -45,6 +45,7 @@ export interface DestinoPublicacion {
   wp_post_id: string | null
   wp_url: string | null
   url_publicacion: string | null
+  meta_post_id: string | null
   registrado_por_user_id: string | null
   fecha_publicacion: string | null
   ultimo_error: string | null
@@ -70,6 +71,15 @@ export interface PostRedSocial {
   texto: string
   miniatura_url: string | null
   fecha_publicacion: string
+  coincidencia: number | null
+  ya_relacionada: boolean
+}
+
+export interface SolicitudContexto {
+  titulo: string | null
+  texto: string
+  clienteNombre: string | null
+  fechaRecepcion: string
 }
 
 export interface ReporteDestino {
@@ -125,20 +135,49 @@ export const solicitudesApi = {
     api.post<DestinoPublicacion>(
       `/publication-requests/${id}/destinos/${destinoId}/crear-borrador-wordpress`,
     ),
-  confirmarDestino: (id: string, destinoId: string, urlPublicacion: string | null) =>
+  confirmarDestino: (
+    id: string,
+    destinoId: string,
+    urlPublicacion: string | null,
+    metaPostId?: string | null,
+  ) =>
     api.post<DestinoPublicacion>(
       `/publication-requests/${id}/destinos/${destinoId}/confirmar-publicacion`,
-      urlPublicacion ? { url_publicacion: urlPublicacion } : {},
+      {
+        ...(urlPublicacion ? { url_publicacion: urlPublicacion } : {}),
+        ...(metaPostId ? { meta_post_id: metaPostId } : {}),
+      },
     ),
   cancelarDestino: (id: string, destinoId: string) =>
     api.post<DestinoPublicacion>(`/publication-requests/${id}/destinos/${destinoId}/cancelar`),
-  corregirEnlaceDestino: (id: string, destinoId: string, canal: CanalPublicacion, enlace: string) =>
+  corregirEnlaceDestino: (
+    id: string,
+    destinoId: string,
+    canal: CanalPublicacion,
+    enlace: string,
+    metaPostId?: string | null,
+  ) =>
     api.patch<DestinoPublicacion>(
       `/publication-requests/${id}/destinos/${destinoId}/corregir-enlace`,
-      canal === 'wordpress' ? { wp_url: enlace } : { url_publicacion: enlace },
+      {
+        ...(canal === 'wordpress' ? { wp_url: enlace } : { url_publicacion: enlace }),
+        ...(metaPostId ? { meta_post_id: metaPostId } : {}),
+      },
     ),
-  postsRecientes: (canal: Exclude<CanalPublicacion, 'wordpress'>) =>
-    api.get<PostRedSocial[]>(`/social/posts-recientes?canal=${canal}`),
+  // Contexto opcional (2026-08-20, conciliación inteligente): cuando se
+  // pasa, el backend calcula coincidencia por post y ordena por ella —
+  // ver GET /social/posts-recientes. Sin contexto, se comporta como
+  // antes (solo recientes, sin puntaje).
+  postsRecientes: (canal: Exclude<CanalPublicacion, 'wordpress'>, contexto?: SolicitudContexto) => {
+    const params = new URLSearchParams({ canal })
+    if (contexto) {
+      if (contexto.titulo) params.set('solicitud_titulo', contexto.titulo)
+      params.set('solicitud_texto', contexto.texto)
+      if (contexto.clienteNombre) params.set('solicitud_cliente_nombre', contexto.clienteNombre)
+      params.set('solicitud_fecha_recepcion', contexto.fechaRecepcion)
+    }
+    return api.get<PostRedSocial[]>(`/social/posts-recientes?${params.toString()}`)
+  },
 
   // Reporte (read-only, generated on demand, never persisted)
   getReporte: (id: string) => api.get<ReporteSolicitud>(`/publication-requests/${id}/reporte`),

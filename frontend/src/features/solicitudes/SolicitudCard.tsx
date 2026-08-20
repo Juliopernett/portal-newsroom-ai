@@ -300,7 +300,17 @@ export function SolicitudCard({
         </Button>
       </div>
 
-      {destinosOpen && <DestinosPanel solicitudId={solicitud.id} />}
+      {destinosOpen && (
+        <DestinosPanel
+          solicitudId={solicitud.id}
+          contexto={{
+            titulo: solicitud.titulo,
+            texto: solicitud.texto,
+            clienteNombre: clienteId ? clienteNombre : null,
+            fechaRecepcion: solicitud.fecha_recepcion,
+          }}
+        />
+      )}
       {reporteOpen && <ReportePanel solicitudId={solicitud.id} />}
       {mediaOpen && <MediaPanel solicitudId={solicitud.id} esPublicada={esPublicada} />}
     </div>

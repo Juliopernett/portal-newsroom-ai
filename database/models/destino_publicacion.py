@@ -30,6 +30,7 @@ class DestinoPublicacionModel(Base):
     wp_post_id: Mapped[str | None] = mapped_column(String, nullable=True)
     wp_url: Mapped[str | None] = mapped_column(String, nullable=True)
     url_publicacion: Mapped[str | None] = mapped_column(String, nullable=True)
+    meta_post_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     registrado_por_user_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("users.id"), nullable=True
     )

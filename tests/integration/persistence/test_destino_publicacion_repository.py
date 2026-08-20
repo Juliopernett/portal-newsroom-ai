@@ -89,6 +89,26 @@ def test_save_and_get_by_id_round_trips_a_publicado_facebook_destino(session: Se
     assert repository.get_by_id(destino.id) == destino
 
 
+def test_save_and_get_by_id_round_trips_a_meta_post_id(session: Session) -> None:
+    solicitud = _create_solicitud(session)
+    repository = SqlAlchemyDestinoPublicacionRepository(session)
+    destino = _destino(
+        publication_request_id=solicitud.id,
+        canal=CanalPublicacion.FACEBOOK,
+        estado=EstadoDestino.PUBLICADO,
+        url_publicacion="https://facebook.com/post/1",
+        meta_post_id="137967556315253_1521505290021833",
+        fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC),
+    )
+
+    repository.save(destino)
+    session.commit()
+
+    recuperado = repository.get_by_id(destino.id)
+    assert recuperado is not None
+    assert recuperado.meta_post_id == "137967556315253_1521505290021833"
+
+
 def test_get_by_id_returns_none_when_not_found(session: Session) -> None:
     repository = SqlAlchemyDestinoPublicacionRepository(session)
 

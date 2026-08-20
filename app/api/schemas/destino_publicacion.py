@@ -30,9 +30,12 @@ class DestinoPublicacionConfirmarPublicacion(BaseModel):
     itself rejects `PUBLICADO` without it for those canales — see
     `core.entities.destino_publicacion`); WordPress already has `wp_url`
     from `crear-borrador-wordpress` and does not need one here.
+    `meta_post_id` is set only when the operator picked the post from
+    "elegir de posts recientes" — a manually-typed link leaves it unset.
     """
 
     url_publicacion: str | None = None
+    meta_post_id: str | None = None
 
 
 class DestinoPublicacionCorregirEnlace(BaseModel):
@@ -47,6 +50,7 @@ class DestinoPublicacionCorregirEnlace(BaseModel):
 
     wp_url: str | None = None
     url_publicacion: str | None = None
+    meta_post_id: str | None = None
 
 
 class DestinoPublicacionOut(BaseModel):
@@ -61,6 +65,7 @@ class DestinoPublicacionOut(BaseModel):
     wp_post_id: str | None
     wp_url: str | None
     url_publicacion: str | None
+    meta_post_id: str | None
     registrado_por_user_id: str | None
     fecha_publicacion: datetime | None
     ultimo_error: str | None

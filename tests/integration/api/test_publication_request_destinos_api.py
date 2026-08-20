@@ -211,6 +211,24 @@ def test_confirmar_publicacion_registers_url_for_instagram(client: TestClient) -
     assert body["fecha_publicacion"] is not None
 
 
+def test_confirmar_publicacion_registers_meta_post_id_when_given(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "facebook"}
+    ).json()["id"]
+
+    response = client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/confirmar-publicacion",
+        json={
+            "url_publicacion": "https://www.facebook.com/reel/1104219988954059/",
+            "meta_post_id": "137967556315253_1521505290021833",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["meta_post_id"] == "137967556315253_1521505290021833"
+
+
 def test_confirmar_publicacion_rejects_instagram_without_url(client: TestClient) -> None:
     solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
     destino_id = client.post(
@@ -316,6 +334,25 @@ def test_corregir_enlace_replaces_url_publicacion_on_a_published_destino(
     body = response.json()
     assert body["url_publicacion"] == "https://instagram.com/p/correct"
     assert body["estado"] == "publicado"
+
+
+def test_corregir_enlace_updates_meta_post_id_when_given(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "instagram"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/confirmar-publicacion",
+        json={"url_publicacion": "https://instagram.com/p/wrong"},
+    )
+
+    response = client.patch(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/corregir-enlace",
+        json={"url_publicacion": "https://instagram.com/p/correct", "meta_post_id": "789"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["meta_post_id"] == "789"
 
 
 def test_corregir_enlace_persists(client: TestClient) -> None:

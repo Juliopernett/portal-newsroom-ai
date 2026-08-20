@@ -8,25 +8,39 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SelectNative } from '@/components/ui/select-native'
 import { formatFechaHoraNegocio } from '@/lib/format'
-import { solicitudesApi, type CanalPublicacion, type DestinoPublicacion } from './api'
+import {
+  solicitudesApi,
+  type CanalPublicacion,
+  type DestinoPublicacion,
+  type PostRedSocial,
+  type SolicitudContexto,
+} from './api'
 import { CANALES_DESTINO, DESTINO_ESTADO_BADGE, DESTINO_ESTADO_LABELS } from './utils'
 
-// "elegir de posts recientes" (conversación de automatización 2026-08-20):
-// en vez de salir de la app a buscar el link publicado, se elige de una
-// lista corta de los últimos posts del canal. Hoy trae datos de
-// demostración (marcados "[DEMO]" — ver agents/meta_social/fake_reader.py)
-// hasta que haya credenciales reales de Meta Graph API.
+// Umbral a partir del cual vale la pena destacar una coincidencia — por
+// debajo de esto el puntaje es ruido, no una sugerencia real (conversación
+// de conciliación inteligente, 2026-08-20).
+const UMBRAL_COINCIDENCIA_DESTACADA = 0.3
+
+// "elegir de posts recientes" — en vez de salir de la app a buscar el link
+// publicado, se elige de una lista corta de los últimos posts del canal.
+// Con contexto de la solicitud (título/texto/cliente/fecha), el backend
+// calcula una coincidencia sugerida y ordena los candidatos por ella —
+// pero la relación SIEMPRE requiere el clic explícito en "Relacionar";
+// nunca se relaciona nada automáticamente, sin importar el puntaje.
 function PostsRecientesPicker({
   canal,
+  contexto,
   onElegir,
 }: {
   canal: Exclude<CanalPublicacion, 'wordpress'>
-  onElegir: (permalink: string) => void
+  contexto?: SolicitudContexto
+  onElegir: (post: PostRedSocial) => void
 }) {
   const [open, setOpen] = useState(false)
   const query = useQuery({
-    queryKey: ['posts-recientes', canal],
-    queryFn: () => solicitudesApi.postsRecientes(canal),
+    queryKey: ['posts-recientes', canal, contexto],
+    queryFn: () => solicitudesApi.postsRecientes(canal, contexto),
     enabled: open,
   })
 
@@ -36,25 +50,65 @@ function PostsRecientesPicker({
         <ListChecks /> Elegir de posts recientes
       </Button>
       {open && (
-        <div className="absolute top-full left-0 z-10 mt-1 max-h-64 w-72 overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
+        <div className="absolute top-full left-0 z-10 mt-1 max-h-96 w-96 overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
           {query.isLoading && <p className="p-2 text-xs text-muted-foreground">Cargando…</p>}
           {query.isError && <p className="p-2 text-xs text-danger">{errorMessage(query.error)}</p>}
           {query.data?.length === 0 && (
             <p className="p-2 text-xs text-muted-foreground">Sin posts recientes.</p>
           )}
           {query.data?.map((post) => (
-            <button
+            <div
               key={post.id}
-              type="button"
-              className="flex w-full flex-col gap-0.5 rounded p-2 text-left text-xs hover:bg-accent"
-              onClick={() => {
-                onElegir(post.permalink)
-                setOpen(false)
-              }}
+              className="flex gap-2 rounded p-2 text-xs hover:bg-accent"
             >
-              <span className="text-muted-foreground">{formatFechaHoraNegocio(post.fecha_publicacion)}</span>
-              <span className="line-clamp-2">{post.texto}</span>
-            </button>
+              {post.miniatura_url && (
+                <img
+                  src={post.miniatura_url}
+                  alt=""
+                  className="size-14 shrink-0 rounded object-cover"
+                />
+              )}
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-1">
+                  {post.coincidencia !== null && post.coincidencia >= UMBRAL_COINCIDENCIA_DESTACADA && (
+                    <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand">
+                      ✨ {Math.round(post.coincidencia * 100)}% de coincidencia
+                    </span>
+                  )}
+                  {post.ya_relacionada && (
+                    <span className="rounded-full bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success">
+                      ✓ Ya relacionada
+                    </span>
+                  )}
+                </div>
+                <span className="line-clamp-2 text-foreground">{post.texto}</span>
+                <span className="text-muted-foreground">
+                  📅 {formatFechaHoraNegocio(post.fecha_publicacion)}
+                </span>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={post.permalink}
+                    target="_blank"
+                    rel="noopener"
+                    className="text-brand underline"
+                  >
+                    Ver publicación
+                  </a>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => {
+                      onElegir(post)
+                      setOpen(false)
+                    }}
+                  >
+                    Relacionar
+                  </Button>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -65,15 +119,19 @@ function PostsRecientesPicker({
 function DestinoRow({
   solicitudId,
   destino,
+  contexto,
   onChanged,
 }: {
   solicitudId: string
   destino: DestinoPublicacion
+  contexto?: SolicitudContexto
   onChanged: () => void
 }) {
   const [url, setUrl] = useState('')
+  const [metaPostId, setMetaPostId] = useState<string | null>(null)
   const [editandoEnlace, setEditandoEnlace] = useState(false)
   const [enlaceCorregido, setEnlaceCorregido] = useState('')
+  const [metaPostIdCorregido, setMetaPostIdCorregido] = useState<string | null>(null)
   const canalLabel = CANALES_DESTINO.find((c) => c.value === destino.canal)?.label ?? destino.canal
 
   const crearBorradorMutation = useMutation({
@@ -86,7 +144,8 @@ function DestinoRow({
   })
 
   const confirmarMutation = useMutation({
-    mutationFn: () => solicitudesApi.confirmarDestino(solicitudId, destino.id, url.trim() || null),
+    mutationFn: () =>
+      solicitudesApi.confirmarDestino(solicitudId, destino.id, url.trim() || null, metaPostId),
     onSuccess: () => {
       toast.success('Destino confirmado.')
       onChanged()
@@ -105,7 +164,13 @@ function DestinoRow({
 
   const corregirEnlaceMutation = useMutation({
     mutationFn: () =>
-      solicitudesApi.corregirEnlaceDestino(solicitudId, destino.id, destino.canal, enlaceCorregido.trim()),
+      solicitudesApi.corregirEnlaceDestino(
+        solicitudId,
+        destino.id,
+        destino.canal,
+        enlaceCorregido.trim(),
+        metaPostIdCorregido,
+      ),
     onSuccess: () => {
       toast.success('Enlace corregido.')
       setEditandoEnlace(false)
@@ -129,10 +194,20 @@ function DestinoRow({
           className="h-8 w-48 text-base sm:text-xs"
           placeholder="Enlace correcto"
           value={enlaceCorregido}
-          onChange={(e) => setEnlaceCorregido(e.target.value)}
+          onChange={(e) => {
+            setEnlaceCorregido(e.target.value)
+            setMetaPostIdCorregido(null)
+          }}
         />
         {destino.canal !== 'wordpress' && (
-          <PostsRecientesPicker canal={destino.canal} onElegir={setEnlaceCorregido} />
+          <PostsRecientesPicker
+            canal={destino.canal}
+            contexto={contexto}
+            onElegir={(post) => {
+              setEnlaceCorregido(post.permalink)
+              setMetaPostIdCorregido(post.id)
+            }}
+          />
         )}
         <Button
           size="sm"
@@ -162,6 +237,7 @@ function DestinoRow({
           variant="ghost"
           onClick={() => {
             setEnlaceCorregido(link ?? '')
+            setMetaPostIdCorregido(destino.meta_post_id)
             setEditandoEnlace(true)
           }}
         >
@@ -200,9 +276,19 @@ function DestinoRow({
           className="h-8 w-48 text-base sm:text-xs"
           placeholder="Enlace de la publicación"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => {
+            setUrl(e.target.value)
+            setMetaPostId(null)
+          }}
         />
-        <PostsRecientesPicker canal={destino.canal} onElegir={setUrl} />
+        <PostsRecientesPicker
+          canal={destino.canal}
+          contexto={contexto}
+          onElegir={(post) => {
+            setUrl(post.permalink)
+            setMetaPostId(post.id)
+          }}
+        />
         <Button size="sm" disabled={acting} onClick={() => confirmarMutation.mutate()}>
           Confirmar
         </Button>
@@ -226,7 +312,13 @@ function DestinoRow({
   )
 }
 
-export function DestinosPanel({ solicitudId }: { solicitudId: string }) {
+export function DestinosPanel({
+  solicitudId,
+  contexto,
+}: {
+  solicitudId: string
+  contexto?: SolicitudContexto
+}) {
   const queryClient = useQueryClient()
   const [canal, setCanal] = useState<CanalPublicacion | ''>('')
   const key = ['destinos', solicitudId]
@@ -271,7 +363,13 @@ export function DestinosPanel({ solicitudId }: { solicitudId: string }) {
       ) : (
         <div className="flex flex-col">
           {destinos.map((d) => (
-            <DestinoRow key={d.id} solicitudId={solicitudId} destino={d} onChanged={onChanged} />
+            <DestinoRow
+              key={d.id}
+              solicitudId={solicitudId}
+              destino={d}
+              contexto={contexto}
+              onChanged={onChanged}
+            />
           ))}
         </div>
       )}
