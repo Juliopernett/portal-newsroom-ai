@@ -11,19 +11,32 @@ import { Textarea } from '@/components/ui/textarea'
 import { clientsApi } from '@/features/clientes/api'
 import { PAUTA_TIPO_LABELS, pautasApi, type Pauta } from '@/features/contratos/api'
 import { formatFecha, formatMoneda } from '@/lib/format'
-import { solicitudesApi, type SolicitudCreateInput, type SolicitudEditInput } from './api'
+import {
+  solicitudesApi,
+  type CanalPublicacion,
+  type SolicitudCreateInput,
+  type SolicitudEditInput,
+} from './api'
 import { SolicitudCard } from './SolicitudCard'
 import { ActividadReciente } from './ActividadReciente'
 import { MetricasSolicitudes } from './MetricasSolicitudes'
 import { PautaCombobox } from './PautaCombobox'
 import { ClienteCombobox } from './ClienteCombobox'
+import { CANALES_DESTINO } from './utils'
 
 const KANBAN_KEY = ['solicitudes-kanban']
 const PAUTAS_KEY = ['pautas']
 const CLIENTS_KEY = ['clients']
 const PUBLICADAS_VISIBLES = 30
 
-const EMPTY_FORM = { pautaId: '', clienteId: '', titulo: '', texto: '', prioridad: false }
+const EMPTY_FORM = {
+  pautaId: '',
+  clienteId: '',
+  titulo: '',
+  texto: '',
+  prioridad: false,
+  canales: [] as CanalPublicacion[],
+}
 
 export function SolicitudesPage() {
   const queryClient = useQueryClient()
@@ -163,8 +176,18 @@ export function SolicitudesPage() {
       titulo: form.titulo.trim() || null,
       texto: form.texto,
       prioridad_manual: form.prioridad,
+      canales: form.canales,
     }
     createMutation.mutate({ payload, archivo })
+  }
+
+  function toggleCanal(canal: CanalPublicacion) {
+    setForm((f) => ({
+      ...f,
+      canales: f.canales.includes(canal)
+        ? f.canales.filter((c) => c !== canal)
+        : [...f.canales, canal],
+    }))
   }
 
   function handleTextoKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -300,6 +323,20 @@ export function SolicitudesPage() {
               />
               Prioridad
             </label>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs text-muted-foreground">Destinos:</span>
+            {CANALES_DESTINO.map((c) => (
+              <label key={c.value} className="flex items-center gap-1.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.canales.includes(c.value)}
+                  onChange={() => toggleCanal(c.value)}
+                />
+                {c.label}
+              </label>
+            ))}
           </div>
 
           {pautaSeleccionada && (

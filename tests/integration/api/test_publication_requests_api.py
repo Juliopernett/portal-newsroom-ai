@@ -61,6 +61,44 @@ def test_create_publication_request_defaults_titulo_to_none(client: TestClient) 
     assert response.json()["titulo"] is None
 
 
+def test_create_publication_request_without_canales_has_no_destinos(client: TestClient) -> None:
+    solicitud_id = client.post(
+        "/publication-requests", json={"texto": "Anuncio de nueva canción"}
+    ).json()["id"]
+
+    destinos = client.get(f"/publication-requests/{solicitud_id}/destinos").json()
+
+    assert destinos == []
+
+
+def test_create_publication_request_with_canales_premarks_pendiente_destinos(
+    client: TestClient,
+) -> None:
+    """2026-08-21: `canales` lets the operator pre-mark destinos at intake
+    instead of adding each one later from the solicitud's card."""
+    solicitud_id = client.post(
+        "/publication-requests",
+        json={"texto": "Anuncio", "canales": ["facebook", "instagram"]},
+    ).json()["id"]
+
+    destinos = client.get(f"/publication-requests/{solicitud_id}/destinos").json()
+
+    assert {d["canal"] for d in destinos} == {"facebook", "instagram"}
+    assert all(d["estado"] == "pendiente" for d in destinos)
+
+
+def test_create_publication_request_dedupes_repeated_canales(client: TestClient) -> None:
+    solicitud_id = client.post(
+        "/publication-requests",
+        json={"texto": "Anuncio", "canales": ["wordpress", "wordpress"]},
+    ).json()["id"]
+
+    destinos = client.get(f"/publication-requests/{solicitud_id}/destinos").json()
+
+    assert len(destinos) == 1
+    assert destinos[0]["canal"] == "wordpress"
+
+
 def test_create_publication_request_rejects_an_empty_titulo(client: TestClient) -> None:
     response = client.post("/publication-requests", json={"texto": "Anuncio", "titulo": ""})
 

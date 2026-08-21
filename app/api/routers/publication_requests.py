@@ -124,9 +124,28 @@ router = APIRouter(
 def create_publication_request(
     payload: PublicationRequestCreate, uow: UnitOfWork = Depends(get_unit_of_work)
 ) -> PublicationRequest:
-    """Register a new commercial publication request, received as RECIBIDA."""
-    solicitud = PublicationRequest(**payload.model_dump())
+    """Register a new commercial publication request, received as RECIBIDA.
+
+    `payload.canales` (2026-08-21) pre-marks the destinos the operator
+    already knows this goes to — each becomes a PENDIENTE
+    DestinoPublicacion right after, so confirming later is just pasting
+    the link instead of adding the destino first. Duplicates are
+    collapsed (dict.fromkeys keeps first-seen order); an empty list
+    behaves exactly as before this field existed. Two commits, not one:
+    the ORM models here are plain FK columns with no `relationship()`
+    mapping (deliberate — see `database/models/client.py`), so SQLAlchemy
+    can't topologically order an as-yet-unflushed parent/child insert
+    pair in a single flush; the solicitud must exist before a destino can
+    reference it.
+    """
+    datos = payload.model_dump()
+    canales = datos.pop("canales")
+    solicitud = PublicationRequest(**datos)
     uow.publication_requests.save(solicitud)
+    uow.commit()
+    for canal in dict.fromkeys(canales):
+        destino = DestinoPublicacion(publication_request_id=solicitud.id, canal=canal)
+        uow.destinos_publicacion.save(destino)
     uow.commit()
     return solicitud
 

@@ -18,6 +18,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.entities.destino_publicacion import CanalPublicacion
 from core.entities.publication_request import PublicationRequestStatus
 
 # security audit 2026-08-20, L1 — generous enough for any real solicitud
@@ -39,6 +40,13 @@ class PublicationRequestCreate(BaseModel):
     texto: str = Field(max_length=_TEXTO_MAX)
     prioridad_manual: bool = False
     observaciones: str | None = Field(default=None, max_length=_OBSERVACIONES_MAX)
+    # Pre-marcar destinos al registrar (2026-08-21): el operador ya sabe a
+    # qué canales va la publicación, así que los crea de una vez como
+    # DestinoPublicacion PENDIENTE — ahorra el viaje de vuelta a "Agregar
+    # destino" por cada canal antes de poder pegar los enlaces al
+    # confirmar. Opcional y sin duplicados por diseño de `canal` en
+    # DestinoPublicacion; una solicitud sin canales se comporta como hoy.
+    canales: list[CanalPublicacion] = Field(default_factory=list)
 
 
 class PublicationRequestLinkPauta(BaseModel):

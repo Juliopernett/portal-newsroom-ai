@@ -21,6 +21,7 @@ export interface SolicitudCreateInput {
   titulo: string | null
   texto: string
   prioridad_manual: boolean
+  canales: CanalPublicacion[]
 }
 
 export interface SolicitudEditInput {
