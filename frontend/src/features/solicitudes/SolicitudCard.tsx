@@ -163,6 +163,17 @@ export function SolicitudCard({
         {esEnCurso && (
           <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs text-brand">🚀 En curso</span>
         )}
+        {solicitud.preparacion_ia_estado === 'fallido' && (
+          <span
+            className="rounded-full bg-warning-bg px-2 py-0.5 text-xs text-warning"
+            title={
+              solicitud.preparacion_ia_error ??
+              'La preparación editorial con IA no estuvo disponible — el borrador se creó con el texto original.'
+            }
+          >
+            ⚠️ Sin IA
+          </span>
+        )}
         {pauta && (
           <>
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
