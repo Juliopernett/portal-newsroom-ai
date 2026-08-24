@@ -12,6 +12,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from types import TracebackType
 
+from core.ports.ai_configuracion_repository import AIConfiguracionRepository
 from core.ports.client_repository import ClientRepository
 from core.ports.destino_publicacion_repository import DestinoPublicacionRepository
 from core.ports.gasto_repository import GastoRepository
@@ -48,6 +49,7 @@ class UnitOfWork(ABC):
     gastos: GastoRepository
     otros_ingresos: OtroIngresoRepository
     identidad_comercial: IdentidadComercialRepository
+    ai_configuracion: AIConfiguracionRepository
     informe_links: InformeLinkRepository
     users: UserRepository
     sessions: SessionRepository

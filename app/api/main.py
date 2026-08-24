@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse, Response
 
 from app.api.errors import register_exception_handlers
 from app.api.routers import (
+    ai_configuracion,
     auth,
     clients,
     dashboard,
@@ -42,6 +43,7 @@ app = FastAPI(title="Portal Newsroom AI — Commercial Core API")
 
 register_exception_handlers(app)
 
+app.include_router(ai_configuracion.router)
 app.include_router(auth.router)
 app.include_router(clients.router)
 app.include_router(dashboard.router)

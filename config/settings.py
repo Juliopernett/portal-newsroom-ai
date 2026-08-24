@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     # --- AI providers (used by the future Writer / SEO / AI Orchestrator agents) ---
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
+    # OpenRouter (openrouter.ai) — aggregator exposing many providers/models
+    # behind one OpenAI-compatible endpoint; selectable as an alternative to
+    # Anthropic direct via Configuración → IA (see core.entities.ai_configuracion).
+    openrouter_api_key: str | None = None
 
     # --- Paths ---
     logs_dir: Path = BASE_DIR / "logs"

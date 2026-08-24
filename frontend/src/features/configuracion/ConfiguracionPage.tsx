@@ -1,10 +1,12 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, RefreshCw, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ApiError, errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { SelectNative } from '@/components/ui/select-native'
 import {
   Sheet,
   SheetContent,
@@ -15,13 +17,15 @@ import {
 import { formatMoneda } from '@/lib/format'
 import { identidadApi, LOGO_URL, type IdentidadComercialInput } from '@/features/identidad/api'
 import { IdentidadForm } from '@/features/identidad/IdentidadForm'
+import { aiConfiguracionApi, type AIConfiguracionInput, type ProveedorIA } from '@/features/ia/api'
 import { planesPautaApi, type PlanPauta, type PlanPautaInput } from './api'
 import { PlanPautaForm } from './PlanPautaForm'
 
 const PLANES_KEY = ['planes-pauta']
 const IDENTIDAD_KEY = ['identidad-comercial']
+const AI_CONFIGURACION_KEY = ['ai-configuracion']
 
-type ConfiguracionTab = 'planes' | 'identidad'
+type ConfiguracionTab = 'planes' | 'identidad' | 'ia'
 
 function PlanesPautaPanel() {
   const queryClient = useQueryClient()
@@ -248,6 +252,91 @@ function IdentidadPanel() {
   )
 }
 
+const PROVEEDORES_IA: { value: ProveedorIA; label: string }[] = [
+  { value: 'anthropic', label: 'Anthropic (Claude)' },
+  { value: 'openrouter', label: 'OpenRouter' },
+]
+
+function IAPanel() {
+  const queryClient = useQueryClient()
+  const configuracionQuery = useQuery({ queryKey: AI_CONFIGURACION_KEY, queryFn: aiConfiguracionApi.get })
+  const configuracion = configuracionQuery.data
+
+  const [proveedor, setProveedor] = useState<ProveedorIA>('anthropic')
+  const [modelo, setModelo] = useState('')
+  // La consulta trae el default vigente (Anthropic + Claude Opus 5) aunque
+  // nunca se haya guardado nada — sincronizamos el formulario una sola vez
+  // cuando llega, sin pisar lo que el operador ya esté escribiendo después.
+  useEffect(() => {
+    if (configuracion) {
+      setProveedor(configuracion.proveedor)
+      setModelo(configuracion.modelo)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configuracion?.proveedor, configuracion?.modelo])
+
+  const saveMutation = useMutation({
+    mutationFn: (payload: AIConfiguracionInput) => aiConfiguracionApi.save(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: AI_CONFIGURACION_KEY })
+      toast.success('Configuración de IA guardada.')
+    },
+  })
+
+  const saveError = saveMutation.error instanceof ApiError ? saveMutation.error.message : null
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">
+        Proveedor y modelo que usa la preparación editorial con IA al crear un borrador de
+        WordPress (título, entradilla, cuerpo, categoría y etiquetas). La API key
+        correspondiente (<code>ANTHROPIC_API_KEY</code> u <code>OPENROUTER_API_KEY</code>) se
+        configura aparte, en el servidor — aquí solo se elige cuál usar. Si la IA falla o no
+        tiene crédito, el borrador se sigue creando igual con el texto original.
+      </p>
+
+      {configuracionQuery.isLoading ? (
+        <p className="text-sm text-muted-foreground">Cargando…</p>
+      ) : (
+        <form
+          className="flex max-w-md flex-col gap-3"
+          onSubmit={(e) => {
+            e.preventDefault()
+            saveMutation.mutate({ proveedor, modelo })
+          }}
+        >
+          <label className="flex flex-col gap-1 text-sm">
+            Proveedor
+            <SelectNative
+              value={proveedor}
+              onChange={(e) => setProveedor(e.target.value as ProveedorIA)}
+            >
+              {PROVEEDORES_IA.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </SelectNative>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Modelo
+            <Input
+              required
+              placeholder={proveedor === 'anthropic' ? 'claude-opus-5' : 'deepseek/deepseek-chat'}
+              value={modelo}
+              onChange={(e) => setModelo(e.target.value)}
+            />
+          </label>
+          {saveError && <p className="text-sm text-danger">{saveError}</p>}
+          <Button type="submit" disabled={saveMutation.isPending} className="self-start">
+            {saveMutation.isPending ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </form>
+      )}
+    </div>
+  )
+}
+
 export function ConfiguracionPage() {
   const [tab, setTab] = useState<ConfiguracionTab>('planes')
 
@@ -262,6 +351,7 @@ export function ConfiguracionPage() {
           [
             { id: 'planes', label: 'Planes de Pauta' },
             { id: 'identidad', label: 'Identidad comercial' },
+            { id: 'ia', label: 'IA' },
           ] as const
         ).map((t) => (
           <button
@@ -281,7 +371,7 @@ export function ConfiguracionPage() {
         ))}
       </div>
 
-      {tab === 'planes' ? <PlanesPautaPanel /> : <IdentidadPanel />}
+      {tab === 'planes' ? <PlanesPautaPanel /> : tab === 'identidad' ? <IdentidadPanel /> : <IAPanel />}
     </div>
   )
 }

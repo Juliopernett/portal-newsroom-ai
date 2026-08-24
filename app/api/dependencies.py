@@ -16,11 +16,13 @@ from functools import lru_cache
 
 from fastapi import Cookie, Depends, HTTPException, status
 
-from agents.ai.anthropic_provider import AnthropicAIProvider
+from agents.ai.anthropic_provider import MODELO_POR_DEFECTO, AnthropicAIProvider
+from agents.ai.openrouter_provider import OpenRouterAIProvider
 from agents.meta_social.client import MetaGraphSocialMediaReader
 from agents.storage.local_disk import LocalDiskMediaStorage
 from agents.wordpress.client import WordPressCMSPublisher
 from config.settings import get_settings
+from core.entities.ai_configuracion import ProveedorIA
 from core.entities.session import Session as SessionEntity
 from core.entities.user import User
 from core.ports.ai_provider import AIProvider
@@ -75,18 +77,31 @@ def get_cms_publisher() -> CMSPublisher:
     return WordPressCMSPublisher(get_settings())
 
 
-def get_ai_provider() -> AIProvider:
+def get_ai_provider(uow: UnitOfWork = Depends(get_unit_of_work)) -> AIProvider:
     """Return the AI provider used to prepare a solicitud's editorial content.
 
-    Sprint 2026-08-21. Unlike `get_cms_publisher`/`get_social_media_reader`,
-    a missing `ANTHROPIC_API_KEY` does NOT raise here — `AnthropicAIProvider`
-    checks it lazily inside `generate_structured`, and
+    Sprint 2026-08-21; provider/model made operator-configurable (Sprint
+    2026-08-24, Configuración → IA — see `core.entities.ai_configuracion`).
+    Reads the singleton `AIConfiguracion` row fresh on every request (via
+    `uow`, never cached like `get_settings()` is) so a change saved in the
+    UI takes effect on the very next "Crear borrador" click, no redeploy
+    needed. Falls back to Anthropic + `MODELO_POR_DEFECTO` when no row has
+    been saved yet.
+
+    Unlike `get_cms_publisher`/`get_social_media_reader`, a missing API key
+    for whichever provider is selected does NOT raise here — both adapters
+    check it lazily inside `generate_structured`, and
     `core.services.editorial_ai_service` catches that failure and degrades
     gracefully (the WordPress draft still gets created from raw text). See
     `core.ports.ai_provider.AIProviderError`'s docstring for why this is
     deliberately asymmetric with the other two providers.
     """
-    return AnthropicAIProvider(get_settings())
+    configuracion = uow.ai_configuracion.get()
+    settings = get_settings()
+    if configuracion is not None and configuracion.proveedor == ProveedorIA.OPENROUTER:
+        return OpenRouterAIProvider(settings, modelo=configuracion.modelo)
+    modelo = configuracion.modelo if configuracion is not None else MODELO_POR_DEFECTO
+    return AnthropicAIProvider(settings, modelo=modelo)
 
 
 def get_social_media_reader() -> SocialMediaReader:

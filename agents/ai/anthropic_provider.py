@@ -23,15 +23,22 @@ import anthropic
 from config.settings import Settings
 from core.ports.ai_provider import AIProviderError
 
-_MODEL = "claude-opus-5"
+MODELO_POR_DEFECTO = "claude-opus-5"
 _MAX_TOKENS = 8000
 
 
 class AnthropicAIProvider:
-    """`AIProvider` implemented against the real Anthropic API."""
+    """`AIProvider` implemented against the real Anthropic API.
 
-    def __init__(self, settings: Settings) -> None:
+    `modelo` (Sprint — configuración de proveedor de IA, 2026-08-24) is
+    operator-configurable from Configuración → IA — see
+    `core.entities.ai_configuracion` — defaulting to `MODELO_POR_DEFECTO`
+    when nothing has been saved yet.
+    """
+
+    def __init__(self, settings: Settings, *, modelo: str = MODELO_POR_DEFECTO) -> None:
         self._api_key = settings.anthropic_api_key
+        self._modelo = modelo
 
     def _client(self) -> anthropic.Anthropic:
         if not self._api_key:
@@ -45,7 +52,7 @@ class AnthropicAIProvider:
         """Return Claude's plain-text completion for `prompt`."""
         try:
             response = self._client().messages.create(
-                model=_MODEL,
+                model=self._modelo,
                 max_tokens=_MAX_TOKENS,
                 output_config={"effort": "medium"},
                 messages=[{"role": "user", "content": prompt}],
@@ -64,7 +71,7 @@ class AnthropicAIProvider:
         """
         try:
             response = self._client().messages.create(
-                model=_MODEL,
+                model=self._modelo,
                 max_tokens=_MAX_TOKENS,
                 output_config={
                     "effort": "medium",

@@ -12,6 +12,9 @@ from types import TracebackType
 from sqlalchemy.orm import Session, sessionmaker
 
 from core.ports.unit_of_work import UnitOfWork
+from database.repositories.ai_configuracion_repository import (
+    SqlAlchemyAIConfiguracionRepository,
+)
 from database.repositories.client_repository import SqlAlchemyClientRepository
 from database.repositories.destino_publicacion_repository import (
     SqlAlchemyDestinoPublicacionRepository,
@@ -52,6 +55,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.gastos = SqlAlchemyGastoRepository(self._session)
         self.otros_ingresos = SqlAlchemyOtroIngresoRepository(self._session)
         self.identidad_comercial = SqlAlchemyIdentidadComercialRepository(self._session)
+        self.ai_configuracion = SqlAlchemyAIConfiguracionRepository(self._session)
         self.informe_links = SqlAlchemyInformeLinkRepository(self._session)
         self.users = SqlAlchemyUserRepository(self._session)
         self.sessions = SqlAlchemySessionRepository(self._session)
