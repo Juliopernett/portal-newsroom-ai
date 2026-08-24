@@ -19,7 +19,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.entities.destino_publicacion import CanalPublicacion
-from core.entities.publication_request import PublicationRequestStatus
+from core.entities.publication_request import EstadoPreparacionIA, PublicationRequestStatus
 
 # security audit 2026-08-20, L1 — generous enough for any real solicitud
 # (`texto` is a social-post caption, not an article body), but bounded so
@@ -86,3 +86,13 @@ class PublicationRequestOut(BaseModel):
     prioridad_manual: bool
     observaciones: str | None
     fecha_cierre: datetime | None
+    # --- Preparación editorial con IA (Sprint 2026-08-21) — solo lectura,
+    # nunca fijados por el cliente; ver PublicationRequestCreate/Update. ---
+    contenido_editorial: str | None
+    entradilla_editorial: str | None
+    titulo_editorial: str | None
+    categoria_editorial: str | None
+    etiquetas_editorial: tuple[str, ...] | None
+    slug_editorial: str | None
+    preparacion_ia_estado: EstadoPreparacionIA
+    preparacion_ia_error: str | None

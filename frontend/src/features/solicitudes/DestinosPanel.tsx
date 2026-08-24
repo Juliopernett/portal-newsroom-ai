@@ -136,8 +136,16 @@ function DestinoRow({
 
   const crearBorradorMutation = useMutation({
     mutationFn: () => solicitudesApi.crearBorradorWordpress(solicitudId, destino.id),
-    onSuccess: () => {
-      toast.success('Borrador creado en WordPress.')
+    onSuccess: (data) => {
+      // La IA prepara el texto antes de crear el borrador (2026-08-21) —
+      // si no estuvo disponible, el borrador igual se crea con el texto
+      // original, así que el toast lo dice en vez de aparentar que todo
+      // salió con preparación editorial.
+      toast.success(
+        data.preparacion_ia_estado === 'procesado'
+          ? 'Borrador creado en WordPress con preparación editorial IA.'
+          : 'Borrador creado en WordPress con el texto original — la preparación con IA no estuvo disponible.',
+      )
       onChanged()
     },
     onError: (err) => toast.error(errorMessage(err)),

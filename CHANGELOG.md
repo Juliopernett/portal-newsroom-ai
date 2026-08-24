@@ -25,6 +25,44 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **Sprint — preparación editorial con IA antes del borrador de WordPress
+  (2026-08-21).** El botón "Crear borrador" que ya existía ahora pasa el
+  texto crudo de la solicitud por Claude Opus 5 antes de crear el borrador
+  en WordPress: genera título, entradilla, cuerpo reescrito (ortografía,
+  puntuación, párrafos, estructura periodística — sin inventar fechas,
+  cifras, nombres ni citas que no estén en el texto original), categoría
+  (solo entre las que ya existen en WordPress — nunca inventa una nueva,
+  reforzado con salida estructurada por JSON Schema, no solo por prompt),
+  etiquetas y slug. Ningún paso ni pantalla nuevos — el mismo flujo
+  "Crear solicitud → seleccionar WordPress → Crear borrador" de siempre.
+  - `PublicationRequest` gana 8 columnas nuevas (todas nullable o con
+    default) para el resultado editorial y su estado
+    (`preparacion_ia_estado`: pendiente/procesado/fallido) — `texto`
+    (el contenido original) nunca se toca ni se sobreescribe.
+    Corregir `texto` después (`PATCH`) limpia el resultado editorial y
+    vuelve a `pendiente`, para que no quede una reescritura obsoleta.
+  - Puerto `AIProvider` gana `generate_structured` (salida garantizada por
+    JSON Schema); puerto `CMSPublisher` gana `listar_categorias`/
+    `resolver_o_crear_etiqueta`/`subir_media` — se extiende el mismo
+    adaptador de WordPress (`agents/wordpress/client.py`), no una segunda
+    integración. Nuevo adaptador `agents/ai/anthropic_provider.py`.
+  - Resiliencia: si la IA falla o no está configurada, el borrador de
+    WordPress se crea igual con el texto original (nunca bloquea la
+    integración); si WordPress falla, no se guarda nada y "Crear borrador"
+    es reintentable con un clic, sin volver a pegar el texto.
+  - Imagen destacada: el primer `MediaAsset` tipo imagen adjunto a la
+    solicitud (por convención, sin columna nueva — el incremento que
+    [ADR-007](docs/adr/ADR-007-media-assets.md) ya había dejado anotado
+    como pendiente).
+  - Tests: unitarios para el nuevo servicio de dominio
+    (`editorial_ai_service`), la orquestación extendida en
+    `wordpress_publication_service`, el adaptador Anthropic (mockeado) y
+    los 3 métodos nuevos del cliente de WordPress; integración cubre el
+    camino exitoso (categoría/etiquetas/imagen reenviados a WordPress),
+    la caída de la IA (borrador igual se crea) y la caída de WordPress
+    (rollback completo, reintentable). Nueva dependencia de producción:
+    `anthropic`.
+
 - **Sprint 4A, Incremento 7 — MediaAsset (adjuntos de imagen/video)** —
   ver [ADR-007](docs/adr/ADR-007-media-assets.md). Cierra el rollout de
   Sprint 4A. `MediaAsset` pasa de Value Object conceptual (Sprint 3A) a

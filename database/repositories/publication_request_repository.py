@@ -7,12 +7,17 @@ Translates between `core.entities.publication_request.PublicationRequest`
 
 from __future__ import annotations
 
+import json
 from datetime import UTC
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
+from core.entities.publication_request import (
+    EstadoPreparacionIA,
+    PublicationRequest,
+    PublicationRequestStatus,
+)
 from database.models.publication_request import PublicationRequestModel
 
 
@@ -28,6 +33,18 @@ def _to_model(solicitud: PublicationRequest) -> PublicationRequestModel:
         prioridad_manual=solicitud.prioridad_manual,
         observaciones=solicitud.observaciones,
         fecha_cierre=solicitud.fecha_cierre,
+        contenido_editorial=solicitud.contenido_editorial,
+        entradilla_editorial=solicitud.entradilla_editorial,
+        titulo_editorial=solicitud.titulo_editorial,
+        categoria_editorial=solicitud.categoria_editorial,
+        etiquetas_editorial=(
+            json.dumps(list(solicitud.etiquetas_editorial))
+            if solicitud.etiquetas_editorial is not None
+            else None
+        ),
+        slug_editorial=solicitud.slug_editorial,
+        preparacion_ia_estado=solicitud.preparacion_ia_estado.value,
+        preparacion_ia_error=solicitud.preparacion_ia_error,
     )
 
 
@@ -54,6 +71,18 @@ def _to_domain(model: PublicationRequestModel) -> PublicationRequest:
         prioridad_manual=model.prioridad_manual,
         observaciones=model.observaciones,
         fecha_cierre=fecha_cierre,
+        contenido_editorial=model.contenido_editorial,
+        entradilla_editorial=model.entradilla_editorial,
+        titulo_editorial=model.titulo_editorial,
+        categoria_editorial=model.categoria_editorial,
+        etiquetas_editorial=(
+            tuple(json.loads(model.etiquetas_editorial))
+            if model.etiquetas_editorial is not None
+            else None
+        ),
+        slug_editorial=model.slug_editorial,
+        preparacion_ia_estado=EstadoPreparacionIA(model.preparacion_ia_estado),
+        preparacion_ia_error=model.preparacion_ia_error,
     )
 
 

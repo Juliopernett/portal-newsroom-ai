@@ -7,7 +7,11 @@ from datetime import UTC, datetime
 import pytest
 
 from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
-from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
+from core.entities.publication_request import (
+    EstadoPreparacionIA,
+    PublicationRequest,
+    PublicationRequestStatus,
+)
 from core.services.publication_request_service import (
     aceptar,
     cancelar_solicitud,
@@ -146,6 +150,56 @@ def test_edit_solicitud_does_not_mutate_the_original() -> None:
     edit_solicitud(solicitud, texto="Texto corregido")
 
     assert solicitud.texto == "Texto original"
+
+
+def test_edit_solicitud_resets_editorial_fields_when_texto_changes() -> None:
+    solicitud = _solicitud(
+        texto="Texto original",
+        contenido_editorial="Cuerpo ya reescrito",
+        titulo_editorial="Titular ya generado",
+        entradilla_editorial="Entradilla",
+        categoria_editorial="Noticias",
+        etiquetas_editorial=("vallenato",),
+        slug_editorial="titular",
+        preparacion_ia_estado=EstadoPreparacionIA.PROCESADO,
+    )
+
+    resultado = edit_solicitud(solicitud, texto="Texto corregido por el operador")
+
+    assert resultado.contenido_editorial is None
+    assert resultado.titulo_editorial is None
+    assert resultado.entradilla_editorial is None
+    assert resultado.categoria_editorial is None
+    assert resultado.etiquetas_editorial is None
+    assert resultado.slug_editorial is None
+    assert resultado.preparacion_ia_estado == EstadoPreparacionIA.PENDIENTE
+    assert resultado.preparacion_ia_error is None
+
+
+def test_edit_solicitud_keeps_editorial_fields_when_texto_is_unchanged() -> None:
+    solicitud = _solicitud(
+        texto="Texto original",
+        contenido_editorial="Cuerpo ya reescrito",
+        preparacion_ia_estado=EstadoPreparacionIA.PROCESADO,
+    )
+
+    resultado = edit_solicitud(solicitud, texto="Texto original", prioridad_manual=True)
+
+    assert resultado.contenido_editorial == "Cuerpo ya reescrito"
+    assert resultado.preparacion_ia_estado == EstadoPreparacionIA.PROCESADO
+
+
+def test_edit_solicitud_keeps_editorial_fields_when_texto_not_provided() -> None:
+    solicitud = _solicitud(
+        texto="Texto original",
+        contenido_editorial="Cuerpo ya reescrito",
+        preparacion_ia_estado=EstadoPreparacionIA.PROCESADO,
+    )
+
+    resultado = edit_solicitud(solicitud, titulo="Nuevo titulo")
+
+    assert resultado.contenido_editorial == "Cuerpo ya reescrito"
+    assert resultado.preparacion_ia_estado == EstadoPreparacionIA.PROCESADO
 
 
 def test_edit_solicitud_rejects_an_empty_texto() -> None:

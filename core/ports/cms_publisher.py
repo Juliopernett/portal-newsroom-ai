@@ -17,6 +17,13 @@ WordPress adapter revealed `DestinoPublicacion` needs both `wp_post_id`
 links shared with clients) — a single opaque string could not carry
 both. Zero adapters existed yet when this changed, so the change carries
 no migration risk.
+
+`listar_categorias`/`resolver_o_crear_etiqueta`/`subir_media` (Sprint
+2026-08-21, preparación editorial con IA) exist so
+`core.services.wordpress_publication_service.preparar_y_crear_borrador`
+can build a taxonomy-aware, illustrated draft without ever importing
+`agents.wordpress.client` directly — the orchestration stays testable
+with a fake, per docs/PROJECT_RULES.md rule 5.
 """
 
 from __future__ import annotations
@@ -31,6 +38,13 @@ class CMSDraftResult(NamedTuple):
     url: str
 
 
+class CategoriaCMS(NamedTuple):
+    """One category already defined in the CMS — id + display name."""
+
+    id: str
+    nombre: str
+
+
 class CMSPublisher(Protocol):
     """Contract for creating editorial drafts in a CMS.
 
@@ -39,5 +53,40 @@ class CMSPublisher(Protocol):
     """
 
     def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:
-        """Create a draft in the CMS and return its post_id and url."""
+        """Create a draft in the CMS and return its post_id and url.
+
+        `content` may include, besides the always-required `title`/
+        `content`: `excerpt`, `slug`, `categories` (a list of
+        `CategoriaCMS.id`), `tags` (a list of ids from
+        `resolver_o_crear_etiqueta`), and `featured_media` (an id from
+        `subir_media`) — every one of these is optional, so a caller that
+        only has raw text still gets a plain draft exactly as before this
+        contract grew.
+        """
+        ...
+
+    def listar_categorias(self) -> list[CategoriaCMS]:
+        """Return every category already defined in the CMS.
+
+        Never creates a category — `core.services.editorial_ai_service`
+        constrains the AI to pick only from this list (or propose none)
+        so an article can never be filed under an invented taxonomy.
+        """
+        ...
+
+    def resolver_o_crear_etiqueta(self, nombre: str) -> str:
+        """Return the id of the tag named `nombre`, creating it if needed.
+
+        Unlike categories, tags are low-stakes and expected to grow
+        organically — the CMS itself de-duplicates by slug, so calling
+        this repeatedly with the same `nombre` is safe.
+        """
+        ...
+
+    def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
+        """Upload a file to the CMS's media library and return its id.
+
+        The returned id is what `create_draft` expects as
+        `featured_media`.
+        """
         ...

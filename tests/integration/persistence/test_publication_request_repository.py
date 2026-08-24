@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session
 
 from core.entities.client import Client, ClientType
 from core.entities.pauta import Pauta
-from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
+from core.entities.publication_request import (
+    EstadoPreparacionIA,
+    PublicationRequest,
+    PublicationRequestStatus,
+)
 from database.repositories.client_repository import SqlAlchemyClientRepository
 from database.repositories.pauta_repository import SqlAlchemyPautaRepository
 from database.repositories.publication_request_repository import (
@@ -118,6 +122,43 @@ def test_save_and_get_by_id_round_trips_titulo_and_fecha_cierre(session: Session
     assert recuperada is not None
     assert recuperada.titulo == "Lanzamiento del sencillo"
     assert recuperada.fecha_cierre is not None
+
+
+def test_save_and_get_by_id_round_trips_editorial_fields(session: Session) -> None:
+    repository = SqlAlchemyPublicationRequestRepository(session)
+    solicitud = _solicitud(
+        contenido_editorial="Cuerpo reescrito",
+        entradilla_editorial="Entradilla",
+        titulo_editorial="Titular IA",
+        categoria_editorial="Noticias",
+        etiquetas_editorial=("vallenato", "lanzamiento"),
+        slug_editorial="titular-ia",
+        preparacion_ia_estado=EstadoPreparacionIA.PROCESADO,
+    )
+
+    repository.save(solicitud)
+    session.commit()
+
+    recuperada = repository.get_by_id(solicitud.id)
+    assert recuperada == solicitud
+    assert recuperada is not None
+    assert recuperada.contenido_editorial == "Cuerpo reescrito"
+    assert recuperada.etiquetas_editorial == ("vallenato", "lanzamiento")
+    assert recuperada.preparacion_ia_estado == EstadoPreparacionIA.PROCESADO
+
+
+def test_save_and_get_by_id_defaults_preparacion_ia_estado_to_pendiente(session: Session) -> None:
+    repository = SqlAlchemyPublicationRequestRepository(session)
+    solicitud = _solicitud()
+
+    repository.save(solicitud)
+    session.commit()
+
+    recuperada = repository.get_by_id(solicitud.id)
+    assert recuperada is not None
+    assert recuperada.preparacion_ia_estado == EstadoPreparacionIA.PENDIENTE
+    assert recuperada.contenido_editorial is None
+    assert recuperada.etiquetas_editorial is None
 
 
 def test_list_all_filters_by_estado(session: Session) -> None:

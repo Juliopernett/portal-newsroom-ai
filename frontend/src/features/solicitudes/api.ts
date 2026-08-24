@@ -2,6 +2,12 @@ import { api } from '@/api/client'
 
 export type SolicitudEstado = 'recibida' | 'aceptada' | 'cancelada'
 
+// Preparación editorial con IA (2026-08-21): PENDIENTE hasta el primer
+// "Crear borrador" en WordPress, PROCESADO si la IA reescribió el texto,
+// FALLIDO si no estuvo disponible — el borrador se crea igual con el
+// texto original, ver DestinosPanel.
+export type EstadoPreparacionIA = 'pendiente' | 'procesado' | 'fallido'
+
 export interface Solicitud {
   id: string
   pauta_id: string | null
@@ -13,6 +19,14 @@ export interface Solicitud {
   prioridad_manual: boolean
   observaciones: string | null
   fecha_cierre: string | null
+  contenido_editorial: string | null
+  entradilla_editorial: string | null
+  titulo_editorial: string | null
+  categoria_editorial: string | null
+  etiquetas_editorial: string[] | null
+  slug_editorial: string | null
+  preparacion_ia_estado: EstadoPreparacionIA
+  preparacion_ia_error: string | null
 }
 
 export interface SolicitudCreateInput {
@@ -138,10 +152,15 @@ export const solicitudesApi = {
   listDestinos: (id: string) => api.get<DestinoPublicacion[]>(`/publication-requests/${id}/destinos`),
   addDestino: (id: string, canal: CanalPublicacion) =>
     api.post<DestinoPublicacion>(`/publication-requests/${id}/destinos`, { canal }),
+  // La preparación editorial con IA (2026-08-21) corre dentro de este mismo
+  // llamado — la respuesta trae el destino más si la IA sí pudo prepararlo,
+  // para que el toast en DestinosPanel sea honesto sin un fetch aparte.
   crearBorradorWordpress: (id: string, destinoId: string) =>
-    api.post<DestinoPublicacion>(
-      `/publication-requests/${id}/destinos/${destinoId}/crear-borrador-wordpress`,
-    ),
+    api.post<{
+      destino: DestinoPublicacion
+      preparacion_ia_estado: EstadoPreparacionIA
+      preparacion_ia_error: string | null
+    }>(`/publication-requests/${id}/destinos/${destinoId}/crear-borrador-wordpress`),
   confirmarDestino: (
     id: string,
     destinoId: string,

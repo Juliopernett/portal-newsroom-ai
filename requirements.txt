@@ -31,3 +31,6 @@ requests>=2.32,<3
 
 # --- Integraciones (usadas a partir de los agentes WordPress / Telegram) ---
 python-telegram-bot>=21.0,<22
+
+# --- IA (preparación editorial — agents/ai, Sprint 2026-08-21) ---
+anthropic>=0.69,<1

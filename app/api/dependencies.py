@@ -16,12 +16,14 @@ from functools import lru_cache
 
 from fastapi import Cookie, Depends, HTTPException, status
 
+from agents.ai.anthropic_provider import AnthropicAIProvider
 from agents.meta_social.client import MetaGraphSocialMediaReader
 from agents.storage.local_disk import LocalDiskMediaStorage
 from agents.wordpress.client import WordPressCMSPublisher
 from config.settings import get_settings
 from core.entities.session import Session as SessionEntity
 from core.entities.user import User
+from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.media_storage import MediaStorage
 from core.ports.password_hasher import PasswordHasher
@@ -71,6 +73,20 @@ def get_cms_publisher() -> CMSPublisher:
     are not set in `.env` — Sprint 4A, Increment 3.
     """
     return WordPressCMSPublisher(get_settings())
+
+
+def get_ai_provider() -> AIProvider:
+    """Return the AI provider used to prepare a solicitud's editorial content.
+
+    Sprint 2026-08-21. Unlike `get_cms_publisher`/`get_social_media_reader`,
+    a missing `ANTHROPIC_API_KEY` does NOT raise here — `AnthropicAIProvider`
+    checks it lazily inside `generate_structured`, and
+    `core.services.editorial_ai_service` catches that failure and degrades
+    gracefully (the WordPress draft still gets created from raw text). See
+    `core.ports.ai_provider.AIProviderError`'s docstring for why this is
+    deliberately asymmetric with the other two providers.
+    """
+    return AnthropicAIProvider(get_settings())
 
 
 def get_social_media_reader() -> SocialMediaReader:

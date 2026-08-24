@@ -6,7 +6,11 @@ from datetime import UTC, datetime
 
 import pytest
 
-from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
+from core.entities.publication_request import (
+    EstadoPreparacionIA,
+    PublicationRequest,
+    PublicationRequestStatus,
+)
 
 
 def _build(**overrides: object) -> PublicationRequest:
@@ -103,3 +107,45 @@ def test_create_publication_request_accepts_titulo_and_fecha_cierre() -> None:
 def test_create_publication_request_rejects_empty_string_titulo() -> None:
     with pytest.raises(ValueError, match="titulo"):
         _build(titulo="")
+
+
+def test_create_publication_request_defaults_preparacion_ia_estado_to_pendiente() -> None:
+    solicitud = _build()
+
+    assert solicitud.preparacion_ia_estado == EstadoPreparacionIA.PENDIENTE
+    assert solicitud.contenido_editorial is None
+    assert solicitud.etiquetas_editorial is None
+    assert solicitud.preparacion_ia_error is None
+
+
+def test_create_publication_request_accepts_a_procesado_editorial_result() -> None:
+    solicitud = _build(
+        contenido_editorial="Cuerpo reescrito por IA",
+        titulo_editorial="Titular generado",
+        etiquetas_editorial=("vallenato", "lanzamiento"),
+        preparacion_ia_estado=EstadoPreparacionIA.PROCESADO,
+    )
+
+    assert solicitud.contenido_editorial == "Cuerpo reescrito por IA"
+    assert solicitud.preparacion_ia_estado == EstadoPreparacionIA.PROCESADO
+
+
+def test_create_publication_request_rejects_procesado_without_contenido_editorial() -> None:
+    with pytest.raises(ValueError, match="contenido_editorial"):
+        _build(preparacion_ia_estado=EstadoPreparacionIA.PROCESADO)
+
+
+def test_create_publication_request_rejects_fallido_without_preparacion_ia_error() -> None:
+    with pytest.raises(ValueError, match="preparacion_ia_error"):
+        _build(preparacion_ia_estado=EstadoPreparacionIA.FALLIDO)
+
+
+def test_create_publication_request_accepts_a_fallido_editorial_result() -> None:
+    solicitud = _build(
+        preparacion_ia_estado=EstadoPreparacionIA.FALLIDO,
+        preparacion_ia_error="ANTHROPIC_API_KEY no configurado",
+    )
+
+    assert solicitud.preparacion_ia_estado == EstadoPreparacionIA.FALLIDO
+    assert solicitud.preparacion_ia_error == "ANTHROPIC_API_KEY no configurado"
+    assert solicitud.contenido_editorial is None

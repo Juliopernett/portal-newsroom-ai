@@ -12,6 +12,13 @@ nullable — see `core.entities.publication_request` for why neither is
 required at this layer yet. `client_id` is a later, separate optional
 reference to the originating `Client` — see that same module docstring
 for why it exists independently of `pauta_id`.
+
+The `*_editorial` columns plus `preparacion_ia_estado`/`preparacion_ia_error`
+(Sprint 2026-08-21, preparación editorial con IA) are all nullable or
+defaulted — every row that existed before this sprint keeps working
+unchanged. `etiquetas_editorial` stores a JSON-array string (a tag can
+legitimately contain a comma); the repository is the only place that
+(de)serializes it — the domain entity holds a real `tuple[str, ...]`.
 """
 
 from __future__ import annotations
@@ -43,3 +50,13 @@ class PublicationRequestModel(Base):
     prioridad_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     observaciones: Mapped[str | None] = mapped_column(String, nullable=True)
     fecha_cierre: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    contenido_editorial: Mapped[str | None] = mapped_column(String, nullable=True)
+    entradilla_editorial: Mapped[str | None] = mapped_column(String, nullable=True)
+    titulo_editorial: Mapped[str | None] = mapped_column(String, nullable=True)
+    categoria_editorial: Mapped[str | None] = mapped_column(String, nullable=True)
+    etiquetas_editorial: Mapped[str | None] = mapped_column(String, nullable=True)
+    slug_editorial: Mapped[str | None] = mapped_column(String, nullable=True)
+    preparacion_ia_estado: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pendiente"
+    )
+    preparacion_ia_error: Mapped[str | None] = mapped_column(String, nullable=True)

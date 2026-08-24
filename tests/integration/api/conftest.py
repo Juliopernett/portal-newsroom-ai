@@ -17,8 +17,14 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import database.models  # noqa: F401  (registers tables on Base.metadata)
+from agents.ai.fake_provider import FakeAIProvider
 from agents.meta_social.fake_reader import FakeSocialMediaReader
-from app.api.dependencies import get_login_rate_limiter, get_social_media_reader, get_unit_of_work
+from app.api.dependencies import (
+    get_ai_provider,
+    get_login_rate_limiter,
+    get_social_media_reader,
+    get_unit_of_work,
+)
 from app.api.main import app
 from core.entities.user import User
 from database.base import Base
@@ -73,6 +79,11 @@ def unauthenticated_client(_test_engine: Engine) -> Iterator[TestClient]:
     # which exist in the test environment, so every test gets the demo
     # reader instead of a 503.
     app.dependency_overrides[get_social_media_reader] = lambda: FakeSocialMediaReader()
+    # No ANTHROPIC_API_KEY in the test environment either — every test gets
+    # a canned successful AI response by default (see agents.ai.fake_provider);
+    # a test exercising the AI-failure path overrides this again with
+    # FakeAIProvider(error=...).
+    app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

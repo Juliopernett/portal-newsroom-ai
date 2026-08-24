@@ -12,25 +12,50 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from agents.ai.fake_provider import FakeAIProvider
 from agents.wordpress.client import WordPressCMSPublisher
-from app.api.dependencies import get_cms_publisher
+from app.api.dependencies import get_ai_provider, get_cms_publisher
 from app.api.main import app
 from config.settings import Settings
-from core.ports.cms_publisher import CMSDraftResult
+from core.ports.ai_provider import AIProviderError
+from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult
 
 
 class _FakeCMSPublisher:
+    """In-memory CMSPublisher used across this whole test module — implements
+    every `CMSPublisher` method (Sprint 2026-08-21 added 3 to the Protocol)
+    so `preparar_y_crear_borrador` never hits a real network call."""
+
     def __init__(
-        self, resultado: CMSDraftResult | None = None, error: Exception | None = None
+        self,
+        resultado: CMSDraftResult | None = None,
+        error: Exception | None = None,
+        categorias: list[CategoriaCMS] | None = None,
     ) -> None:
         self.resultado = resultado
         self.error = error
+        self.categorias = categorias or []
+        self.contenido_recibido: dict[str, Any] | None = None
+        self.etiquetas_resueltas: list[str] = []
+        self.media_subida: list[tuple[str, str, int]] = []
 
     def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:
         if self.error is not None:
             raise self.error
+        self.contenido_recibido = content
         assert self.resultado is not None
         return self.resultado
+
+    def listar_categorias(self) -> list[CategoriaCMS]:
+        return self.categorias
+
+    def resolver_o_crear_etiqueta(self, nombre: str) -> str:
+        self.etiquetas_resueltas.append(nombre)
+        return f"tag-{nombre}"
+
+    def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
+        self.media_subida.append((nombre_archivo, content_type, len(contenido)))
+        return "media-1"
 
 
 @pytest.fixture
@@ -107,9 +132,141 @@ def test_crear_borrador_wordpress_attaches_post_id_and_url(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["wp_post_id"] == "42"
-    assert body["wp_url"] == "https://www.portalvallenato.com/?p=42"
-    assert body["estado"] == "pendiente"
+    assert body["destino"]["wp_post_id"] == "42"
+    assert body["destino"]["wp_url"] == "https://www.portalvallenato.com/?p=42"
+    assert body["destino"]["estado"] == "pendiente"
+    assert body["preparacion_ia_estado"] == "procesado"
+    assert body["preparacion_ia_error"] is None
+
+
+def test_crear_borrador_wordpress_forwards_category_and_tags_to_wordpress(
+    client: TestClient, fake_cms_publisher: _FakeCMSPublisher
+) -> None:
+    fake_cms_publisher.categorias = [CategoriaCMS(id="7", nombre="Noticias")]
+    app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider(
+        respuesta_json=(
+            '{"titulo": "Titular IA", "entradilla": "Entradilla", '
+            '"contenido": "Cuerpo reescrito", "categoria": "Noticias", '
+            '"etiquetas": ["vallenato", "lanzamiento"], "slug": "titular-ia"}'
+        )
+    )
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+
+    response = client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
+    )
+
+    assert response.status_code == 200
+    assert fake_cms_publisher.contenido_recibido is not None
+    assert fake_cms_publisher.contenido_recibido["title"] == "Titular IA"
+    assert fake_cms_publisher.contenido_recibido["content"] == "Cuerpo reescrito"
+    assert fake_cms_publisher.contenido_recibido["categories"] == ["7"]
+    assert fake_cms_publisher.etiquetas_resueltas == ["vallenato", "lanzamiento"]
+
+    solicitudes = client.get("/publication-requests").json()
+    solicitud = next(s for s in solicitudes if s["id"] == solicitud_id)
+    assert solicitud["preparacion_ia_estado"] == "procesado"
+    assert solicitud["contenido_editorial"] == "Cuerpo reescrito"
+    assert solicitud["texto"] == "Anuncio"  # el original nunca se toca
+
+
+def test_crear_borrador_wordpress_still_creates_draft_when_ai_fails(
+    client: TestClient, fake_cms_publisher: _FakeCMSPublisher
+) -> None:
+    """An AI outage must never block the WordPress integration."""
+    app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider(
+        error=AIProviderError("ANTHROPIC_API_KEY no está configurado en .env")
+    )
+    solicitud_id = client.post(
+        "/publication-requests", json={"texto": "Anuncio con texto crudo"}
+    ).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+
+    response = client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["destino"]["wp_post_id"] == "42"
+    assert body["preparacion_ia_estado"] == "fallido"
+    assert body["preparacion_ia_error"] is not None
+    assert fake_cms_publisher.contenido_recibido == {
+        "title": "Anuncio con texto crudo",
+        "content": "Anuncio con texto crudo",
+    }
+
+    solicitudes = client.get("/publication-requests").json()
+    solicitud = next(s for s in solicitudes if s["id"] == solicitud_id)
+    assert solicitud["preparacion_ia_estado"] == "fallido"
+    assert solicitud["contenido_editorial"] is None
+    assert solicitud["texto"] == "Anuncio con texto crudo"
+
+
+def test_crear_borrador_wordpress_attaches_the_solicitud_featured_image(
+    client: TestClient, fake_cms_publisher: _FakeCMSPublisher
+) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/media",
+        files={"archivo": ("foto.jpg", b"contenido-de-la-foto", "image/jpeg")},
+    )
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+
+    response = client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
+    )
+
+    assert response.status_code == 200
+    assert fake_cms_publisher.media_subida == [
+        ("foto.jpg", "image/jpeg", len(b"contenido-de-la-foto"))
+    ]
+    assert fake_cms_publisher.contenido_recibido is not None
+    assert fake_cms_publisher.contenido_recibido["featured_media"] == "media-1"
+
+
+def test_crear_borrador_wordpress_rolls_back_completely_when_wordpress_fails(
+    client: TestClient, fake_cms_publisher: _FakeCMSPublisher
+) -> None:
+    import requests
+
+    fake_cms_publisher.error = requests.ConnectionError("WordPress no responde")
+    solicitud_id = client.post(
+        "/publication-requests", json={"texto": "Anuncio a reintentar"}
+    ).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+
+    response = client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
+    )
+
+    assert response.status_code == 502
+
+    # nothing was saved — solicitud and destino are exactly as before,
+    # retriable with a single click, no need to re-paste anything
+    solicitudes = client.get("/publication-requests").json()
+    solicitud = next(s for s in solicitudes if s["id"] == solicitud_id)
+    assert solicitud["preparacion_ia_estado"] == "pendiente"
+    assert solicitud["texto"] == "Anuncio a reintentar"
+    destinos = client.get(f"/publication-requests/{solicitud_id}/destinos").json()
+    assert destinos[0]["wp_post_id"] is None
+
+    # and a retry (now that WordPress is "back up") succeeds cleanly
+    fake_cms_publisher.error = None
+    retry = client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
+    )
+    assert retry.status_code == 200
+    assert retry.json()["destino"]["wp_post_id"] == "42"
 
 
 def test_publish_reuses_an_existing_wordpress_destino_from_crear_borrador(

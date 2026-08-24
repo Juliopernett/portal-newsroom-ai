@@ -13,7 +13,11 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 from core.entities.destino_publicacion import DestinoPublicacion
-from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
+from core.entities.publication_request import (
+    EstadoPreparacionIA,
+    PublicationRequest,
+    PublicationRequestStatus,
+)
 from core.services.destino_publicacion_service import esta_completa
 
 
@@ -90,18 +94,41 @@ def edit_solicitud(
     Increment 2 needs it, and `PublicationRequest.__post_init__` already
     rejects an empty string, so "no titulo yet" only ever happens at
     creation, never as an edit.
+
+    Correcting `texto` (Sprint 2026-08-21) clears any AI editorial
+    preparation already run and resets `preparacion_ia_estado` back to
+    `PENDIENTE` — otherwise a later "Crear borrador" would either publish
+    a rewrite of text the operator just replaced, or silently skip
+    re-running the AI because `preparacion_ia_estado` still read
+    `PROCESADO`. A `texto` correction that happens to match the current
+    value exactly is not treated as a change, so it never wastes an
+    already-successful preparation.
     """
     if solicitud.estado != PublicationRequestStatus.RECIBIDA:
         raise ValueError(
             f"cannot edit a PublicationRequest once its estado is {solicitud.estado.value!r}"
         )
-    return replace(
+    editada = replace(
         solicitud,
         titulo=titulo if titulo is not None else solicitud.titulo,
         texto=texto if texto is not None else solicitud.texto,
         prioridad_manual=prioridad_manual
         if prioridad_manual is not None
         else solicitud.prioridad_manual,
+    )
+    texto_cambio = texto is not None and texto != solicitud.texto
+    if not texto_cambio:
+        return editada
+    return replace(
+        editada,
+        contenido_editorial=None,
+        entradilla_editorial=None,
+        titulo_editorial=None,
+        categoria_editorial=None,
+        etiquetas_editorial=None,
+        slug_editorial=None,
+        preparacion_ia_estado=EstadoPreparacionIA.PENDIENTE,
+        preparacion_ia_error=None,
     )
 
 

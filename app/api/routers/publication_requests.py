@@ -25,8 +25,9 @@ recreating it.
 `/{request_id}/destinos` (Sprint 4A, Increment 3 — see
 docs/adr/ADR-006-multichannel-publication.md) exposes `DestinoPublicacion`
 CRUD scoped to one solicitud; `.../crear-borrador-wordpress` triggers
-`core.services.wordpress_publication_service.crear_borrador` against the
-real WordPress REST API (draft only, never publishes, per
+`core.services.wordpress_publication_service.preparar_y_crear_borrador`
+(Sprint 2026-08-21 adds the AI editorial rewrite step ahead of the draft)
+against the real WordPress REST API (draft only, never publishes, per
 docs/PROJECT_RULES.md rule 1); `.../confirmar-publicacion` (Increment 4)
 registers a destino as actually live — required `url_publicacion` for
 Facebook/Instagram, optional for WordPress (already has `wp_url`); and
@@ -64,12 +65,14 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from app.api.dependencies import (
+    get_ai_provider,
     get_cms_publisher,
     get_current_user,
     get_media_storage,
     get_unit_of_work,
 )
 from app.api.schemas.destino_publicacion import (
+    CrearBorradorWordpressOut,
     DestinoPublicacionConfirmarPublicacion,
     DestinoPublicacionCorregirEnlace,
     DestinoPublicacionCreate,
@@ -89,6 +92,7 @@ from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicaci
 from core.entities.media_asset import MediaAsset
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.entities.user import User
+from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.media_storage import MediaStorage
 from core.ports.unit_of_work import UnitOfWork
@@ -111,7 +115,7 @@ from core.services.publication_request_service import (
     link_pauta,
 )
 from core.services.reporte_service import ReporteSolicitud, construir_reporte
-from core.services.wordpress_publication_service import crear_borrador
+from core.services.wordpress_publication_service import preparar_y_crear_borrador
 
 router = APIRouter(
     prefix="/publication-requests",
@@ -340,19 +344,32 @@ def list_destinos(
 
 @router.post(
     "/{request_id}/destinos/{destino_id}/crear-borrador-wordpress",
-    response_model=DestinoPublicacionOut,
+    response_model=CrearBorradorWordpressOut,
 )
 def crear_borrador_wordpress(
     request_id: str,
     destino_id: str,
     uow: UnitOfWork = Depends(get_unit_of_work),
     cms_publisher: CMSPublisher = Depends(get_cms_publisher),
-) -> DestinoPublicacion:
-    """Create a WordPress draft for `destino_id` and attach its post_id/url.
+    ai_provider: AIProvider = Depends(get_ai_provider),
+    media_storage: MediaStorage = Depends(get_media_storage),
+) -> CrearBorradorWordpressOut:
+    """Prepare `request_id`'s content with AI, then create its WordPress draft.
 
-    Never publishes — only creates a draft (docs/PROJECT_RULES.md rule 1).
-    A human still has to go into WordPress, or call
-    `confirmar-publicacion`, to actually mark the post live in this system.
+    Sprint 2026-08-21 — preparación editorial con IA. Never publishes —
+    only creates a draft (docs/PROJECT_RULES.md rule 1). A human still has
+    to go into WordPress, or call `confirmar-publicacion`, to actually
+    mark the post live in this system.
+
+    Runs `core.services.wordpress_publication_service
+    .preparar_y_crear_borrador`: rewrites `texto` into a WordPress-ready
+    article (título, entradilla, categoría existente, etiquetas, slug),
+    attaches the solicitud's first imagen MediaAsset as featured image if
+    one exists, then creates the draft. If the AI step fails for any
+    reason, the draft is still created from the raw `texto` — an AI outage
+    never blocks this endpoint. If WordPress itself fails, nothing is
+    saved (see `preparar_y_crear_borrador`'s own docstring) and the
+    request is safely retriable.
     """
     solicitud = uow.publication_requests.get_by_id(request_id)
     if solicitud is None:
@@ -360,10 +377,18 @@ def crear_borrador_wordpress(
     destino = uow.destinos_publicacion.get_by_id(destino_id)
     if destino is None or destino.publication_request_id != request_id:
         raise HTTPException(status_code=404, detail="DestinoPublicacion not found")
-    con_borrador = crear_borrador(destino, solicitud, cms_publisher)
+    media_assets = uow.media_assets.list_by_publication_request_id(request_id)
+    con_borrador, solicitud_actualizada = preparar_y_crear_borrador(
+        destino, solicitud, media_assets, ai_provider, cms_publisher, media_storage
+    )
     uow.destinos_publicacion.save(con_borrador)
+    uow.publication_requests.save(solicitud_actualizada)
     uow.commit()
-    return con_borrador
+    return CrearBorradorWordpressOut(
+        destino=DestinoPublicacionOut.model_validate(con_borrador),
+        preparacion_ia_estado=solicitud_actualizada.preparacion_ia_estado,
+        preparacion_ia_error=solicitud_actualizada.preparacion_ia_error,
+    )
 
 
 @router.post(

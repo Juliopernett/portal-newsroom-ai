@@ -14,6 +14,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from core.entities.destino_publicacion import CanalPublicacion, EstadoDestino
+from core.entities.publication_request import EstadoPreparacionIA
 
 
 class DestinoPublicacionCreate(BaseModel):
@@ -69,3 +70,18 @@ class DestinoPublicacionOut(BaseModel):
     registrado_por_user_id: str | None
     fecha_publicacion: datetime | None
     ultimo_error: str | None
+
+
+class CrearBorradorWordpressOut(BaseModel):
+    """Response body for `POST .../destinos/{destino_id}/crear-borrador-wordpress`.
+
+    Sprint 2026-08-21 — preparación editorial con IA. Wraps the destino
+    together with whether the automatic editorial rewrite ran, so the
+    frontend can show an honest toast ("creado con preparación editorial"
+    vs. "creado con el texto original — la IA no estuvo disponible")
+    without a second request.
+    """
+
+    destino: DestinoPublicacionOut
+    preparacion_ia_estado: EstadoPreparacionIA
+    preparacion_ia_error: str | None

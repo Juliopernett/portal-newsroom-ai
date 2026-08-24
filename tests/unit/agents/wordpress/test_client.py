@@ -8,7 +8,7 @@ import pytest
 
 from agents.wordpress.client import WordPressCMSPublisher, WordPressConfigurationError
 from config.settings import Settings
-from core.ports.cms_publisher import CMSDraftResult
+from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult
 
 
 def _settings(**overrides: object) -> Settings:
@@ -88,3 +88,106 @@ def test_create_draft_raises_on_a_non_2xx_response() -> None:
         pytest.raises(requests.HTTPError),
     ):
         publisher.create_draft({"title": "T", "content": "C"})
+
+
+def test_create_draft_forwards_optional_fields_as_wordpress_ids() -> None:
+    publisher = WordPressCMSPublisher(_settings())
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"id": 1, "link": "https://example.com/?p=1"}
+
+    with patch("agents.wordpress.client.requests.post", return_value=mock_response) as mock_post:
+        publisher.create_draft(
+            {
+                "title": "T",
+                "content": "C",
+                "excerpt": "Entradilla",
+                "slug": "titulo",
+                "categories": ["7"],
+                "tags": ["3", "9"],
+                "featured_media": "12",
+            }
+        )
+
+    _args, kwargs = mock_post.call_args
+    assert kwargs["json"]["excerpt"] == "Entradilla"
+    assert kwargs["json"]["slug"] == "titulo"
+    assert kwargs["json"]["categories"] == [7]
+    assert kwargs["json"]["tags"] == [3, 9]
+    assert kwargs["json"]["featured_media"] == 12
+
+
+def test_create_draft_omits_optional_fields_when_absent() -> None:
+    publisher = WordPressCMSPublisher(_settings())
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"id": 1, "link": "https://example.com/?p=1"}
+
+    with patch("agents.wordpress.client.requests.post", return_value=mock_response) as mock_post:
+        publisher.create_draft({"title": "T", "content": "C"})
+
+    _args, kwargs = mock_post.call_args
+    assert set(kwargs["json"]) == {"title", "content", "status"}
+
+
+def test_listar_categorias_returns_id_and_name_pairs() -> None:
+    publisher = WordPressCMSPublisher(_settings())
+    mock_response = MagicMock()
+    mock_response.json.return_value = [
+        {"id": 3, "name": "Noticias"},
+        {"id": 7, "name": "Crónicas"},
+    ]
+
+    with patch("agents.wordpress.client.requests.get", return_value=mock_response) as mock_get:
+        resultado = publisher.listar_categorias()
+
+    assert resultado == [CategoriaCMS(id="3", nombre="Noticias"), CategoriaCMS(id="7", nombre="Crónicas")]
+    args, _kwargs = mock_get.call_args
+    assert args[0] == "https://www.portalvallenato.com/wp-json/wp/v2/categories"
+    mock_response.raise_for_status.assert_called_once()
+
+
+def test_resolver_o_crear_etiqueta_reuses_an_existing_tag() -> None:
+    publisher = WordPressCMSPublisher(_settings())
+    mock_search = MagicMock()
+    mock_search.json.return_value = [{"id": 5, "name": "vallenato"}]
+
+    with patch("agents.wordpress.client.requests.get", return_value=mock_search) as mock_get:
+        with patch("agents.wordpress.client.requests.post") as mock_post:
+            resultado = publisher.resolver_o_crear_etiqueta("vallenato")
+
+    assert resultado == "5"
+    mock_post.assert_not_called()
+    _args, kwargs = mock_get.call_args
+    assert kwargs["params"] == {"search": "vallenato"}
+
+
+def test_resolver_o_crear_etiqueta_creates_a_new_tag_when_not_found() -> None:
+    publisher = WordPressCMSPublisher(_settings())
+    mock_search = MagicMock()
+    mock_search.json.return_value = []
+    mock_create = MagicMock()
+    mock_create.json.return_value = {"id": 11, "name": "nueva-etiqueta"}
+
+    with patch("agents.wordpress.client.requests.get", return_value=mock_search):
+        with patch(
+            "agents.wordpress.client.requests.post", return_value=mock_create
+        ) as mock_post:
+            resultado = publisher.resolver_o_crear_etiqueta("nueva-etiqueta")
+
+    assert resultado == "11"
+    _args, kwargs = mock_post.call_args
+    assert kwargs["json"] == {"name": "nueva-etiqueta"}
+
+
+def test_subir_media_sends_content_disposition_and_returns_id() -> None:
+    publisher = WordPressCMSPublisher(_settings())
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"id": 21}
+
+    with patch("agents.wordpress.client.requests.post", return_value=mock_response) as mock_post:
+        resultado = publisher.subir_media(b"contenido", "foto.jpg", "image/jpeg")
+
+    assert resultado == "21"
+    _args, kwargs = mock_post.call_args
+    assert kwargs["data"] == b"contenido"
+    assert kwargs["headers"]["Content-Disposition"] == 'attachment; filename="foto.jpg"'
+    assert kwargs["headers"]["Content-Type"] == "image/jpeg"

@@ -57,6 +57,23 @@ class PublicationRequestStatus(StrEnum):
     CANCELADA = "cancelada"
 
 
+class EstadoPreparacionIA(StrEnum):
+    """Whether the automatic editorial rewrite (Sprint — preparación editorial con
+    IA, 2026-08-21) has run for this solicitud.
+
+    `PENDIENTE` is the default for every solicitud, old and new alike —
+    `crear_borrador_wordpress` is the only place that ever moves it forward.
+    `FALLIDO` is not a dead end: the WordPress draft still gets created with
+    the raw `texto` when the AI step fails (see
+    `core.services.wordpress_publication_service.preparar_y_crear_borrador`)
+    — a caída de la IA nunca debe bloquear el flujo de WordPress.
+    """
+
+    PENDIENTE = "pendiente"
+    PROCESADO = "procesado"
+    FALLIDO = "fallido"
+
+
 _ESTADOS_CON_PAUTA_OBLIGATORIA: frozenset[PublicationRequestStatus] = frozenset(
     {PublicationRequestStatus.ACEPTADA}
 )
@@ -80,6 +97,20 @@ class PublicationRequest:
     prioridad_manual: bool = False
     observaciones: str | None = None
     fecha_cierre: datetime | None = None
+    # --- Preparación editorial con IA (Sprint 2026-08-21) ---
+    # `texto` above stays forever the untouched contenido_original; these
+    # fields hold the IA's proposal, kept in a clean separate namespace so
+    # nothing here ever overwrites what the client actually sent. All
+    # populated together, only when `preparacion_ia_estado` becomes
+    # PROCESADO — see `core.services.editorial_ai_service`.
+    contenido_editorial: str | None = None
+    entradilla_editorial: str | None = None
+    titulo_editorial: str | None = None
+    categoria_editorial: str | None = None
+    etiquetas_editorial: tuple[str, ...] | None = None
+    slug_editorial: str | None = None
+    preparacion_ia_estado: EstadoPreparacionIA = EstadoPreparacionIA.PENDIENTE
+    preparacion_ia_error: str | None = None
 
     def __post_init__(self) -> None:
         if self.pauta_id == "":
@@ -96,3 +127,17 @@ class PublicationRequest:
             raise ValueError("titulo must not be an empty string — use None if not set yet")
         if self.estado in _ESTADOS_CON_PAUTA_OBLIGATORIA and self.pauta_id is None:
             raise ValueError(f"pauta_id is required when estado is {self.estado.value!r}")
+        if (
+            self.preparacion_ia_estado == EstadoPreparacionIA.PROCESADO
+            and self.contenido_editorial is None
+        ):
+            raise ValueError(
+                "contenido_editorial is required when preparacion_ia_estado is 'procesado'"
+            )
+        if (
+            self.preparacion_ia_estado == EstadoPreparacionIA.FALLIDO
+            and self.preparacion_ia_error is None
+        ):
+            raise ValueError(
+                "preparacion_ia_error is required when preparacion_ia_estado is 'fallido'"
+            )
