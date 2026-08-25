@@ -7,16 +7,21 @@ wired in `app/api/dependencies.py`, so this module stays testable with a
 fake, no network, per docs/PROJECT_RULES.md rule 5.
 
 Exactly one AI call per solicitud (`generar_contenido_editorial`), using
-`AIProvider.generate_structured` — the model's output is constrained to a
-JSON Schema built fresh from the CMS's real categories, so it is
-structurally incapable of inventing a category, and any other malformed
-response raises `EditorialAIError` rather than silently corrupting a
-`PublicationRequest`.
+`AIProvider.generate_structured` — the prompt spells out the exact JSON
+shape expected, and on Anthropic that's additionally enforced server-side
+via a JSON Schema built fresh from the CMS's real categories (structurally
+incapable of inventing one). Not every provider offers that same
+guarantee (see `agents.ai.openrouter_provider`), so parsing here degrades
+gracefully: only a missing `titulo`/`contenido` raises `EditorialAIError`
+— everything else (entradilla, categoria, etiquetas, slug) falls back to a
+safe default rather than discarding an otherwise usable rewrite.
 """
 
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -119,7 +124,16 @@ def _construir_prompt(solicitud: PublicationRequest, categorias_existentes: list
         f"{titulo_operador}\n\n"
         f"Categorías existentes en WordPress (elige una de estas o deja "
         f"categoria en null si ninguna encaja): {categorias_texto}\n\n"
-        "Devuelve la noticia lista para publicar como borrador."
+        "Devuelve ÚNICAMENTE un objeto JSON, sin texto antes ni después, "
+        "con exactamente estas claves:\n"
+        '- "titulo": string, el titular\n'
+        '- "entradilla": string, una breve introducción que contextualice la noticia\n'
+        '- "contenido": string, el cuerpo de la noticia ya reescrito\n'
+        '- "categoria": string (una de las categorías existentes de arriba) o null\n'
+        '- "etiquetas": array de strings\n'
+        '- "slug": string, en minúsculas y con guiones\n'
+        "No omitas ninguna clave — si un campo no aplica, usa un string vacío "
+        "o null según corresponda, nunca la omitas."
     )
 
 
@@ -144,17 +158,36 @@ def generar_contenido_editorial(
         datos = json.loads(respuesta)
     except (json.JSONDecodeError, TypeError) as exc:
         raise EditorialAIError(f"respuesta de IA no es JSON válido: {exc}") from exc
+    # titulo/contenido son lo único verdaderamente indispensable — sin
+    # ellos no hay artículo que publicar. entradilla/categoria/etiquetas/
+    # slug se rellenan con un valor seguro si el proveedor los omite (no
+    # todos ofrecen la misma garantía de esquema que Anthropic vía
+    # output_config.format — ver AIProvider.generate_structured), en vez
+    # de descartar una reescritura por lo demás perfectamente usable.
     try:
-        return ContenidoEditorial(
-            titulo=datos["titulo"],
-            entradilla=datos["entradilla"],
-            contenido=datos["contenido"],
-            categoria=datos["categoria"],
-            etiquetas=tuple(datos["etiquetas"]),
-            slug=datos["slug"],
-        )
+        titulo = str(datos["titulo"])
+        contenido = str(datos["contenido"])
     except (KeyError, TypeError) as exc:
         raise EditorialAIError(f"respuesta de IA no tiene la forma esperada: {exc}") from exc
+    etiquetas_valor = datos.get("etiquetas")
+    etiquetas = tuple(str(e) for e in etiquetas_valor) if isinstance(etiquetas_valor, list) else ()
+    categoria = datos.get("categoria")
+    slug = datos.get("slug")
+    return ContenidoEditorial(
+        titulo=titulo,
+        entradilla=str(datos.get("entradilla") or ""),
+        contenido=contenido,
+        categoria=str(categoria) if isinstance(categoria, str) and categoria else None,
+        etiquetas=etiquetas,
+        slug=str(slug) if isinstance(slug, str) and slug else _slug_basico(titulo),
+    )
+
+
+def _slug_basico(texto: str) -> str:
+    """A safe fallback slug derived from `texto` when the provider omits one."""
+    normalizado = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", normalizado.lower())).strip("-")
+    return slug or "sin-titulo"
 
 
 def aplicar_preparacion_exitosa(

@@ -116,6 +116,36 @@ def test_generar_contenido_editorial_raises_on_missing_required_key() -> None:
         generar_contenido_editorial(_solicitud(), [], provider)
 
 
+def test_generar_contenido_editorial_defaults_optional_fields_when_missing() -> None:
+    """Not every provider guarantees the exact schema Anthropic does (see
+    agents.ai.openrouter_provider) — a response missing entradilla/categoria/
+    etiquetas/slug is still usable, unlike one missing titulo/contenido."""
+    provider = _FakeAIProvider(
+        respuesta=json.dumps({"titulo": "Un titular cualquiera", "contenido": "Cuerpo."})
+    )
+
+    resultado = generar_contenido_editorial(_solicitud(), [], provider)
+
+    assert resultado.titulo == "Un titular cualquiera"
+    assert resultado.contenido == "Cuerpo."
+    assert resultado.entradilla == ""
+    assert resultado.categoria is None
+    assert resultado.etiquetas == ()
+    assert resultado.slug == "un-titular-cualquiera"
+
+
+def test_generar_contenido_editorial_uses_provided_slug_when_present() -> None:
+    provider = _FakeAIProvider(
+        respuesta=json.dumps(
+            {"titulo": "Titular", "contenido": "Cuerpo.", "slug": "slug-elegido-por-la-ia"}
+        )
+    )
+
+    resultado = generar_contenido_editorial(_solicitud(), [], provider)
+
+    assert resultado.slug == "slug-elegido-por-la-ia"
+
+
 def test_aplicar_preparacion_exitosa_populates_editorial_fields() -> None:
     solicitud = _solicitud()
     contenido = ContenidoEditorial(
