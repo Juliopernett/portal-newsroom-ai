@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { solicitudesApi } from './api'
-import { CANALES_DESTINO, DESTINO_ESTADO_BADGE, DESTINO_ESTADO_LABELS, formatoReporteTexto } from './utils'
+import { CANAL_LABEL_REPORTE, DESTINO_ESTADO_BADGE, DESTINO_ESTADO_LABELS, formatoReporteTexto } from './utils'
 
 export function ReportePanel({ solicitudId }: { solicitudId: string }) {
   const reporteQuery = useQuery({
@@ -41,7 +41,7 @@ export function ReportePanel({ solicitudId }: { solicitudId: string }) {
       ) : (
         <div className="flex flex-col divide-y divide-border">
           {reporte.destinos.map((d, i) => {
-            const canalLabel = CANALES_DESTINO.find((c) => c.value === d.canal)?.label ?? d.canal
+            const canalLabel = CANAL_LABEL_REPORTE[d.canal] ?? d.canal
             return (
               <div key={i} className="flex items-center justify-between gap-2 py-1.5">
                 <div className="flex items-center gap-2">

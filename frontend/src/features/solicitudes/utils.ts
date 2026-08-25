@@ -62,6 +62,14 @@ export const CANALES_DESTINO: { value: CanalPublicacion; label: string }[] = [
   { value: 'instagram', label: 'Instagram' },
 ]
 
+// El reporte lo lee el cliente, no el operador — "WordPress" es un detalle
+// de implementación que no le dice nada; "Página web" sí.
+export const CANAL_LABEL_REPORTE: Record<CanalPublicacion, string> = {
+  wordpress: 'Página web',
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+}
+
 export const DESTINO_ESTADO_LABELS: Record<EstadoDestino, string> = {
   pendiente: 'Pendiente',
   publicado: 'Publicado',
@@ -104,7 +112,7 @@ export function formatoReporteTexto(reporte: ReporteSolicitud): string {
     lineas.push('  (sin destinos todavía)')
   } else {
     for (const d of reporte.destinos) {
-      const canalLabel = CANALES_DESTINO.find((c) => c.value === d.canal)?.label ?? d.canal
+      const canalLabel = CANAL_LABEL_REPORTE[d.canal] ?? d.canal
       const estadoLabel = DESTINO_ESTADO_LABELS[d.estado]
       let linea = `  - ${canalLabel}: ${estadoLabel}`
       if (d.enlace) linea += ` — ${d.enlace}`
