@@ -64,12 +64,15 @@ class WordPressCMSPublisher:
 
         `content` must have `title` and `content` keys — see
         `core.services.wordpress_publication_service.construir_contenido_wordpress`,
-        the main intended caller. `excerpt`/`slug` (strings) and
+        the main intended caller. `excerpt`/`slug` (strings),
         `categories`/`tags`/`featured_media` (WordPress numeric ids as
-        `str`, converted to `int` on the wire here) are forwarded only
-        when present, so a plain `{title, content}` payload behaves
-        exactly as before this method grew. Raises `requests.HTTPError`
-        on a non-2xx response (invalid credentials, unreachable site, ...).
+        `str`, converted to `int` on the wire here), and `meta` (a
+        `dict[str, str]` — Yoast SEO's `_yoast_wpseo_title`/`_metadesc`/
+        `_focuskw`, confirmed `show_in_rest: true` on this site via `wp
+        eval`, 2026-08-25) are forwarded only when present, so a plain
+        `{title, content}` payload behaves exactly as before this method
+        grew. Raises `requests.HTTPError` on a non-2xx response (invalid
+        credentials, unreachable site, ...).
         """
         payload: dict[str, Any] = {
             "title": content["title"],
@@ -86,6 +89,8 @@ class WordPressCMSPublisher:
             payload["tags"] = [int(t) for t in content["tags"]]
         if "featured_media" in content:
             payload["featured_media"] = int(content["featured_media"])
+        if "meta" in content:
+            payload["meta"] = dict(content["meta"])
         response = requests.post(
             self._posts_url, json=payload, auth=self._auth, timeout=_REQUEST_TIMEOUT_SECONDS
         )

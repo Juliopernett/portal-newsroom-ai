@@ -94,5 +94,8 @@ class PublicationRequestOut(BaseModel):
     categoria_editorial: str | None
     etiquetas_editorial: tuple[str, ...] | None
     slug_editorial: str | None
+    meta_titulo_editorial: str | None
+    meta_descripcion_editorial: str | None
+    frase_clave_editorial: str | None
     preparacion_ia_estado: EstadoPreparacionIA
     preparacion_ia_error: str | None

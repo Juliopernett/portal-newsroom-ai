@@ -184,6 +184,37 @@ def test_construir_contenido_operador_titulo_wins_over_titulo_editorial() -> Non
     assert contenido["title"] == "Título del operador"
 
 
+def test_construir_contenido_includes_yoast_meta_when_seo_fields_set() -> None:
+    solicitud = _solicitud(
+        contenido_editorial="Cuerpo reescrito",
+        titulo_editorial="Titular IA",
+        preparacion_ia_estado=EstadoPreparacionIA.PROCESADO,
+        meta_titulo_editorial="Meta título SEO",
+        meta_descripcion_editorial="Meta descripción SEO.",
+        frase_clave_editorial="frase clave",
+    )
+
+    contenido = construir_contenido_wordpress(solicitud)
+
+    assert contenido["meta"] == {
+        "_yoast_wpseo_title": "Meta título SEO",
+        "_yoast_wpseo_metadesc": "Meta descripción SEO.",
+        "_yoast_wpseo_focuskw": "frase clave",
+    }
+
+
+def test_construir_contenido_omits_meta_when_no_seo_fields_set() -> None:
+    solicitud = _solicitud(
+        contenido_editorial="Cuerpo reescrito",
+        titulo_editorial="Titular IA",
+        preparacion_ia_estado=EstadoPreparacionIA.PROCESADO,
+    )
+
+    contenido = construir_contenido_wordpress(solicitud)
+
+    assert "meta" not in contenido
+
+
 def test_construir_contenido_ignores_editorial_fields_when_fallido() -> None:
     solicitud = _solicitud(
         texto="Texto crudo",

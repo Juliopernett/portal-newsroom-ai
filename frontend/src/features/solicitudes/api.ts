@@ -25,6 +25,9 @@ export interface Solicitud {
   categoria_editorial: string | null
   etiquetas_editorial: string[] | null
   slug_editorial: string | null
+  meta_titulo_editorial: string | null
+  meta_descripcion_editorial: string | null
+  frase_clave_editorial: string | null
   preparacion_ia_estado: EstadoPreparacionIA
   preparacion_ia_error: string | null
 }

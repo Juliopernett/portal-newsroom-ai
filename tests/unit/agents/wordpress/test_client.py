@@ -105,6 +105,11 @@ def test_create_draft_forwards_optional_fields_as_wordpress_ids() -> None:
                 "categories": ["7"],
                 "tags": ["3", "9"],
                 "featured_media": "12",
+                "meta": {
+                    "_yoast_wpseo_title": "Meta título",
+                    "_yoast_wpseo_metadesc": "Meta descripción",
+                    "_yoast_wpseo_focuskw": "frase clave",
+                },
             }
         )
 
@@ -114,6 +119,11 @@ def test_create_draft_forwards_optional_fields_as_wordpress_ids() -> None:
     assert kwargs["json"]["categories"] == [7]
     assert kwargs["json"]["tags"] == [3, 9]
     assert kwargs["json"]["featured_media"] == 12
+    assert kwargs["json"]["meta"] == {
+        "_yoast_wpseo_title": "Meta título",
+        "_yoast_wpseo_metadesc": "Meta descripción",
+        "_yoast_wpseo_focuskw": "frase clave",
+    }
 
 
 def test_create_draft_omits_optional_fields_when_absent() -> None:

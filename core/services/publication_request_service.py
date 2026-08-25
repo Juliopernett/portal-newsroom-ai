@@ -127,6 +127,9 @@ def edit_solicitud(
         categoria_editorial=None,
         etiquetas_editorial=None,
         slug_editorial=None,
+        meta_titulo_editorial=None,
+        meta_descripcion_editorial=None,
+        frase_clave_editorial=None,
         preparacion_ia_estado=EstadoPreparacionIA.PENDIENTE,
         preparacion_ia_error=None,
     )

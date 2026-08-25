@@ -36,30 +36,65 @@ from core.ports.cms_publisher import CategoriaCMS
 _ERROR_MAX_CHARS = 2000
 
 _SYSTEM_PROMPT = """\
-Eres un editor periodístico de Portal Vallenato, un medio de noticias del \
-género vallenato. Tu trabajo es tomar un texto recibido tal cual (a veces \
-por WhatsApp, con errores de tipeo, sin estructura) y convertirlo en una \
-noticia publicable, sin cambiar lo que dice.
+Eres un editor periodístico y de SEO de Portal Vallenato, un medio de \
+noticias del género vallenato. Tu trabajo es tomar un texto recibido tal \
+cual (a veces por WhatsApp, con errores de tipeo, sin estructura) y \
+convertirlo en una noticia publicable ya optimizada para buscadores, sin \
+cambiar lo que dice.
 
 Reglas absolutas, sin excepción:
 - Nunca agregues fechas, cifras, lugares, nombres, declaraciones, citas \
 ni ningún otro hecho que no esté explícitamente en el texto original. \
 Ante la duda, conserva la redacción original literal en vez de asumir o \
-completar información.
+completar información. Esto aplica también al SEO: la frase clave y la \
+meta descripción deben describir lo que el texto realmente dice, nunca \
+inventar un ángulo o dato que no esté ahí.
 - No inventes contexto biográfico ni antecedentes que el texto no da.
 - Corrige ortografía y puntuación, separa párrafos, elimina repeticiones \
 evidentes, mejora la claridad y dale estructura periodística — pero el \
 sentido y los hechos deben ser exactamente los del texto original.
+- Extensión del cuerpo: Yoast SEO (el plugin de este sitio) marca en rojo \
+cualquier artículo de menos de 300 palabras, así que ese es el largo \
+ideal — pero SOLO se logra desarrollando mejor lo que el texto original \
+ya cuenta (contexto de la frase, transiciones, un cierre), nunca \
+inventando declaraciones, cifras o hechos nuevos para rellenar. Si el \
+texto original es muy breve y no da para 300 palabras sin inventar, \
+prioriza siempre la fidelidad a los hechos sobre la extensión — un \
+artículo corto pero honesto es mejor que uno largo con datos inventados.
 - La categoría debe ser una de las categorías existentes que se te dan, \
 o null si ninguna encaja bien — nunca inventes una categoría nueva.
 - El slug debe ser corto, en minúsculas, con palabras separadas por \
 guiones, sin tildes ni caracteres especiales.
+- Etiquetas: propone entre 2 y 6, casi nunca dejes el array vacío — usa \
+nombres propios (artistas, lugares, eventos) y temas mencionados \
+explícitamente en el texto. Solo va vacío si el texto es demasiado corto \
+o genérico para identificar ninguna.
+- Frase clave (SEO): la frase de 2 a 4 palabras que mejor resume de qué \
+trata la noticia — normalmente el nombre del artista/evento principal. \
+Debe aparecer también dentro del meta título, la meta descripción y el \
+primer párrafo del cuerpo — así es como Yoast la reconoce como relevante.
+- Meta descripción (SEO): entre 120 y 156 caracteres (ni más corta ni más \
+larga — Yoast marca ambos casos como problema), resumen atractivo pero \
+fiel al contenido, sin relleno ni clickbait, incluyendo la frase clave.
+- Meta título (SEO): como el titular, pero pensado para el buscador — \
+máximo 60 caracteres (Yoast lo corta después de eso en los resultados de \
+Google), con la frase clave cerca del inicio si es natural hacerlo.
 """
 
 
 @dataclass(frozen=True, slots=True)
 class ContenidoEditorial:
-    """The AI's proposed rewrite of a solicitud, ready to hand to WordPress."""
+    """The AI's proposed rewrite of a solicitud, ready to hand to WordPress.
+
+    `meta_titulo`/`meta_descripcion`/`frase_clave` (Sprint — SEO real,
+    2026-08-25) feed Yoast SEO's own fields (`_yoast_wpseo_title`/
+    `_yoast_wpseo_metadesc`/`_yoast_wpseo_focuskw`) — confirmed
+    REST-settable on this WordPress install (`show_in_rest: true` on all
+    three, checked via `wp eval` against the live site, 2026-08-25) —
+    rather than leaving every AI-prepared draft with Yoast's own
+    "necesita mejorar" score, the same gap every other solicitud already
+    published manually has.
+    """
 
     titulo: str
     entradilla: str
@@ -67,6 +102,9 @@ class ContenidoEditorial:
     categoria: str | None
     etiquetas: tuple[str, ...]
     slug: str
+    meta_titulo: str
+    meta_descripcion: str
+    frase_clave: str
 
 
 class EditorialAIError(RuntimeError):
@@ -102,8 +140,21 @@ def _construir_json_schema(categorias_existentes: list[str]) -> dict[str, Any]:
             },
             "etiquetas": {"type": "array", "items": {"type": "string", "minLength": 1}},
             "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+            "meta_titulo": {"type": "string", "minLength": 1, "maxLength": 60},
+            "meta_descripcion": {"type": "string", "minLength": 1, "maxLength": 156},
+            "frase_clave": {"type": "string", "minLength": 1},
         },
-        "required": ["titulo", "entradilla", "contenido", "categoria", "etiquetas", "slug"],
+        "required": [
+            "titulo",
+            "entradilla",
+            "contenido",
+            "categoria",
+            "etiquetas",
+            "slug",
+            "meta_titulo",
+            "meta_descripcion",
+            "frase_clave",
+        ],
         "additionalProperties": False,
     }
 
@@ -128,10 +179,14 @@ def _construir_prompt(solicitud: PublicationRequest, categorias_existentes: list
         "con exactamente estas claves:\n"
         '- "titulo": string, el titular\n'
         '- "entradilla": string, una breve introducción que contextualice la noticia\n'
-        '- "contenido": string, el cuerpo de la noticia ya reescrito\n'
+        '- "contenido": string, el cuerpo de la noticia ya reescrito (apunta a ~300 '
+        "palabras sin inventar nada, ver regla de extensión arriba)\n"
         '- "categoria": string (una de las categorías existentes de arriba) o null\n'
-        '- "etiquetas": array de strings\n'
+        '- "etiquetas": array de strings (2 a 6, casi nunca vacío)\n'
         '- "slug": string, en minúsculas y con guiones\n'
+        '- "meta_titulo": string, título SEO (máx. 60 caracteres)\n'
+        '- "meta_descripcion": string, meta descripción SEO (120 a 156 caracteres)\n'
+        '- "frase_clave": string, la frase clave SEO de 2 a 4 palabras\n'
         "No omitas ninguna clave — si un campo no aplica, usa un string vacío "
         "o null según corresponda, nunca la omitas."
     )
@@ -173,13 +228,29 @@ def generar_contenido_editorial(
     etiquetas = tuple(str(e) for e in etiquetas_valor) if isinstance(etiquetas_valor, list) else ()
     categoria = datos.get("categoria")
     slug = datos.get("slug")
+    entradilla = str(datos.get("entradilla") or "")
+    meta_titulo = datos.get("meta_titulo")
+    meta_descripcion = datos.get("meta_descripcion")
+    frase_clave = datos.get("frase_clave")
     return ContenidoEditorial(
         titulo=titulo,
-        entradilla=str(datos.get("entradilla") or ""),
+        entradilla=entradilla,
         contenido=contenido,
         categoria=str(categoria) if isinstance(categoria, str) and categoria else None,
         etiquetas=etiquetas,
         slug=str(slug) if isinstance(slug, str) and slug else _slug_basico(titulo),
+        # Los tres campos de SEO son "buenos tener", no indispensables —
+        # si el proveedor los omite, se derivan de lo que ya generó en vez
+        # de descartar la reescritura (misma filosofía que entradilla/slug
+        # arriba). meta_titulo/meta_descripcion se truncan al límite que
+        # Yoast SEO realmente respeta (60 / 156 caracteres).
+        meta_titulo=str(meta_titulo)[:60] if isinstance(meta_titulo, str) and meta_titulo else titulo[:60],
+        meta_descripcion=(
+            str(meta_descripcion)[:156]
+            if isinstance(meta_descripcion, str) and meta_descripcion
+            else (entradilla or contenido)[:156]
+        ),
+        frase_clave=str(frase_clave) if isinstance(frase_clave, str) and frase_clave else "",
     )
 
 
@@ -202,6 +273,9 @@ def aplicar_preparacion_exitosa(
         categoria_editorial=contenido.categoria,
         etiquetas_editorial=contenido.etiquetas,
         slug_editorial=contenido.slug,
+        meta_titulo_editorial=contenido.meta_titulo,
+        meta_descripcion_editorial=contenido.meta_descripcion,
+        frase_clave_editorial=contenido.frase_clave,
         preparacion_ia_estado=EstadoPreparacionIA.PROCESADO,
         preparacion_ia_error=None,
     )

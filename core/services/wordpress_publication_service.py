@@ -60,6 +60,20 @@ def construir_contenido_wordpress(solicitud: PublicationRequest) -> dict[str, An
             content["excerpt"] = solicitud.entradilla_editorial
         if solicitud.slug_editorial:
             content["slug"] = solicitud.slug_editorial
+        # Yoast SEO's own fields (confirmed REST-settable on the live
+        # WordPress site — show_in_rest=true on all three, checked via
+        # `wp eval`, 2026-08-25) — feeds the exact same score Yoast shows
+        # for every manually-published post, instead of leaving every
+        # AI-prepared draft flagged "necesita mejorar".
+        meta: dict[str, str] = {}
+        if solicitud.meta_titulo_editorial:
+            meta["_yoast_wpseo_title"] = solicitud.meta_titulo_editorial
+        if solicitud.meta_descripcion_editorial:
+            meta["_yoast_wpseo_metadesc"] = solicitud.meta_descripcion_editorial
+        if solicitud.frase_clave_editorial:
+            meta["_yoast_wpseo_focuskw"] = solicitud.frase_clave_editorial
+        if meta:
+            content["meta"] = meta
         return content
     return {
         "title": solicitud.titulo or solicitud.texto[:60],

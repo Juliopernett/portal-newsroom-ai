@@ -26,6 +26,9 @@ _RESPUESTA_VALIDA = json.dumps(
         "categoria": "Noticias",
         "etiquetas": ["vallenato", "lanzamiento"],
         "slug": "titular-generado",
+        "meta_titulo": "Titular generado — SEO",
+        "meta_descripcion": "Meta descripción generada para el buscador.",
+        "frase_clave": "titular generado",
     }
 )
 
@@ -70,6 +73,9 @@ def test_generar_contenido_editorial_returns_parsed_result() -> None:
         categoria="Noticias",
         etiquetas=("vallenato", "lanzamiento"),
         slug="titular-generado",
+        meta_titulo="Titular generado — SEO",
+        meta_descripcion="Meta descripción generada para el buscador.",
+        frase_clave="titular generado",
     )
 
 
@@ -132,6 +138,51 @@ def test_generar_contenido_editorial_defaults_optional_fields_when_missing() -> 
     assert resultado.categoria is None
     assert resultado.etiquetas == ()
     assert resultado.slug == "un-titular-cualquiera"
+    assert resultado.meta_titulo == "Un titular cualquiera"
+    assert resultado.meta_descripcion == "Cuerpo."
+    assert resultado.frase_clave == ""
+
+
+def test_generar_contenido_editorial_uses_provided_seo_fields_when_present() -> None:
+    provider = _FakeAIProvider(
+        respuesta=json.dumps(
+            {
+                "titulo": "Titular",
+                "contenido": "Cuerpo.",
+                "meta_titulo": "Meta título elegido por la IA",
+                "meta_descripcion": "Meta descripción elegida por la IA.",
+                "frase_clave": "frase clave elegida",
+            }
+        )
+    )
+
+    resultado = generar_contenido_editorial(_solicitud(), [], provider)
+
+    assert resultado.meta_titulo == "Meta título elegido por la IA"
+    assert resultado.meta_descripcion == "Meta descripción elegida por la IA."
+    assert resultado.frase_clave == "frase clave elegida"
+
+
+def test_generar_contenido_editorial_truncates_an_oversized_meta_titulo() -> None:
+    provider = _FakeAIProvider(
+        respuesta=json.dumps({"titulo": "Titular", "contenido": "Cuerpo.", "meta_titulo": "x" * 100})
+    )
+
+    resultado = generar_contenido_editorial(_solicitud(), [], provider)
+
+    assert len(resultado.meta_titulo) == 60
+
+
+def test_generar_contenido_editorial_truncates_an_oversized_meta_descripcion() -> None:
+    provider = _FakeAIProvider(
+        respuesta=json.dumps(
+            {"titulo": "Titular", "contenido": "Cuerpo.", "meta_descripcion": "x" * 300}
+        )
+    )
+
+    resultado = generar_contenido_editorial(_solicitud(), [], provider)
+
+    assert len(resultado.meta_descripcion) == 156
 
 
 def test_generar_contenido_editorial_uses_provided_slug_when_present() -> None:
@@ -155,6 +206,9 @@ def test_aplicar_preparacion_exitosa_populates_editorial_fields() -> None:
         categoria="Noticias",
         etiquetas=("a", "b"),
         slug="t",
+        meta_titulo="MT",
+        meta_descripcion="MD",
+        frase_clave="FC",
     )
 
     actualizada = aplicar_preparacion_exitosa(solicitud, contenido)
@@ -162,6 +216,9 @@ def test_aplicar_preparacion_exitosa_populates_editorial_fields() -> None:
     assert actualizada.contenido_editorial == "C"
     assert actualizada.titulo_editorial == "T"
     assert actualizada.etiquetas_editorial == ("a", "b")
+    assert actualizada.meta_titulo_editorial == "MT"
+    assert actualizada.meta_descripcion_editorial == "MD"
+    assert actualizada.frase_clave_editorial == "FC"
     assert actualizada.preparacion_ia_estado.value == "procesado"
     assert actualizada.preparacion_ia_error is None
     # original untouched

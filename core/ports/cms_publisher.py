@@ -58,10 +58,12 @@ class CMSPublisher(Protocol):
         `content` may include, besides the always-required `title`/
         `content`: `excerpt`, `slug`, `categories` (a list of
         `CategoriaCMS.id`), `tags` (a list of ids from
-        `resolver_o_crear_etiqueta`), and `featured_media` (an id from
-        `subir_media`) — every one of these is optional, so a caller that
-        only has raw text still gets a plain draft exactly as before this
-        contract grew.
+        `resolver_o_crear_etiqueta`), `featured_media` (an id from
+        `subir_media`), and `meta` (a `dict[str, str]` of CMS-specific
+        meta keys — e.g. Yoast SEO's `_yoast_wpseo_title`/`_metadesc`/
+        `_focuskw` on the WordPress adapter) — every one of these is
+        optional, so a caller that only has raw text still gets a plain
+        draft exactly as before this contract grew.
         """
         ...
 

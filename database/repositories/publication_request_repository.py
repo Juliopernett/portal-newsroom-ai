@@ -43,6 +43,9 @@ def _to_model(solicitud: PublicationRequest) -> PublicationRequestModel:
             else None
         ),
         slug_editorial=solicitud.slug_editorial,
+        meta_titulo_editorial=solicitud.meta_titulo_editorial,
+        meta_descripcion_editorial=solicitud.meta_descripcion_editorial,
+        frase_clave_editorial=solicitud.frase_clave_editorial,
         preparacion_ia_estado=solicitud.preparacion_ia_estado.value,
         preparacion_ia_error=solicitud.preparacion_ia_error,
     )
@@ -81,6 +84,9 @@ def _to_domain(model: PublicationRequestModel) -> PublicationRequest:
             else None
         ),
         slug_editorial=model.slug_editorial,
+        meta_titulo_editorial=model.meta_titulo_editorial,
+        meta_descripcion_editorial=model.meta_descripcion_editorial,
+        frase_clave_editorial=model.frase_clave_editorial,
         preparacion_ia_estado=EstadoPreparacionIA(model.preparacion_ia_estado),
         preparacion_ia_error=model.preparacion_ia_error,
     )

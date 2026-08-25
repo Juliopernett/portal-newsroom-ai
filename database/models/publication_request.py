@@ -56,6 +56,9 @@ class PublicationRequestModel(Base):
     categoria_editorial: Mapped[str | None] = mapped_column(String, nullable=True)
     etiquetas_editorial: Mapped[str | None] = mapped_column(String, nullable=True)
     slug_editorial: Mapped[str | None] = mapped_column(String, nullable=True)
+    meta_titulo_editorial: Mapped[str | None] = mapped_column(String(70), nullable=True)
+    meta_descripcion_editorial: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    frase_clave_editorial: Mapped[str | None] = mapped_column(String(100), nullable=True)
     preparacion_ia_estado: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pendiente"
     )

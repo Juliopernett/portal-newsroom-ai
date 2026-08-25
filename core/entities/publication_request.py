@@ -109,6 +109,12 @@ class PublicationRequest:
     categoria_editorial: str | None = None
     etiquetas_editorial: tuple[str, ...] | None = None
     slug_editorial: str | None = None
+    # SEO real (Sprint 2026-08-25) — feed Yoast SEO's own fields
+    # (_yoast_wpseo_title/_metadesc/_focuskw) instead of leaving every
+    # AI-prepared draft with Yoast's "necesita mejorar" score.
+    meta_titulo_editorial: str | None = None
+    meta_descripcion_editorial: str | None = None
+    frase_clave_editorial: str | None = None
     preparacion_ia_estado: EstadoPreparacionIA = EstadoPreparacionIA.PENDIENTE
     preparacion_ia_error: str | None = None
 
