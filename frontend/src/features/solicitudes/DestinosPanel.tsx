@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ListChecks } from 'lucide-react'
 import { toast } from 'sonner'
@@ -352,15 +352,16 @@ export function DestinosPanel({
 
   const destinosQuery = useQuery({ queryKey: key, queryFn: () => solicitudesApi.listDestinos(solicitudId) })
 
-  function onChanged() {
-    queryClient.invalidateQueries({ queryKey: key })
+  const onChanged = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['destinos', solicitudId] })
     queryClient.invalidateQueries({ queryKey: ['reporte', solicitudId] })
     // Confirming/cancelling a destino can complete the solicitud (moves
     // it to Publicadas) and consume Pauta quota — same "heavy refresh"
-    // the legacy app does after these two actions.
+    // the legacy app does after these two actions. The silent WordPress
+    // auto-sync below reuses this too, for the same reason.
     queryClient.invalidateQueries({ queryKey: ['solicitudes-kanban'] })
     queryClient.invalidateQueries({ queryKey: ['pautas'] })
-  }
+  }, [queryClient, solicitudId])
 
   const addMutation = useMutation({
     mutationFn: (c: CanalPublicacion) => solicitudesApi.addDestino(solicitudId, c),
@@ -393,10 +394,8 @@ export function DestinosPanel({
     if (aSincronizar.length === 0) return
     Promise.allSettled(
       aSincronizar.map((d) => solicitudesApi.sincronizarWordpress(solicitudId, d.id)),
-    ).then(() => {
-      queryClient.invalidateQueries({ queryKey: key })
-    })
-  }, [destinosQuery.data, solicitudId])
+    ).then(onChanged)
+  }, [destinosQuery.data, solicitudId, onChanged])
 
   const destinos = destinosQuery.data ?? []
   // Un destino cancelado nunca vuelve a publicarse (marcar_publicado lo
