@@ -112,7 +112,18 @@ class WordPressCMSPublisher:
         return [CategoriaCMS(id=str(c["id"]), nombre=c["name"]) for c in response.json()]
 
     def resolver_o_crear_etiqueta(self, nombre: str) -> str:
-        """Return the id of the WordPress tag named `nombre`, creating it if needed."""
+        """Return the id of the WordPress tag named `nombre`, creating it if needed.
+
+        WordPress's own tag search (`search=`) is a best-effort text match, not a
+        guaranteed lookup — confirmed live (2026-08-25) that creating a tag whose
+        name/slug already exists, even when the prior search somehow missed it,
+        makes WordPress reject the `POST` with `400 {"code": "term_exists",
+        "data": {"term_id": ...}}` rather than silently reusing it. That id is
+        exactly what this method needs, so a `term_exists` conflict is treated as
+        a successful resolution instead of an error — the real failure mode this
+        guards against is `preparar_y_crear_borrador` aborting an otherwise-fine
+        draft over a tag WordPress already has.
+        """
         busqueda = requests.get(
             self._tags_url,
             params={"search": nombre},
@@ -131,6 +142,12 @@ class WordPressCMSPublisher:
             auth=self._auth,
             timeout=_REQUEST_TIMEOUT_SECONDS,
         )
+        if creacion.status_code == 400:
+            datos_error = creacion.json()
+            if datos_error.get("code") == "term_exists":
+                term_id = datos_error.get("data", {}).get("term_id")
+                if term_id is not None:
+                    return str(term_id)
         creacion.raise_for_status()
         return str(creacion.json()["id"])
 

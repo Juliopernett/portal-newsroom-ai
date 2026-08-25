@@ -12,7 +12,7 @@ from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicaci
 from core.entities.media_asset import MediaAsset, MediaAssetType
 from core.entities.publication_request import EstadoPreparacionIA, PublicationRequest
 from core.ports.ai_provider import AIProviderError
-from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult
+from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult, ConsultaPostCMS, EstadoPostCMS
 from core.services.wordpress_publication_service import (
     construir_contenido_wordpress,
     crear_borrador,
@@ -64,6 +64,9 @@ class _FakeCMSPublisher:
     def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
         self.media_subida.append((nombre_archivo, content_type, len(contenido)))
         return "media-1"
+
+    def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
+        return ConsultaPostCMS(estado=EstadoPostCMS.BORRADOR, url=None, fecha_publicacion=None)
 
 
 class _FakeAIProvider:
@@ -316,6 +319,24 @@ def test_preparar_y_crear_borrador_uses_editorial_content_on_ai_success() -> Non
     assert publisher.contenido_recibido["content"] == "Cuerpo reescrito."
     assert publisher.contenido_recibido["categories"] == ["7"]
     assert publisher.etiquetas_resueltas == ["vallenato"]
+
+
+def test_preparar_y_crear_borrador_discards_blank_etiquetas_before_resolving() -> None:
+    """Reproduced live (2026-08-25): a blank etiqueta reaching WordPress raises
+    `400 empty_term_name` and aborts the whole draft — must be filtered out
+    before ever calling `resolver_o_crear_etiqueta`."""
+    solicitud = _solicitud(
+        preparacion_ia_estado=EstadoPreparacionIA.PROCESADO,
+        titulo_editorial="Titular",
+        contenido_editorial="Cuerpo.",
+        etiquetas_editorial=("vallenato", "", "   ", "Karen Lizarazo"),
+    )
+    destino = _destino()
+    publisher = _FakeCMSPublisher(resultado=CMSDraftResult(post_id="1", url="https://example.com/?p=1"))
+
+    preparar_y_crear_borrador(destino, solicitud, [], _FakeAIProvider(), publisher, _FakeMediaStorage())
+
+    assert publisher.etiquetas_resueltas == ["vallenato", "Karen Lizarazo"]
 
 
 def test_preparar_y_crear_borrador_omits_category_when_no_match() -> None:

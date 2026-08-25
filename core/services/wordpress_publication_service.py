@@ -196,9 +196,15 @@ def preparar_y_crear_borrador(
             if coincidencia is not None:
                 content["categories"] = [coincidencia.id]
         if solicitud.etiquetas_editorial:
+            # Una etiqueta en blanco es un dato inválido de la IA, no una
+            # etiqueta real que WordPress pueda crear — se descarta antes de
+            # llegar a `resolver_o_crear_etiqueta` en vez de reventar el
+            # borrador entero por un `400 empty_term_name` de WordPress
+            # (reproducido en vivo, 2026-08-25).
             content["tags"] = [
                 cms_publisher.resolver_o_crear_etiqueta(nombre)
                 for nombre in solicitud.etiquetas_editorial
+                if nombre and nombre.strip()
             ]
 
     imagen = _primera_imagen(media_assets)

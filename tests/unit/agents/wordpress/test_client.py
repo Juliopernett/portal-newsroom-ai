@@ -190,6 +190,51 @@ def test_resolver_o_crear_etiqueta_creates_a_new_tag_when_not_found() -> None:
     assert kwargs["json"] == {"name": "nueva-etiqueta"}
 
 
+def test_resolver_o_crear_etiqueta_reuses_the_term_id_wordpress_reports_on_a_conflict() -> None:
+    """Reproduced live against the real site (2026-08-25): creating a tag whose
+    name/slug already exists returns 400 term_exists with the existing term_id
+    in the error body, even though the prior search call missed it — this must
+    resolve to that id instead of raising and aborting the whole draft."""
+    publisher = WordPressCMSPublisher(_settings())
+    mock_search = MagicMock()
+    mock_search.json.return_value = []
+    mock_create = MagicMock()
+    mock_create.status_code = 400
+    mock_create.json.return_value = {
+        "code": "term_exists",
+        "message": "Ya existe en esta taxonomía un término con el nombre y el slug facilitados.",
+        "data": {"status": 400, "term_id": 572},
+    }
+
+    with patch("agents.wordpress.client.requests.get", return_value=mock_search):
+        with patch(
+            "agents.wordpress.client.requests.post", return_value=mock_create
+        ) as mock_post:
+            resultado = publisher.resolver_o_crear_etiqueta("Karen Lizarazo")
+
+    assert resultado == "572"
+    mock_create.raise_for_status.assert_not_called()
+    _args, kwargs = mock_post.call_args
+    assert kwargs["json"] == {"name": "Karen Lizarazo"}
+
+
+def test_resolver_o_crear_etiqueta_raises_on_a_400_that_is_not_term_exists() -> None:
+    import requests
+
+    publisher = WordPressCMSPublisher(_settings())
+    mock_search = MagicMock()
+    mock_search.json.return_value = []
+    mock_create = MagicMock()
+    mock_create.status_code = 400
+    mock_create.json.return_value = {"code": "empty_term_name", "message": "..."}
+    mock_create.raise_for_status.side_effect = requests.HTTPError("400 Bad Request")
+
+    with patch("agents.wordpress.client.requests.get", return_value=mock_search):
+        with patch("agents.wordpress.client.requests.post", return_value=mock_create):
+            with pytest.raises(requests.HTTPError):
+                publisher.resolver_o_crear_etiqueta("")
+
+
 def test_subir_media_sends_content_disposition_and_returns_id() -> None:
     publisher = WordPressCMSPublisher(_settings())
     mock_response = MagicMock()
