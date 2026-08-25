@@ -18,7 +18,7 @@ from app.api.dependencies import get_ai_provider, get_cms_publisher
 from app.api.main import app
 from config.settings import Settings
 from core.ports.ai_provider import AIProviderError
-from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult
+from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult, ConsultaPostCMS, EstadoPostCMS
 
 
 class _FakeCMSPublisher:
@@ -38,6 +38,11 @@ class _FakeCMSPublisher:
         self.contenido_recibido: dict[str, Any] | None = None
         self.etiquetas_resueltas: list[str] = []
         self.media_subida: list[tuple[str, str, int]] = []
+        # Sprint 2026-08-24 — sincronización de estado. Por defecto reporta
+        # que el post sigue en borrador, como cualquier draft recién creado.
+        self.consulta_estado = ConsultaPostCMS(
+            estado=EstadoPostCMS.BORRADOR, url=None, fecha_publicacion=None
+        )
 
     def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:
         if self.error is not None:
@@ -56,6 +61,9 @@ class _FakeCMSPublisher:
     def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
         self.media_subida.append((nombre_archivo, content_type, len(contenido)))
         return "media-1"
+
+    def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
+        return self.consulta_estado
 
 
 @pytest.fixture
@@ -347,6 +355,123 @@ def test_crear_borrador_wordpress_rejects_a_non_wordpress_destino(
     )
 
     assert response.status_code == 422
+
+
+def test_sincronizar_wordpress_marca_publicado_cuando_wordpress_lo_reporta(
+    client: TestClient, fake_cms_publisher: _FakeCMSPublisher
+) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
+    )
+    fake_cms_publisher.consulta_estado = ConsultaPostCMS(
+        estado=EstadoPostCMS.PUBLICADO,
+        url="https://www.portalvallenato.com/nota-real/",
+        fecha_publicacion=None,
+    )
+
+    response = client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/sincronizar-wordpress"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["estado"] == "publicado"
+    assert body["wp_url"] == "https://www.portalvallenato.com/nota-real/"
+    assert body["fecha_publicacion"] is not None
+    # nadie hizo clic en "Confirmar" a mano — lo detectó la sincronización
+    assert body["registrado_por_user_id"] is None
+
+
+def test_sincronizar_wordpress_no_cambia_nada_si_sigue_en_borrador(
+    client: TestClient, fake_cms_publisher: _FakeCMSPublisher
+) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
+    )
+
+    response = client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/sincronizar-wordpress"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["estado"] == "pendiente"
+
+
+def test_sincronizar_wordpress_marca_fallido_cuando_el_post_esta_en_la_papelera(
+    client: TestClient, fake_cms_publisher: _FakeCMSPublisher
+) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
+    )
+    fake_cms_publisher.consulta_estado = ConsultaPostCMS(
+        estado=EstadoPostCMS.ELIMINADO, url=None, fecha_publicacion=None
+    )
+
+    response = client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/sincronizar-wordpress"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["estado"] == "fallido"
+    assert "papelera" in (body["ultimo_error"] or "")
+
+
+def test_sincronizar_wordpress_completa_la_solicitud_cuando_detecta_publicacion(
+    client: TestClient, fake_cms_publisher: _FakeCMSPublisher
+) -> None:
+    """La sincronización debe recomputar esta_completa/fecha_cierre igual
+    que confirmar-publicacion — si este era el único destino, la solicitud
+    debe pasar a completa sin que el operador toque nada más."""
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+    destino_id = client.post(
+        f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
+    ).json()["id"]
+    client.post(
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
+    )
+    fake_cms_publisher.consulta_estado = ConsultaPostCMS(
+        estado=EstadoPostCMS.PUBLICADO, url="https://www.portalvallenato.com/nota-real/", fecha_publicacion=None
+    )
+
+    client.post(f"/publication-requests/{solicitud_id}/destinos/{destino_id}/sincronizar-wordpress")
+
+    solicitudes = client.get("/publication-requests", params={"completa": "true"}).json()
+    assert any(s["id"] == solicitud_id for s in solicitudes)
+
+
+def test_sincronizar_wordpress_returns_404_when_solicitud_not_found(
+    client: TestClient, fake_cms_publisher: _FakeCMSPublisher
+) -> None:
+    response = client.post(
+        "/publication-requests/no-existe/destinos/no-existe/sincronizar-wordpress"
+    )
+
+    assert response.status_code == 404
+
+
+def test_sincronizar_wordpress_returns_404_when_destino_not_found(
+    client: TestClient, fake_cms_publisher: _FakeCMSPublisher
+) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+
+    response = client.post(
+        f"/publication-requests/{solicitud_id}/destinos/no-existe/sincronizar-wordpress"
+    )
+
+    assert response.status_code == 404
 
 
 def test_confirmar_publicacion_registers_url_for_instagram(client: TestClient) -> None:

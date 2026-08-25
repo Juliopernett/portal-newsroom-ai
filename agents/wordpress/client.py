@@ -21,18 +21,20 @@ exist on the port at all instead of being called directly.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 import requests
 
 from config.settings import Settings
-from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult
+from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult, ConsultaPostCMS, EstadoPostCMS
 
 _REQUEST_TIMEOUT_SECONDS = 30
 # WordPress's own REST API cap on `per_page` — used to fetch categories in
 # one page. A site with more than 100 categories would need real
 # pagination, not expected for Portal Vallenato's taxonomy.
 _CATEGORIAS_POR_PAGINA = 100
+_CONSULTA_ERROR = ConsultaPostCMS(estado=EstadoPostCMS.ERROR, url=None, fecha_publicacion=None)
 
 
 class WordPressConfigurationError(RuntimeError):
@@ -151,3 +153,38 @@ class WordPressCMSPublisher:
         )
         response.raise_for_status()
         return str(response.json()["id"])
+
+    def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
+        """Return the real current state of a WordPress post.
+
+        `context=edit` is required for WordPress to return the post at all
+        while it's `draft`/`trash` (the default `context=view` only
+        returns `publish`ed posts) — same Application Password used
+        everywhere else in this adapter already has `edit_posts`
+        capability. Never raises: network errors, a 404 (post no longer
+        exists), and any other non-2xx all map to `EstadoPostCMS.ERROR`.
+        """
+        try:
+            response = requests.get(
+                f"{self._posts_url}/{post_id}",
+                params={"context": "edit"},
+                auth=self._auth,
+                timeout=_REQUEST_TIMEOUT_SECONDS,
+            )
+        except requests.RequestException:
+            return _CONSULTA_ERROR
+        if not response.ok:
+            return _CONSULTA_ERROR
+        data = response.json()
+        estado_wp = data.get("status")
+        if estado_wp == "publish":
+            fecha_gmt = data.get("date_gmt")
+            fecha_publicacion = (
+                datetime.fromisoformat(fecha_gmt).replace(tzinfo=UTC) if fecha_gmt else None
+            )
+            return ConsultaPostCMS(
+                estado=EstadoPostCMS.PUBLICADO, url=data.get("link"), fecha_publicacion=fecha_publicacion
+            )
+        if estado_wp == "trash":
+            return ConsultaPostCMS(estado=EstadoPostCMS.ELIMINADO, url=None, fecha_publicacion=None)
+        return ConsultaPostCMS(estado=EstadoPostCMS.BORRADOR, url=None, fecha_publicacion=None)

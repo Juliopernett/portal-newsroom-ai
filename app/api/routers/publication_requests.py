@@ -36,6 +36,17 @@ two recompute `esta_completa` across the solicitud's destinos and stamp
 `fecha_cierre` the first time it becomes true — see
 `core.services.publication_request_service.cerrar_si_completa`.
 
+`.../sincronizar-wordpress` (2026-08-24) reads the real state of a
+WordPress destino from the CMS itself (`core.services
+.destino_publicacion_service.sincronizar_estado_wordpress`) so the
+operator publishing directly in WordPress is, by itself, enough for
+Newsroom to detect it. The frontend calls it both silently (auto-sync on
+opening a solicitud) and as what the WordPress row's "Confirmar
+publicado" button now triggers — a real verification instead of the
+blind confirm it used to be. `confirmar-publicacion` itself is untouched
+and still the only path for Facebook/Instagram, which have no CMS to
+verify against.
+
 `GET /{request_id}/reporte` (Incremento 6) exposes
 `core.services.reporte_service.construir_reporte` — enlaces por
 plataforma, fecha de publicación, estado y si consumió cuota de Pauta.
@@ -101,6 +112,7 @@ from core.services.destino_publicacion_service import (
     corregir_enlace,
     marcar_publicado,
     puede_eliminarse_sin_afectar_completitud,
+    sincronizar_estado_wordpress,
 )
 from core.services.media_asset_service import (
     construir_storage_key,
@@ -429,6 +441,43 @@ def confirmar_publicacion_destino(
     uow.publication_requests.save(cerrada)
     uow.commit()
     return publicado
+
+
+@router.post(
+    "/{request_id}/destinos/{destino_id}/sincronizar-wordpress",
+    response_model=DestinoPublicacionOut,
+)
+def sincronizar_wordpress_destino(
+    request_id: str,
+    destino_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    cms_publisher: CMSPublisher = Depends(get_cms_publisher),
+) -> DestinoPublicacion:
+    """Reconcile a WordPress destino against its real state in WordPress (2026-08-24).
+
+    Runs `core.services.destino_publicacion_service.sincronizar_estado_wordpress`
+    — a read against the WordPress REST API, never a write. Used both as
+    the frontend's silent auto-sync when a solicitud is opened and as what
+    the "Confirmar publicado" button now calls for WordPress destinos
+    (real verification instead of a blind confirm). A no-op for any
+    non-WordPress destino or one without a `wp_post_id` yet. Recomputes
+    `esta_completa`/`fecha_cierre` the same way `confirmar_publicacion_destino`
+    does, in case this sync is what completes the solicitud.
+    """
+    solicitud = uow.publication_requests.get_by_id(request_id)
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    destinos = uow.destinos_publicacion.list_by_publication_request_id(request_id)
+    destino = next((d for d in destinos if d.id == destino_id), None)
+    if destino is None:
+        raise HTTPException(status_code=404, detail="DestinoPublicacion not found")
+    sincronizado = sincronizar_estado_wordpress(destino, cms_publisher)
+    destinos_actualizados = [sincronizado if d.id == destino_id else d for d in destinos]
+    cerrada = cerrar_si_completa(solicitud, destinos_actualizados)
+    uow.destinos_publicacion.save(sincronizado)
+    uow.publication_requests.save(cerrada)
+    uow.commit()
+    return sincronizado
 
 
 @router.patch(

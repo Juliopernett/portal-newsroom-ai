@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ListChecks } from 'lucide-react'
 import { toast } from 'sonner'
@@ -161,6 +161,24 @@ function DestinoRow({
     onError: (err) => toast.error(errorMessage(err)),
   })
 
+  // Sincronización con WordPress (2026-08-24): lo que el botón "Confirmar
+  // publicado" de la fila de WordPress dispara ahora — una verificación
+  // real contra el post, no una confirmación a ciegas.
+  const sincronizarMutation = useMutation({
+    mutationFn: () => solicitudesApi.sincronizarWordpress(solicitudId, destino.id),
+    onSuccess: (actualizado) => {
+      if (actualizado.estado === 'publicado') {
+        toast.success('Publicación confirmada — WordPress ya lo tiene publicado.')
+      } else if (actualizado.estado === 'fallido') {
+        toast.error(actualizado.ultimo_error ?? 'No se pudo sincronizar con WordPress.')
+      } else {
+        toast('Todavía sigue en borrador en WordPress.')
+      }
+      onChanged()
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
   const cancelarMutation = useMutation({
     mutationFn: () => solicitudesApi.cancelarDestino(solicitudId, destino.id),
     onSuccess: () => {
@@ -190,6 +208,7 @@ function DestinoRow({
   const acting =
     crearBorradorMutation.isPending ||
     confirmarMutation.isPending ||
+    sincronizarMutation.isPending ||
     cancelarMutation.isPending ||
     corregirEnlaceMutation.isPending
 
@@ -261,7 +280,7 @@ function DestinoRow({
             <a className="text-xs text-brand underline" href={destino.wp_url} target="_blank" rel="noopener">
               Ver borrador
             </a>
-            <Button size="sm" disabled={acting} onClick={() => confirmarMutation.mutate()}>
+            <Button size="sm" disabled={acting} onClick={() => sincronizarMutation.mutate()}>
               Confirmar publicado
             </Button>
           </>
@@ -353,6 +372,31 @@ export function DestinosPanel({
     },
     onError: (err) => toast.error(errorMessage(err)),
   })
+
+  // Auto-sync silencioso con WordPress al abrir la solicitud (2026-08-24):
+  // el operador ya viene a revisarla, así que aprovechamos esa visita para
+  // detectar solo si publicó directamente en WordPress, sin pedirle un
+  // clic aparte. Una vez por solicitudId (el ref evita repetirlo en cada
+  // refetch que dispara otra mutación) y solo para destinos de WordPress
+  // con wp_post_id y todavía no terminales — el resto es no-op en el
+  // backend de todas formas, pero evitar la llamada de una vez es más
+  // barato. Promise.allSettled: que un post falle no debe frenar a los
+  // demás; nada de esto muestra un toast, es la fila la que se repinta
+  // sola si algo cambió.
+  const sincronizadoParaRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!destinosQuery.data || sincronizadoParaRef.current === solicitudId) return
+    sincronizadoParaRef.current = solicitudId
+    const aSincronizar = destinosQuery.data.filter(
+      (d) => d.canal === 'wordpress' && d.wp_post_id && (d.estado === 'pendiente' || d.estado === 'fallido'),
+    )
+    if (aSincronizar.length === 0) return
+    Promise.allSettled(
+      aSincronizar.map((d) => solicitudesApi.sincronizarWordpress(solicitudId, d.id)),
+    ).then(() => {
+      queryClient.invalidateQueries({ queryKey: key })
+    })
+  }, [destinosQuery.data, solicitudId])
 
   const destinos = destinosQuery.data ?? []
   // Un destino cancelado nunca vuelve a publicarse (marcar_publicado lo

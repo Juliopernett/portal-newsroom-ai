@@ -24,10 +24,18 @@ no migration risk.
 can build a taxonomy-aware, illustrated draft without ever importing
 `agents.wordpress.client` directly — the orchestration stays testable
 with a fake, per docs/PROJECT_RULES.md rule 5.
+
+`consultar_estado_post` (Sprint 2026-08-24, sincronización de estado)
+lets `core.services.destino_publicacion_service.sincronizar_estado_wordpress`
+detect that an operator published a draft directly in the CMS, without
+this system ever issuing a publish command itself — still a pure read,
+same "never publish automatically" rule `create_draft` already follows.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
+from enum import StrEnum
 from typing import Any, NamedTuple, Protocol
 
 
@@ -43,6 +51,27 @@ class CategoriaCMS(NamedTuple):
 
     id: str
     nombre: str
+
+
+class EstadoPostCMS(StrEnum):
+    """The real, current state of a post in the CMS, as read back from it."""
+
+    BORRADOR = "borrador"
+    PUBLICADO = "publicado"
+    ELIMINADO = "eliminado"
+    ERROR = "error"
+
+
+class ConsultaPostCMS(NamedTuple):
+    """Result of asking the CMS for a post's real state.
+
+    `url`/`fecha_publicacion` are only ever populated when `estado` is
+    `PUBLICADO` — a draft, a trashed post, or an error carry neither.
+    """
+
+    estado: EstadoPostCMS
+    url: str | None
+    fecha_publicacion: datetime | None
 
 
 class CMSPublisher(Protocol):
@@ -90,5 +119,17 @@ class CMSPublisher(Protocol):
 
         The returned id is what `create_draft` expects as
         `featured_media`.
+        """
+        ...
+
+    def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
+        """Return the real current state of a post already created via create_draft.
+
+        Total — never raises. Any failure (network, credentials, the post
+        no longer existing, an unexpected response shape) is translated to
+        `EstadoPostCMS.ERROR` instead of propagating an exception, so a
+        caller never has to wrap this in try/except: an ERROR is itself
+        state information ("could not verify right now"), not a system
+        failure.
         """
         ...

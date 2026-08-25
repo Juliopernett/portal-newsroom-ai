@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
 from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
+from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult, ConsultaPostCMS, EstadoPostCMS
 from core.services.destino_publicacion_service import (
     cancelar,
     corregir_enlace,
@@ -14,8 +16,36 @@ from core.services.destino_publicacion_service import (
     marcar_fallido,
     marcar_publicado,
     puede_eliminarse_sin_afectar_completitud,
+    sincronizar_estado_wordpress,
     tiene_destino_social,
 )
+
+
+class _FakeCMSPublisherEstado:
+    """In-memory CMSPublisher stub — only `consultar_estado_post` matters here."""
+
+    def __init__(self, consulta: ConsultaPostCMS | None = None) -> None:
+        self._consulta = consulta
+        self.post_id_consultado: str | None = None
+        self.llamadas = 0
+
+    def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:  # pragma: no cover - unused here
+        raise NotImplementedError
+
+    def listar_categorias(self) -> list[CategoriaCMS]:  # pragma: no cover - unused here
+        return []
+
+    def resolver_o_crear_etiqueta(self, nombre: str) -> str:  # pragma: no cover - unused here
+        raise NotImplementedError
+
+    def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
+        raise NotImplementedError  # pragma: no cover - unused here
+
+    def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
+        self.llamadas += 1
+        self.post_id_consultado = post_id
+        assert self._consulta is not None
+        return self._consulta
 
 
 def _destino(**overrides: object) -> DestinoPublicacion:
@@ -357,3 +387,126 @@ def test_puede_eliminarse_es_true_cuando_ya_estaba_incompleta_sin_el() -> None:
         puede_eliminarse_sin_afectar_completitud(wordpress_pendiente, [instagram_pendiente])
         is True
     )
+
+
+def test_sincronizar_estado_wordpress_marca_publicado_cuando_wordpress_lo_reporta() -> None:
+    destino = _destino(wp_post_id="42", wp_url="https://example.com/?p=42")
+    fecha = datetime(2026, 8, 24, 12, 0, tzinfo=UTC)
+    cms = _FakeCMSPublisherEstado(
+        ConsultaPostCMS(
+            estado=EstadoPostCMS.PUBLICADO, url="https://example.com/nota-real/", fecha_publicacion=fecha
+        )
+    )
+
+    resultado = sincronizar_estado_wordpress(destino, cms)
+
+    assert resultado.estado == EstadoDestino.PUBLICADO
+    assert resultado.wp_url == "https://example.com/nota-real/"
+    assert resultado.fecha_publicacion == fecha
+    assert resultado.registrado_por_user_id is None
+
+
+def test_sincronizar_estado_wordpress_mantiene_wp_url_si_wordpress_no_da_link() -> None:
+    destino = _destino(wp_post_id="42", wp_url="https://example.com/?p=42")
+    cms = _FakeCMSPublisherEstado(
+        ConsultaPostCMS(estado=EstadoPostCMS.PUBLICADO, url=None, fecha_publicacion=datetime(2026, 8, 24, tzinfo=UTC))
+    )
+
+    resultado = sincronizar_estado_wordpress(destino, cms)
+
+    assert resultado.wp_url == "https://example.com/?p=42"
+
+
+def test_sincronizar_estado_wordpress_marca_fallido_cuando_esta_en_la_papelera() -> None:
+    destino = _destino(wp_post_id="42", wp_url="https://example.com/?p=42")
+    cms = _FakeCMSPublisherEstado(
+        ConsultaPostCMS(estado=EstadoPostCMS.ELIMINADO, url=None, fecha_publicacion=None)
+    )
+
+    resultado = sincronizar_estado_wordpress(destino, cms)
+
+    assert resultado.estado == EstadoDestino.FALLIDO
+    assert resultado.ultimo_error is not None
+    assert "papelera" in resultado.ultimo_error
+
+
+def test_sincronizar_estado_wordpress_registra_error_sin_tocar_estado_ni_wp_url() -> None:
+    """'post inexistente/error -> estado de error sin destruir información
+    existente': ni el estado ni wp_url se pierden, solo se anota
+    ultimo_error para dar visibilidad del intento fallido."""
+    destino = _destino(wp_post_id="42", wp_url="https://example.com/?p=42")
+    cms = _FakeCMSPublisherEstado(
+        ConsultaPostCMS(estado=EstadoPostCMS.ERROR, url=None, fecha_publicacion=None)
+    )
+
+    resultado = sincronizar_estado_wordpress(destino, cms)
+
+    assert resultado.estado == EstadoDestino.PENDIENTE
+    assert resultado.wp_url == "https://example.com/?p=42"
+    assert resultado.ultimo_error is not None
+
+
+def test_sincronizar_estado_wordpress_no_cambia_nada_si_sigue_en_borrador() -> None:
+    destino = _destino(wp_post_id="42", wp_url="https://example.com/?p=42")
+    cms = _FakeCMSPublisherEstado(
+        ConsultaPostCMS(estado=EstadoPostCMS.BORRADOR, url=None, fecha_publicacion=None)
+    )
+
+    resultado = sincronizar_estado_wordpress(destino, cms)
+
+    assert resultado == destino
+
+
+def test_sincronizar_estado_wordpress_es_no_op_sin_wp_post_id() -> None:
+    """Sin wp_post_id (borrador nunca creado) no hay nada que consultar —
+    ni siquiera se llama al CMS."""
+    destino = _destino()
+    cms = _FakeCMSPublisherEstado()
+
+    resultado = sincronizar_estado_wordpress(destino, cms)
+
+    assert resultado == destino
+    assert cms.llamadas == 0
+
+
+def test_sincronizar_estado_wordpress_es_no_op_para_canal_no_wordpress() -> None:
+    destino = _destino(canal=CanalPublicacion.FACEBOOK, url_publicacion="https://facebook.com/post/1")
+    cms = _FakeCMSPublisherEstado()
+
+    resultado = sincronizar_estado_wordpress(destino, cms)
+
+    assert resultado == destino
+    assert cms.llamadas == 0
+
+
+def test_sincronizar_estado_wordpress_es_no_op_si_ya_es_terminal() -> None:
+    """Un destino ya PUBLICADO o CANCELADO no necesita sincronizarse —
+    verificado con un fake que lanza si llega a llamarse, para probar que
+    el short-circuit ocurre antes de tocar el CMS."""
+    destino = _destino(
+        wp_post_id="42",
+        wp_url="https://example.com/?p=42",
+        estado=EstadoDestino.PUBLICADO,
+        fecha_publicacion=datetime(2026, 8, 24, tzinfo=UTC),
+    )
+    cms = _FakeCMSPublisherEstado()
+
+    resultado = sincronizar_estado_wordpress(destino, cms)
+
+    assert resultado == destino
+    assert cms.llamadas == 0
+
+
+def test_sincronizar_estado_wordpress_no_muta_el_original() -> None:
+    destino = _destino(wp_post_id="42", wp_url="https://example.com/?p=42")
+    cms = _FakeCMSPublisherEstado(
+        ConsultaPostCMS(
+            estado=EstadoPostCMS.PUBLICADO,
+            url="https://example.com/nota-real/",
+            fecha_publicacion=datetime(2026, 8, 24, tzinfo=UTC),
+        )
+    )
+
+    sincronizar_estado_wordpress(destino, cms)
+
+    assert destino.estado == EstadoDestino.PENDIENTE

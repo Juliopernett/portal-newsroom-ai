@@ -164,6 +164,15 @@ export const solicitudesApi = {
       preparacion_ia_estado: EstadoPreparacionIA
       preparacion_ia_error: string | null
     }>(`/publication-requests/${id}/destinos/${destinoId}/crear-borrador-wordpress`),
+  // Sincronización con el estado real de WordPress (2026-08-24): lectura
+  // pura contra la API REST de WordPress vía wp_post_id, nunca una orden
+  // de publicar. Se usa tanto en silencio (auto-sync al abrir la
+  // solicitud) como detrás del botón "Confirmar publicado" de la fila de
+  // WordPress, que dejó de marcar publicado a ciegas.
+  sincronizarWordpress: (id: string, destinoId: string) =>
+    api.post<DestinoPublicacion>(
+      `/publication-requests/${id}/destinos/${destinoId}/sincronizar-wordpress`,
+    ),
   confirmarDestino: (
     id: string,
     destinoId: string,

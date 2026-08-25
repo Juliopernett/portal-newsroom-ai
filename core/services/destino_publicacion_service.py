@@ -14,6 +14,10 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
+from core.ports.cms_publisher import CMSPublisher, EstadoPostCMS
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def marcar_publicado(
@@ -90,6 +94,58 @@ def corregir_enlace(
         url_publicacion=url_publicacion if url_publicacion is not None else destino.url_publicacion,
         meta_post_id=meta_post_id if meta_post_id is not None else destino.meta_post_id,
     )
+
+
+def sincronizar_estado_wordpress(
+    destino: DestinoPublicacion, cms_publisher: CMSPublisher
+) -> DestinoPublicacion:
+    """Return `destino` reconciled against WordPress's real, current state.
+
+    Sprint 2026-08-24 — lets the operator publish directly in WordPress
+    without a separate manual "Confirmar publicado" step in Newsroom being
+    the only way this system ever finds out. A no-op (no call to
+    `cms_publisher` at all) when there is nothing to sync: not a
+    WordPress destino, no `wp_post_id` yet (draft never created), or
+    already terminal (`PUBLICADO`/`CANCELADO` — nothing left to detect).
+
+    `CMSPublisher.consultar_estado_post` never raises, so every branch
+    here is a plain state mapping, never a try/except:
+    - `PUBLICADO` in WordPress → `marcar_publicado`, with the real url/
+      fecha WordPress reports.
+    - `ELIMINADO` (moved to trash) → `marcar_fallido`, reusing the
+      existing FALLIDO estado with a descriptive message instead of
+      adding a new EstadoDestino — FALLIDO is already retriable/
+      cancellable, so the operator can decide what to do next.
+    - `ERROR` (network/credentials/unexpected response) → only
+      `ultimo_error` is updated; `estado`/`wp_url`/`fecha_publicacion` are
+      left untouched — a failed verification attempt must never destroy
+      what was already known.
+    - `BORRADOR` → unchanged, still waiting.
+    """
+    if destino.canal is not CanalPublicacion.WORDPRESS or destino.wp_post_id is None:
+        return destino
+    if destino.es_terminal:
+        return destino
+    consulta = cms_publisher.consultar_estado_post(destino.wp_post_id)
+    if consulta.estado is EstadoPostCMS.PUBLICADO:
+        actualizado = marcar_publicado(
+            destino,
+            fecha_publicacion=consulta.fecha_publicacion,
+            wp_url=consulta.url or destino.wp_url,
+        )
+        logger.info("Destino %s sincronizado: WordPress lo reporta publicado.", destino.id)
+        return actualizado
+    if consulta.estado is EstadoPostCMS.ELIMINADO:
+        actualizado = marcar_fallido(
+            destino, error="El borrador fue movido a la papelera en WordPress."
+        )
+        logger.info("Destino %s sincronizado: WordPress lo reporta en la papelera.", destino.id)
+        return actualizado
+    if consulta.estado is EstadoPostCMS.ERROR:
+        return replace(
+            destino, ultimo_error="No se pudo verificar el estado en WordPress ahora mismo."
+        )
+    return destino
 
 
 def marcar_fallido(destino: DestinoPublicacion, *, error: str) -> DestinoPublicacion:

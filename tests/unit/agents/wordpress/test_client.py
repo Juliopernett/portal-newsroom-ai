@@ -6,9 +6,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from datetime import UTC, datetime
+
 from agents.wordpress.client import WordPressCMSPublisher, WordPressConfigurationError
 from config.settings import Settings
-from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult
+from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult, ConsultaPostCMS, EstadoPostCMS
 
 
 def _settings(**overrides: object) -> Settings:
@@ -201,3 +203,75 @@ def test_subir_media_sends_content_disposition_and_returns_id() -> None:
     assert kwargs["data"] == b"contenido"
     assert kwargs["headers"]["Content-Disposition"] == 'attachment; filename="foto.jpg"'
     assert kwargs["headers"]["Content-Type"] == "image/jpeg"
+
+
+def test_consultar_estado_post_maps_publish_to_publicado_with_url_and_fecha() -> None:
+    publisher = WordPressCMSPublisher(_settings())
+    mock_response = MagicMock()
+    mock_response.ok = True
+    mock_response.json.return_value = {
+        "status": "publish",
+        "link": "https://www.portalvallenato.com/nota-real/",
+        "date_gmt": "2026-08-24T15:30:00",
+    }
+
+    with patch("agents.wordpress.client.requests.get", return_value=mock_response) as mock_get:
+        resultado = publisher.consultar_estado_post("42")
+
+    assert resultado == ConsultaPostCMS(
+        estado=EstadoPostCMS.PUBLICADO,
+        url="https://www.portalvallenato.com/nota-real/",
+        fecha_publicacion=datetime(2026, 8, 24, 15, 30, tzinfo=UTC),
+    )
+    args, kwargs = mock_get.call_args
+    assert args[0] == "https://www.portalvallenato.com/wp-json/wp/v2/posts/42"
+    assert kwargs["params"] == {"context": "edit"}
+
+
+def test_consultar_estado_post_maps_trash_to_eliminado() -> None:
+    publisher = WordPressCMSPublisher(_settings())
+    mock_response = MagicMock()
+    mock_response.ok = True
+    mock_response.json.return_value = {"status": "trash"}
+
+    with patch("agents.wordpress.client.requests.get", return_value=mock_response):
+        resultado = publisher.consultar_estado_post("42")
+
+    assert resultado == ConsultaPostCMS(estado=EstadoPostCMS.ELIMINADO, url=None, fecha_publicacion=None)
+
+
+def test_consultar_estado_post_maps_draft_to_borrador() -> None:
+    publisher = WordPressCMSPublisher(_settings())
+    mock_response = MagicMock()
+    mock_response.ok = True
+    mock_response.json.return_value = {"status": "draft"}
+
+    with patch("agents.wordpress.client.requests.get", return_value=mock_response):
+        resultado = publisher.consultar_estado_post("42")
+
+    assert resultado == ConsultaPostCMS(estado=EstadoPostCMS.BORRADOR, url=None, fecha_publicacion=None)
+
+
+def test_consultar_estado_post_maps_a_404_to_error() -> None:
+    publisher = WordPressCMSPublisher(_settings())
+    mock_response = MagicMock()
+    mock_response.ok = False
+    mock_response.status_code = 404
+
+    with patch("agents.wordpress.client.requests.get", return_value=mock_response):
+        resultado = publisher.consultar_estado_post("42")
+
+    assert resultado == ConsultaPostCMS(estado=EstadoPostCMS.ERROR, url=None, fecha_publicacion=None)
+
+
+def test_consultar_estado_post_maps_a_network_error_to_error_without_raising() -> None:
+    import requests
+
+    publisher = WordPressCMSPublisher(_settings())
+
+    with patch(
+        "agents.wordpress.client.requests.get", side_effect=requests.ConnectionError("timeout")
+    ):
+        resultado = publisher.consultar_estado_post("42")
+
+    assert resultado == ConsultaPostCMS(estado=EstadoPostCMS.ERROR, url=None, fecha_publicacion=None)
