@@ -7,6 +7,22 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added
+
+- **Sprint Discovery 1 — primera fuente real conectada al DiscoveryEngine
+  (2026-08-25).** El pilar Discovery deja de ser puro esqueleto: un
+  `ContentSource` real (`agents/radar/rss_content_source.py`,
+  `RssContentSource`) lee el RSS de Google Noticias para "vallenato"
+  (`Settings.radar_rss_feed_url`, overrideable) y lo normaliza a
+  `NewsCandidate`, sin tocar `DiscoveryEngine` ni su firma pública.
+  `core.services.radar_service.descubrir` corre una pasada y persiste
+  solo los candidatos que `NewsCandidateRepository.exists(hash)` no
+  conocía todavía (primer uso real de `core.ports.repository.Repository`,
+  reservado para esto desde Sprint 2) — idempotente, verificado en vivo:
+  correr `python -m scripts.descubrir_noticias` dos veces seguidas da
+  `Nuevos: 0` la segunda vez. Nueva tabla `news_candidates`
+  (`hash` único). Sin API/UI nueva — deliberadamente fuera de alcance.
+
 ### Fixed
 
 - **Regresión real (encontrada antes de desplegar, no en producción):**

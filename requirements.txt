@@ -34,3 +34,6 @@ python-telegram-bot>=21.0,<22
 
 # --- IA (preparación editorial — agents/ai, Sprint 2026-08-21) ---
 anthropic>=0.69,<1
+
+# --- Discovery / Radar (agents/radar, Sprint Discovery 1) ---
+feedparser>=6.0,<7

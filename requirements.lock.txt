@@ -45,6 +45,10 @@ docstring-parser==0.18.0
     # via anthropic
 fastapi==0.141.1
     # via -r requirements.txt
+feedparser==6.0.14
+    # via -r requirements.txt
+feedparser-sgmllib==2.1.0
+    # via feedparser
 greenlet==3.5.5
     # via
     #   playwright

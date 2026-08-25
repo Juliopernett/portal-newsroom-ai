@@ -25,6 +25,7 @@ from database.repositories.identidad_comercial_repository import (
 )
 from database.repositories.informe_link_repository import SqlAlchemyInformeLinkRepository
 from database.repositories.media_asset_repository import SqlAlchemyMediaAssetRepository
+from database.repositories.news_candidate_repository import SqlAlchemyNewsCandidateRepository
 from database.repositories.otro_ingreso_repository import SqlAlchemyOtroIngresoRepository
 from database.repositories.pauta_repository import SqlAlchemyPautaRepository
 from database.repositories.plan_pauta_repository import SqlAlchemyPlanPautaRepository
@@ -38,7 +39,7 @@ from database.repositories.user_repository import SqlAlchemyUserRepository
 class SqlAlchemyUnitOfWork(UnitOfWork):
     """Groups `Client`/`Pauta`/`PublicationRequest`/`DestinoPublicacion`/
     `MediaAsset`/`Gasto`/`OtroIngreso`/`IdentidadComercial`/`InformeLink`/
-    `User`/`Session` repos in one transaction."""
+    `User`/`Session`/`NewsCandidate` repos in one transaction."""
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
@@ -59,6 +60,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.informe_links = SqlAlchemyInformeLinkRepository(self._session)
         self.users = SqlAlchemyUserRepository(self._session)
         self.sessions = SqlAlchemySessionRepository(self._session)
+        self.news_candidates = SqlAlchemyNewsCandidateRepository(self._session)
         return self
 
     def __exit__(

@@ -19,6 +19,7 @@ from core.ports.gasto_repository import GastoRepository
 from core.ports.identidad_comercial_repository import IdentidadComercialRepository
 from core.ports.informe_link_repository import InformeLinkRepository
 from core.ports.media_asset_repository import MediaAssetRepository
+from core.ports.news_candidate_repository import NewsCandidateRepository
 from core.ports.otro_ingreso_repository import OtroIngresoRepository
 from core.ports.pauta_repository import PautaRepository
 from core.ports.plan_pauta_repository import PlanPautaRepository
@@ -33,8 +34,8 @@ class UnitOfWork(ABC):
     Concrete adapters (`database.unit_of_work.SqlAlchemyUnitOfWork`) open a
     transaction on `__enter__` and expose `clients`/`pautas`/
     `publication_requests`/`destinos_publicacion`/`media_assets`/`gastos`/
-    `otros_ingresos`/`identidad_comercial`/`informe_links`/`users`/`sessions`
-    bound to it. Exiting the `with`
+    `otros_ingresos`/`identidad_comercial`/`informe_links`/`users`/
+    `sessions`/`news_candidates` bound to it. Exiting the `with`
     block always rolls back unless `commit()` was called explicitly first
     — the same discipline regardless of what happened inside the block, so
     callers never have to remember to clean up after an exception.
@@ -53,6 +54,7 @@ class UnitOfWork(ABC):
     informe_links: InformeLinkRepository
     users: UserRepository
     sessions: SessionRepository
+    news_candidates: NewsCandidateRepository
 
     @abstractmethod
     def __enter__(self) -> UnitOfWork:

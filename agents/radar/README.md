@@ -1,19 +1,40 @@
 # Radar Agent
 
-**Estado:** No implementado. Planeado para docs/ROADMAP.md Fase 1.
+**Estado:** Parcialmente implementado (Sprint Discovery 1, 2026-08-25).
 
-## Responsabilidad
+## Lo que ya existe
 
-Vigilar continuamente las fuentes configuradas (sitios de noticias, feeds
-RSS, etc.) y detectar contenido que sea nuevo, es decir, que no exista ya
-en el historial editorial.
+- `rss_content_source.py`: `RssContentSource`, el primer `ContentSource`
+  real — lee un feed RSS/Atom real por HTTP (`requests` + `feedparser`) y
+  lo normaliza a `NewsCandidate`. Hoy apunta al RSS de Google Noticias
+  para "vallenato" (`Settings.radar_rss_feed_url`, overrideable por
+  `.env`).
+- `core.services.radar_service.descubrir(source, repository)`: corre
+  `DiscoveryEngine.run([source])` (sin cambios) y persiste solo los
+  candidatos que `NewsCandidateRepository.exists(hash)` no conocía
+  todavía — la deduplicación *entre* pasadas que el `DiscoveryEngine` en
+  sí deliberadamente no hace. Devuelve un `ResultadoDescubrimiento`
+  (consultados/nuevos/duplicados/errores).
+- Persistencia real: `database/models/news_candidate.py` +
+  `database/repositories/news_candidate_repository.py` (tabla
+  `news_candidates`, `hash` único).
+- Ejecutable a mano: `python -m scripts.descubrir_noticias`.
 
-El motor de esta detección (`core.services.discovery_engine.DiscoveryEngine`
-— agregación, deduplicación por hash y ordenamiento de candidatos) ya
-existe desde Sprint 2. Lo que falta para que este agente exista de verdad:
-un `ContentSource` real por fuente (RSS, crawler, ...) y la integración
-con `Repository` para descartar contra el historial editorial persistido
-(el `DiscoveryEngine` solo deduplica dentro de una misma pasada).
+## Lo que falta (Discovery 2+)
+
+- Más de una fuente simultánea (`descubrir` ya acepta un `ContentSource`
+  por llamada; falta orquestar varias y agregar sus resultados).
+- Resolver el redirect de Google Noticias (`news.google.com/rss/articles/...`)
+  a la URL real del medio — hoy es suficiente para identificar la
+  noticia, pero un futuro Extractor necesita la URL real para sacar el
+  cuerpo del artículo.
+- `Source` persistido y gestionable (hoy se construye a mano en el
+  script, no vive en base de datos).
+- El mapeo a `PublicationRequest` vía `RadarPublicationInboxAdapter` (ver
+  [ADR-003](../../docs/adr/ADR-003-publication-inbox.md)) — Radar
+  todavía no converge con los demás canales de Publication Inbox.
+- Un scheduler (hoy es un script disparado a mano, igual que
+  `scripts/purgar_media_expirados.py` — deliberado, no un descuido).
 
 ## Depende de
 

@@ -11,6 +11,11 @@ a una única entidad y por lo tanto no encaja como método de un modelo de
 - `discovery_engine.py`: `DiscoveryEngine`, el motor que agrega, deduplica
   y ordena candidatos provenientes de varias fuentes (Sprint 2). Ver
   docs/ARCHITECTURE.md, sección "Discovery Engine".
+- `radar_service.py`: `descubrir`, corre una pasada de `DiscoveryEngine`
+  sobre una fuente y persiste solo los `NewsCandidate` que
+  `NewsCandidateRepository` no conocía todavía — la deduplicación *entre*
+  ejecuciones que `DiscoveryEngine` deliberadamente no hace (Sprint
+  Discovery 1, 2026-08-25). Ver `agents/radar/README.md`.
 - `pauta_service.py`: `PautaService`, calcula cupo consumido/restante y
   vigencia/vencimiento de una `Pauta` (Sprint 3B — Commercial Core MVP).
   Todo calculado a partir de `Pauta` y su historial de

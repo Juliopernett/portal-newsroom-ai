@@ -14,6 +14,7 @@ from database.models.gasto import GastoModel
 from database.models.identidad_comercial import IdentidadComercialModel
 from database.models.informe_link import InformeLinkModel
 from database.models.media_asset import MediaAssetModel
+from database.models.news_candidate import NewsCandidateModel
 from database.models.pauta import PautaModel
 from database.models.plan_pauta import PlanPautaModel
 from database.models.publication_request import PublicationRequestModel
@@ -27,6 +28,7 @@ __all__ = [
     "IdentidadComercialModel",
     "InformeLinkModel",
     "MediaAssetModel",
+    "NewsCandidateModel",
     "PautaModel",
     "PlanPautaModel",
     "PublicationRequestModel",

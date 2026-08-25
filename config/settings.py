@@ -65,6 +65,14 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
 
+    # --- Radar (Discovery pillar — see agents/radar/rss_content_source.py) ---
+    # A working default so `scripts/descubrir_noticias.py` runs out of the
+    # box; overridable per Rule 2 without touching code. Google News's own
+    # per-query RSS export — real, current vallenato coverage, no API key.
+    radar_rss_feed_url: str = (
+        "https://news.google.com/rss/search?q=vallenato&hl=es-419&gl=CO&ceid=CO:es-419"
+    )
+
     # --- AI providers (used by the future Writer / SEO / AI Orchestrator agents) ---
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None

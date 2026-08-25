@@ -20,6 +20,18 @@ from core.entities.news_candidate import NewsCandidate
 from core.entities.source import Source
 
 
+class ContentSourceError(RuntimeError):
+    """Raised when a `ContentSource` adapter cannot fetch or parse its source.
+
+    Covers network failure, a non-2xx response, or a feed/page whose
+    content is too broken to use — same role `AIProviderError` plays for
+    `core.ports.ai_provider`: lives on the port so a caller (e.g.
+    `core.services.radar_service.descubrir`) can catch one domain-level
+    exception without importing whatever HTTP/parsing library the
+    concrete adapter happens to use.
+    """
+
+
 class ContentSource(Protocol):
     """Contract for anything capable of reporting newly discovered content.
 
