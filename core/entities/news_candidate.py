@@ -12,7 +12,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import uuid4
+
+
+class EstadoNewsCandidate(StrEnum):
+    """Editorial review state of a `NewsCandidate` (Sprint Discovery 2).
+
+    `PROCESADO` is the only terminal state — a candidate sent toward the
+    editorial flow (`core.services.news_candidate_service.crear_noticia`)
+    is never re-guardado/descartado/crear-noticia'd again (see
+    docs/PROJECT_RULES.md, rule 11: no news item is processed twice).
+    `GUARDADO`/`DESCARTADO` are not terminal relative to each other — an
+    operator can change their mind either way.
+    """
+
+    NUEVO = "nuevo"
+    GUARDADO = "guardado"
+    DESCARTADO = "descartado"
+    PROCESADO = "procesado"
+
+
+_ESTADOS_TERMINALES: frozenset[EstadoNewsCandidate] = frozenset({EstadoNewsCandidate.PROCESADO})
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -30,6 +51,7 @@ class NewsCandidate:
     hash: str
     metadata: dict[str, str] = field(default_factory=dict)
     confidence: float = 1.0
+    estado: EstadoNewsCandidate = EstadoNewsCandidate.NUEVO
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.confidence <= 1.0:
@@ -37,3 +59,8 @@ class NewsCandidate:
         for required in ("id", "source", "title", "url", "hash"):
             if not getattr(self, required):
                 raise ValueError(f"{required} must not be empty")
+
+    @property
+    def es_terminal(self) -> bool:
+        """Return whether this candidate is done — no further review transition expected."""
+        return self.estado in _ESTADOS_TERMINALES

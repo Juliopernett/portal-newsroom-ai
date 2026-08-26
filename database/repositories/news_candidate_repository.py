@@ -13,7 +13,7 @@ from datetime import UTC
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from core.entities.news_candidate import NewsCandidate
+from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
 from database.models.news_candidate import NewsCandidateModel
 
 
@@ -30,6 +30,7 @@ def _to_model(candidate: NewsCandidate) -> NewsCandidateModel:
         hash=candidate.hash,
         metadata_json=json.dumps(candidate.metadata) if candidate.metadata else None,
         confidence=candidate.confidence,
+        estado=candidate.estado.value,
     )
 
 
@@ -55,6 +56,7 @@ def _to_domain(model: NewsCandidateModel) -> NewsCandidate:
         hash=model.hash,
         metadata=json.loads(model.metadata_json) if model.metadata_json is not None else {},
         confidence=model.confidence,
+        estado=EstadoNewsCandidate(model.estado),
     )
 
 
@@ -67,6 +69,11 @@ class SqlAlchemyNewsCandidateRepository:
     def save(self, entity: NewsCandidate) -> None:
         """Persist `entity`, creating or updating it as needed."""
         self._session.merge(_to_model(entity))
+
+    def get_by_id(self, id: str) -> NewsCandidate | None:
+        """Return the `NewsCandidate` identified by `id`, or `None` if not found."""
+        model = self._session.get(NewsCandidateModel, id)
+        return _to_domain(model) if model is not None else None
 
     def exists(self, reference: str) -> bool:
         """Return whether a `NewsCandidate` with hash `reference` was already stored."""

@@ -9,6 +9,28 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **Sprint Discovery 2 — Radar Editorial (2026-08-26).** Los
+  `NewsCandidate` que Discovery 1 empezó a persistir dejan de ser
+  invisibles: nueva pantalla **Radar Editorial** en Newsroom
+  (`frontend/src/features/radar/`, ruta `/radar`) donde revisar,
+  buscar/filtrar y decidir `Guardar`/`Descartar`/`Crear noticia` sobre
+  cada candidato. Nuevo estado de dominio `EstadoNewsCandidate`
+  (`NUEVO/GUARDADO/DESCARTADO/PROCESADO`, `PROCESADO` terminal —
+  mismo patrón que `EstadoDestino`/`EstadoPreparacionIA`) y
+  `core/services/news_candidate_service.py` con las tres transiciones
+  puras. Nuevo router `app/api/routers/discovery.py`
+  (`GET /discovery`, `POST /discovery/{id}/guardar|descartar|crear-noticia`).
+  "Crear noticia" **solo** transiciona a `PROCESADO` — no genera
+  `Article` ni `PublicationRequest` (el `RadarPublicationInboxAdapter`
+  de ADR-003 está desactualizado frente al `PublicationRequest` actual,
+  que es exclusivamente comercial; no se sigue ese diseño sin
+  revisarlo). "Actualizar Radar" solo re-lee lo ya persistido — nunca
+  dispara `descubrir_noticias`. Migración
+  `180770bf0fc3_add_estado_to_news_candidates`. De paso, verificación
+  manual en vivo contra el feed real destapó que el `summary` de Google
+  Noticias venía con marcado HTML crudo (`<a>`/`<font>`); se limpia en
+  `RssContentSource._clean_summary` (Discovery 1, corregido aquí).
+
 - **Sprint Discovery 1 — primera fuente real conectada al DiscoveryEngine
   (2026-08-25).** El pilar Discovery deja de ser puro esqueleto: un
   `ContentSource` real (`agents/radar/rss_content_source.py`,

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from core.entities.news_candidate import NewsCandidate
+from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
 from database.repositories.news_candidate_repository import SqlAlchemyNewsCandidateRepository
 
 
@@ -79,3 +80,44 @@ def test_save_twice_with_the_same_id_does_not_create_a_duplicate_row(session: Se
     session.commit()
 
     assert len(repository.list_all()) == 1
+
+
+def test_get_by_id_returns_none_when_not_found(session: Session) -> None:
+    repository = SqlAlchemyNewsCandidateRepository(session)
+
+    assert repository.get_by_id("no-existe") is None
+
+
+def test_get_by_id_returns_the_saved_candidate(session: Session) -> None:
+    repository = SqlAlchemyNewsCandidateRepository(session)
+    candidato = _candidato()
+    repository.save(candidato)
+    session.commit()
+
+    resultado = repository.get_by_id(candidato.id)
+
+    assert resultado is not None
+    assert resultado.title == candidato.title
+
+
+def test_estado_defaults_to_nuevo_on_a_freshly_saved_candidate(session: Session) -> None:
+    repository = SqlAlchemyNewsCandidateRepository(session)
+    repository.save(_candidato())
+    session.commit()
+
+    assert repository.list_all()[0].estado == EstadoNewsCandidate.NUEVO
+
+
+def test_estado_survives_the_round_trip_after_a_transition(session: Session) -> None:
+    repository = SqlAlchemyNewsCandidateRepository(session)
+    candidato = _candidato()
+    repository.save(candidato)
+    session.commit()
+
+    guardado = replace(candidato, estado=EstadoNewsCandidate.GUARDADO)
+    repository.save(guardado)
+    session.commit()
+
+    resultado = repository.get_by_id(candidato.id)
+    assert resultado is not None
+    assert resultado.estado == EstadoNewsCandidate.GUARDADO

@@ -12,6 +12,7 @@ import { ClientesPage } from '@/features/clientes/ClientesPage'
 import { ReportesPage } from '@/features/reportes/ReportesPage'
 import { ContratosPage } from '@/features/contratos/ContratosPage'
 import { SolicitudesPage } from '@/features/solicitudes/SolicitudesPage'
+import { RadarPage } from '@/features/radar/RadarPage'
 import { AlertasPage } from '@/features/alertas/AlertasPage'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { ConfiguracionPage } from '@/features/configuracion/ConfiguracionPage'
@@ -48,6 +49,7 @@ export default function App() {
                 <Route index element={<DashboardPage />} />
                 <Route path="alertas" element={<AlertasPage />} />
                 <Route path="solicitudes" element={<SolicitudesPage />} />
+                <Route path="radar" element={<RadarPage />} />
                 <Route path="clientes" element={<ClientesPage />} />
                 <Route path="contratos" element={<ContratosPage />} />
                 <Route path="gastos" element={<GastosPage />} />

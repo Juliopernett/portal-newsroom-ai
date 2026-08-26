@@ -25,6 +25,7 @@ from app.api.routers import (
     auth,
     clients,
     dashboard,
+    discovery,
     gastos,
     identidad_comercial,
     insights,
@@ -47,6 +48,7 @@ app.include_router(ai_configuracion.router)
 app.include_router(auth.router)
 app.include_router(clients.router)
 app.include_router(dashboard.router)
+app.include_router(discovery.router)
 app.include_router(gastos.router)
 app.include_router(identidad_comercial.router)
 app.include_router(identidad_comercial.router_publico)

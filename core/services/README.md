@@ -16,6 +16,12 @@ a una única entidad y por lo tanto no encaja como método de un modelo de
   `NewsCandidateRepository` no conocía todavía — la deduplicación *entre*
   ejecuciones que `DiscoveryEngine` deliberadamente no hace (Sprint
   Discovery 1, 2026-08-25). Ver `agents/radar/README.md`.
+- `news_candidate_service.py`: `guardar`/`descartar`/`crear_noticia`,
+  transiciones puras de `EstadoNewsCandidate` sobre un `NewsCandidate`
+  (`ValueError` si ya está en un estado terminal — mismo patrón que
+  `destino_publicacion_service.py`); `ordenar_para_revision`, ordena
+  para el Radar Editorial (nuevos primero, luego más recientes). Sprint
+  Discovery 2, 2026-08-26.
 - `pauta_service.py`: `PautaService`, calcula cupo consumido/restante y
   vigencia/vencimiento de una `Pauta` (Sprint 3B — Commercial Core MVP).
   Todo calculado a partir de `Pauta` y su historial de

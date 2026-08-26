@@ -15,6 +15,10 @@ arbitrary number of keys) — same convention
 `PublicationRequestModel.etiquetas_editorial` already uses for
 `tuple[str, ...]`: only the repository (de)serializes it, the domain entity
 holds a real `dict`.
+
+`estado` (Sprint Discovery 2, 2026-08-26) — Radar Editorial's review
+state, same string-enum-value convention as
+`PublicationRequestModel.preparacion_ia_estado`.
 """
 
 from __future__ import annotations
@@ -43,3 +47,4 @@ class NewsCandidateModel(Base):
     hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     metadata_json: Mapped[str | None] = mapped_column(String, nullable=True)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="nuevo")

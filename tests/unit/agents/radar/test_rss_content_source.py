@@ -56,6 +56,21 @@ _FEED_CON_ENTRADA_INCOMPLETA = b"""<?xml version="1.0" encoding="UTF-8"?>
 
 _FEED_MALFORMADO = b"esto no es XML valido {{{ << >>"
 
+_FEED_CON_RESUMEN_HTML = b"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+<title>Feed con resumen HTML (estilo Google Noticias)</title>
+<item>
+  <title>Noticia con resumen envuelto en HTML</title>
+  <link>https://example.com/noticia-html</link>
+  <description>&lt;a href="https://news.google.com/rss/articles/xyz"
+    target="_blank"&gt;Noticia con resumen envuelto en HTML&lt;/a&gt;&amp;nbsp;&amp;nbsp;
+    &lt;font color="#6f6f6f"&gt;ELHERALDO.CO&lt;/font&gt;</description>
+</item>
+</channel>
+</rss>
+"""
+
 
 def _source(**overrides: object) -> Source:
     defaults: dict[str, object] = {
@@ -157,6 +172,24 @@ def test_fetch_candidates_skips_an_entry_missing_title_or_link() -> None:
     assert candidatos[0].title == "Noticia valida"
 
 
+def test_fetch_candidates_strips_html_markup_from_the_summary() -> None:
+    source = _source()
+    adapter = RssContentSource(source)
+
+    with patch(
+        "agents.radar.rss_content_source.requests.get",
+        return_value=_mock_response(_FEED_CON_RESUMEN_HTML),
+    ):
+        candidatos = adapter.fetch_candidates()
+
+    assert len(candidatos) == 1
+    resumen = candidatos[0].summary
+    assert "<a href" not in resumen
+    assert "<font" not in resumen
+    assert "&nbsp;" not in resumen
+    assert "ELHERALDO.CO" in resumen
+
+
 def test_fetch_candidates_raises_content_source_error_on_network_failure() -> None:
     source = _source()
     adapter = RssContentSource(source)
@@ -164,9 +197,8 @@ def test_fetch_candidates_raises_content_source_error_on_network_failure() -> No
     with patch(
         "agents.radar.rss_content_source.requests.get",
         side_effect=requests.ConnectionError("no se pudo conectar"),
-    ):
-        with pytest.raises(ContentSourceError):
-            adapter.fetch_candidates()
+    ), pytest.raises(ContentSourceError):
+        adapter.fetch_candidates()
 
 
 def test_fetch_candidates_raises_content_source_error_on_a_non_2xx_response() -> None:
@@ -176,9 +208,8 @@ def test_fetch_candidates_raises_content_source_error_on_a_non_2xx_response() ->
     with patch(
         "agents.radar.rss_content_source.requests.get",
         return_value=_mock_response(b"", status_ok=False),
-    ):
-        with pytest.raises(ContentSourceError):
-            adapter.fetch_candidates()
+    ), pytest.raises(ContentSourceError):
+        adapter.fetch_candidates()
 
 
 def test_fetch_candidates_raises_content_source_error_on_a_malformed_feed() -> None:
@@ -188,6 +219,5 @@ def test_fetch_candidates_raises_content_source_error_on_a_malformed_feed() -> N
     with patch(
         "agents.radar.rss_content_source.requests.get",
         return_value=_mock_response(_FEED_MALFORMADO),
-    ):
-        with pytest.raises(ContentSourceError):
-            adapter.fetch_candidates()
+    ), pytest.raises(ContentSourceError):
+        adapter.fetch_candidates()

@@ -8,6 +8,11 @@ piece of news twice across separate discovery passes (see
 docs/PROJECT_RULES.md, rule 11). `list_all` is the one addition beyond the
 generic contract — what a future Radar/admin view needs to see what
 Discovery has found so far.
+
+`get_by_id` (Sprint Discovery 2, 2026-08-26) — needed once Radar
+Editorial's action endpoints (`guardar`/`descartar`/`crear-noticia`) had
+to fetch one specific candidate to transition, same shape as
+`core.ports.client_repository.ClientRepository.get_by_id`.
 """
 
 from __future__ import annotations
@@ -20,6 +25,10 @@ from core.ports.repository import Repository
 
 class NewsCandidateRepository(Repository[NewsCandidate], Protocol):
     """Contract for storing and retrieving `NewsCandidate` entities."""
+
+    def get_by_id(self, id: str) -> NewsCandidate | None:
+        """Return the `NewsCandidate` identified by `id`, or `None` if not found."""
+        ...
 
     def list_all(self) -> list[NewsCandidate]:
         """Return every persisted `NewsCandidate`."""

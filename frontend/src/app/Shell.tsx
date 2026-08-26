@@ -11,6 +11,7 @@ import {
   Download,
   LogOut,
   Menu,
+  Radar,
   Settings,
   X,
 } from 'lucide-react'
@@ -41,6 +42,10 @@ const NAV_GROUPS = [
       { to: '/contratos', label: 'Contratos', icon: FileText, end: false },
       { to: '/solicitudes', label: 'Solicitudes', icon: ClipboardList, end: false },
     ],
+  },
+  {
+    label: 'Discovery',
+    items: [{ to: '/radar', label: 'Radar Editorial', icon: Radar, end: false }],
   },
   {
     label: 'Finanzas',

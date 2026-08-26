@@ -8,11 +8,18 @@ Deliberately minimal: an entry missing `title` or `link` is skipped (with
 a warning) rather than failing the whole fetch — a real-world RSS feed
 occasionally has a malformed entry, and one bad entry should never hide
 every other real one.
+
+`summary` is stripped of HTML markup (found live in Google News, which
+puts an `<a>`/`<font>` snippet in `<description>` — see `_clean_summary`,
+added Sprint Discovery 2 after seeing raw markup in the Radar Editorial
+review UI).
 """
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
+from html import unescape
 from time import struct_time
 
 import feedparser
@@ -27,6 +34,7 @@ from shared.logger import get_logger
 logger = get_logger(__name__)
 
 _REQUEST_TIMEOUT_SECONDS = 15
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
 class RssContentSource:
@@ -59,8 +67,9 @@ class RssContentSource:
 
         parsed = feedparser.parse(response.content)
         if parsed.bozo and not parsed.entries:
+            razon = parsed.get("bozo_exception")
             raise ContentSourceError(
-                f"El feed '{self._source.name}' no se pudo interpretar: {parsed.get('bozo_exception')}"
+                f"El feed '{self._source.name}' no se pudo interpretar: {razon}"
             )
 
         candidatos: list[NewsCandidate] = []
@@ -88,11 +97,22 @@ class RssContentSource:
             source=self._source.id,
             title=title,
             url=url,
-            summary=entry.get("summary", ""),
+            summary=_clean_summary(entry.get("summary", "")),
             published_at=_parse_published_at(entry.get("published_parsed")),
             hash=generate_candidate_hash(source=self._source.id, url=url),
             metadata=metadata,
         )
+
+
+def _clean_summary(raw: str) -> str:
+    """Strip markup from a feed's `summary`, e.g. Google News' `<a>`/`<font>` wrapper.
+
+    Some RSS feeds put an HTML snippet (a link, related-coverage list,
+    `&nbsp;` spacing) in `<description>` instead of plain text — shown
+    raw, that's unreadable in the Radar Editorial review UI.
+    """
+    sin_etiquetas = _HTML_TAG_RE.sub(" ", raw)
+    return " ".join(unescape(sin_etiquetas).split())
 
 
 def _parse_published_at(published_parsed: struct_time | None) -> datetime | None:
