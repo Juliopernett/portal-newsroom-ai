@@ -13,6 +13,12 @@ resolved by the caller (`GET /pautas/{id}/contrato.pdf` in
 `tipo`, or reaches the network. All the small formatting/identidad
 helpers are shared from `pdf_informe` so the two documents can never
 drift in how a date, a monto, or the identidad block looks.
+
+Unlike the informe, the contrato's cierre does *not* repeat the logo /
+razón social / redes: this is a one-page document and that block is
+already in the header a few centímetros above — printing it twice just
+looked cramped (user feedback, 2026-09-07). Only the "gracias" line and
+the system credit stay.
 """
 
 from __future__ import annotations
@@ -31,13 +37,13 @@ from reportlab.platypus import (
 
 from app.api.pdf_informe import (
     _COLOR_BORDE,
+    _NOMBRE_SISTEMA,
     _PAUTA_TIPO_LABELS,
     _bloque_identidad,
     _escape,
     _fila_resumen,
     _fmt_fecha,
     _fmt_moneda,
-    _seccion_cierre,
     _Styles,
     _tabla_resumen,
 )
@@ -66,6 +72,20 @@ def _seccion_datos_contrato(
     return [
         Paragraph("Datos del contrato", styles.subtitulo),
         _tabla_resumen(filas),
+    ]
+
+
+def _seccion_cierre_contrato(nombre_comercial: str, styles: _Styles) -> list[Flowable]:
+    """A minimal cierre — no repeated identidad block (see module docstring)."""
+    return [
+        Spacer(1, 0.6 * cm),
+        HRFlowable(width="100%", color=_COLOR_BORDE, thickness=0.75),
+        Spacer(1, 0.3 * cm),
+        Paragraph(
+            f"Gracias por confiar en <b>{_escape(nombre_comercial)}</b>",
+            styles.cierre_titulo,
+        ),
+        Paragraph(f"Generado con {_escape(_NOMBRE_SISTEMA)}", styles.credito_sistema),
     ]
 
 
@@ -112,7 +132,7 @@ def generar_contrato_pauta_pdf(
 
     story.extend(_seccion_datos_contrato(pauta, cliente, styles))
 
-    story.extend(_seccion_cierre(identidad, logo_bytes, styles))
+    story.extend(_seccion_cierre_contrato(nombre_comercial, styles))
 
     doc.build(story)
     return buffer.getvalue()
