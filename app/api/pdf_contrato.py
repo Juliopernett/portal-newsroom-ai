@@ -3,9 +3,11 @@
 The "Contrato" download / "Enviar contrato al cliente" share link — the
 document sent to the client *when the pauta is about to start*, before
 there is anything to report on. Deliberately the same layout language as
-`app.api.pdf_informe` (identidad header, one clean facts table, cierre),
+`app.api.pdf_informe` (identidad header, plain facts tables, cierre),
 just without the results half: no "publicaciones realizadas/restantes",
-no detalle de publicaciones, no cupo — only what was contracted.
+no detalle de publicaciones, no cupo — only who contracted and what.
+Cliente-facing, so it carries the client's own data (nombre, tipo,
+contacto, Instagram) but never internal notes.
 
 Same discipline as `pdf_informe`: this module only *renders* data already
 resolved by the caller (`GET /pautas/{id}/contrato.pdf` in
@@ -44,19 +46,49 @@ from app.api.pdf_informe import (
     _fila_resumen,
     _fmt_fecha,
     _fmt_moneda,
+    _href_red_social,
+    _link_texto,
     _Styles,
     _tabla_resumen,
 )
-from core.entities.client import Client
+from core.entities.client import Client, ClientType
 from core.entities.identidad_comercial import IdentidadComercial
 from core.entities.pauta import Pauta
 
+_CLIENT_TIPO_LABELS = {
+    ClientType.ARTISTA: "Artista",
+    ClientType.MANAGER: "Mánager",
+    ClientType.PROMOTOR: "Promotor",
+    ClientType.EMPRESARIO: "Empresario",
+}
 
-def _seccion_datos_contrato(
-    pauta: Pauta, cliente: Client | None, styles: _Styles
-) -> list[Flowable]:
+
+def _seccion_datos_cliente(cliente: Client | None, styles: _Styles) -> list[Flowable]:
+    if cliente is None:
+        filas = [_fila_resumen("Nombre", "—", styles)]
+    else:
+        filas = [
+            _fila_resumen("Nombre", _escape(cliente.nombre), styles),
+            _fila_resumen("Tipo", _CLIENT_TIPO_LABELS[cliente.tipo], styles),
+            _fila_resumen("Teléfono", _escape(cliente.telefono), styles),
+        ]
+        if cliente.instagram and cliente.instagram.strip():
+            handle = cliente.instagram.strip()
+            filas.append(
+                _fila_resumen(
+                    "Instagram",
+                    _link_texto(_href_red_social(handle, "instagram.com"), handle),
+                    styles,
+                )
+            )
+    return [
+        Paragraph("Datos del cliente", styles.subtitulo),
+        _tabla_resumen(filas),
+    ]
+
+
+def _seccion_datos_contrato(pauta: Pauta, styles: _Styles) -> list[Flowable]:
     filas = [
-        _fila_resumen("Cliente", _escape(cliente.nombre if cliente else "—"), styles),
         _fila_resumen("Tipo de plan", _PAUTA_TIPO_LABELS[pauta.tipo], styles),
         _fila_resumen("Fecha de inicio", _fmt_fecha(pauta.fecha_inicio), styles),
         _fila_resumen("Fecha de finalización", _fmt_fecha(pauta.fecha_fin), styles),
@@ -130,7 +162,10 @@ def generar_contrato_pauta_pdf(
     )
     story.append(Spacer(1, 0.4 * cm))
 
-    story.extend(_seccion_datos_contrato(pauta, cliente, styles))
+    story.extend(_seccion_datos_cliente(cliente, styles))
+    story.append(Spacer(1, 0.4 * cm))
+
+    story.extend(_seccion_datos_contrato(pauta, styles))
 
     story.extend(_seccion_cierre_contrato(nombre_comercial, styles))
 
