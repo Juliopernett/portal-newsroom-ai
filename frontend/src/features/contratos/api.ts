@@ -52,4 +52,5 @@ export const pautasApi = {
   create: (payload: PautaInput) => api.post<Pauta>('/pautas', payload),
   update: (id: string, payload: PautaInput) => api.put<Pauta>(`/pautas/${id}`, payload),
   crearInformeLink: (id: string) => api.post<InformeLink>(`/pautas/${id}/informe-link`),
+  crearContratoLink: (id: string) => api.post<InformeLink>(`/pautas/${id}/contrato-link`),
 }

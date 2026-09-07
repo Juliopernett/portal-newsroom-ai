@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Calendar, FileDown, Inbox, MessageCircle, Pencil, Plus, RefreshCw, Search } from 'lucide-react'
+import {
+  Calendar,
+  FileDown,
+  FileText,
+  Inbox,
+  MessageCircle,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ApiError, errorMessage } from '@/api/client'
@@ -97,12 +107,20 @@ export function ContratosPage() {
     onError: (err) => toast.error(errorMessage(err)),
   })
 
+  const contratoLinkMutation = useMutation({
+    mutationFn: pautasApi.crearContratoLink,
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
   // wa.me's click-to-chat only pre-fills text — it cannot attach the PDF
-  // itself, so the message carries a link to it instead (see
-  // `POST /pautas/{id}/informe-link` — a fresh, time-limited token every
-  // click, no login required to open it). The number must be digits only,
-  // country code included, no "+"/spaces/dashes.
-  function enviarInformePorWhatsapp(pauta: Pauta) {
+  // itself, so the message carries a link to it instead (a fresh,
+  // time-limited token every click, no login required to open it). The
+  // number must be digits only, country code included, no "+"/spaces/dashes.
+  function enviarPorWhatsapp(
+    pauta: Pauta,
+    mutation: typeof informeLinkMutation,
+    mensajeConLink: (nombre: string, url: string) => string,
+  ) {
     const telefono = clientsPhoneById.get(pauta.client_id)
     if (!telefono) {
       toast.error('Este cliente no tiene teléfono registrado.')
@@ -110,13 +128,29 @@ export function ContratosPage() {
     }
     const digits = telefono.replace(/\D/g, '')
     const nombre = clientsById.get(pauta.client_id) ?? ''
-    informeLinkMutation.mutate(pauta.id, {
+    mutation.mutate(pauta.id, {
       onSuccess: (link) => {
-        const mensaje = `Hola ${nombre}, aquí tienes el informe de resultados de tu campaña con Portal Vallenato: ${link.url}`
+        const mensaje = mensajeConLink(nombre, link.url)
         window.open(`https://wa.me/${digits}?text=${encodeURIComponent(mensaje)}`, '_blank', 'noopener')
       },
     })
   }
+
+  const enviarInformePorWhatsapp = (pauta: Pauta) =>
+    enviarPorWhatsapp(
+      pauta,
+      informeLinkMutation,
+      (nombre, url) =>
+        `Hola ${nombre}, aquí tienes el informe de resultados de tu campaña con Portal Vallenato: ${url}`,
+    )
+
+  const enviarContratoPorWhatsapp = (pauta: Pauta) =>
+    enviarPorWhatsapp(
+      pauta,
+      contratoLinkMutation,
+      (nombre, url) =>
+        `Hola ${nombre}, aquí tienes el detalle de tu contrato de publicidad con Portal Vallenato: ${url}`,
+    )
 
   const createMutation = useMutation({
     mutationFn: pautasApi.create,
@@ -310,6 +344,19 @@ export function ContratosPage() {
                       </Button>
                     )}
                     <Button variant="ghost" size="sm" asChild>
+                      <a href={`/pautas/${pauta.id}/contrato.pdf`} target="_blank" rel="noopener">
+                        <FileText /> Contrato
+                      </a>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={contratoLinkMutation.isPending}
+                      onClick={() => enviarContratoPorWhatsapp(pauta)}
+                    >
+                      <MessageCircle /> Enviar contrato
+                    </Button>
+                    <Button variant="ghost" size="sm" asChild>
                       <a href={`/pautas/${pauta.id}/informe.pdf`} target="_blank" rel="noopener">
                         <FileDown /> Informe
                       </a>
@@ -320,7 +367,7 @@ export function ContratosPage() {
                       disabled={informeLinkMutation.isPending}
                       onClick={() => enviarInformePorWhatsapp(pauta)}
                     >
-                      <MessageCircle /> Enviar al cliente
+                      <MessageCircle /> Enviar informe
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => openEdit(pauta)}>
                       <Pencil /> Editar

@@ -8,9 +8,10 @@ Sprint 3B, without any new domain logic.
 Every route requires an authenticated session — `dependencies=` at the
 `APIRouter` level, not per-function, so a route added here later is
 protected automatically instead of by remembering to add it — **except**
-`router_publico` (see below): `GET /{pauta_id}/informe-publico.pdf` is the
-"Enviar por WhatsApp" share link, meant to be opened by the client, who
-never logs in. It carries its own token-based guard instead of a session.
+`router_publico` (see below): `GET /{pauta_id}/informe-publico.pdf` and
+`GET /{pauta_id}/contrato-publico.pdf` are the "Enviar al cliente" share
+links, meant to be opened by the client, who never logs in. They carry
+their own token-based guard instead of a session.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from app.api.dependencies import (
     get_unit_of_work,
     hash_session_token,
 )
+from app.api.pdf_contrato import generar_contrato_pauta_pdf
 from app.api.pdf_informe import generar_informe_pauta_pdf
 from app.api.schemas.pauta import InformeLinkOut, PautaCreate, PautaOut
 from config.settings import get_settings
@@ -128,9 +130,29 @@ def list_pautas(uow: UnitOfWork = Depends(get_unit_of_work)) -> list[PautaOut]:
     return [_to_out(pauta, uow) for pauta in uow.pautas.list_all()]
 
 
-def _nombre_archivo_informe(pauta: Pauta, cliente_nombre: str | None) -> str:
-    base = f"informe-{cliente_nombre or 'cliente'}-{pauta.fecha_inicio.isoformat()}"
+def _nombre_archivo(prefijo: str, pauta: Pauta, cliente_nombre: str | None) -> str:
+    base = f"{prefijo}-{cliente_nombre or 'cliente'}-{pauta.fecha_inicio.isoformat()}"
     return _FILENAME_UNSAFE.sub("-", base).strip("-") + ".pdf"
+
+
+def _logo_bytes(uow: UnitOfWork, media_storage: MediaStorage) -> bytes | None:
+    """Read the identidad comercial's logo bytes, or `None` when there is no
+    identidad, no logo configured, or the stored file is missing."""
+    identidad = uow.identidad_comercial.get()
+    if identidad is None or identidad.logo_storage_key is None:
+        return None
+    try:
+        return media_storage.leer(identidad.logo_storage_key)
+    except FileNotFoundError:
+        return None
+
+
+def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 def _generar_informe_pdf_response(
@@ -161,20 +183,34 @@ def _generar_informe_pdf_response(
     reporte = construir_reporte_pauta(pauta, solicitudes, destinos, cliente, PautaService())
 
     identidad = uow.identidad_comercial.get()
-    logo_bytes: bytes | None = None
-    if identidad is not None and identidad.logo_storage_key is not None:
-        try:
-            logo_bytes = media_storage.leer(identidad.logo_storage_key)
-        except FileNotFoundError:
-            logo_bytes = None
+    pdf_bytes = generar_informe_pauta_pdf(reporte, identidad, _logo_bytes(uow, media_storage))
+    filename = _nombre_archivo("informe", pauta, cliente.nombre if cliente else None)
+    return _pdf_response(pdf_bytes, filename)
 
-    pdf_bytes = generar_informe_pauta_pdf(reporte, identidad, logo_bytes)
-    filename = _nombre_archivo_informe(pauta, cliente.nombre if cliente else None)
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+
+def _generar_contrato_pdf_response(
+    pauta_id: str, uow: UnitOfWork, media_storage: MediaStorage
+) -> Response:
+    """Build the `contrato.pdf` `Response` for one Pauta — shared by
+    `descargar_contrato_pauta` (authenticated) and
+    `descargar_contrato_pauta_publico` (token-guarded), the same way
+    `_generar_informe_pdf_response` is, so the two entry points can never
+    drift in what they generate.
+
+    Contract terms only — no `construir_reporte_pauta`, no `PautaService`:
+    this document is meant to be sent when the pauta is about to start,
+    before there is any publication history to aggregate.
+    """
+    pauta = uow.pautas.get_by_id(pauta_id)
+    if pauta is None:
+        raise HTTPException(status_code=404, detail="Pauta not found")
+    cliente = uow.clients.get_by_id(pauta.client_id)
+    identidad = uow.identidad_comercial.get()
+    pdf_bytes = generar_contrato_pauta_pdf(
+        pauta, cliente, identidad, _logo_bytes(uow, media_storage)
     )
+    filename = _nombre_archivo("contrato", pauta, cliente.nombre if cliente else None)
+    return _pdf_response(pdf_bytes, filename)
 
 
 @router.get("/{pauta_id}/informe.pdf")
@@ -188,14 +224,12 @@ def descargar_informe_pauta(
     return _generar_informe_pdf_response(pauta_id, uow, media_storage)
 
 
-@router.post("/{pauta_id}/informe-link", response_model=InformeLinkOut)
-def crear_informe_link(
-    pauta_id: str,
-    request: Request,
-    uow: UnitOfWork = Depends(get_unit_of_work),
+def _mint_share_link(
+    pauta_id: str, documento_publico: str, request: Request, uow: UnitOfWork
 ) -> InformeLinkOut:
-    """Mint a fresh, time-limited share link to this Pauta's informe —
-    "Enviar por WhatsApp" on the Contratos card.
+    """Mint a fresh, time-limited share link to one of this Pauta's
+    client-facing PDFs — `documento_publico` is the public route segment
+    (`informe-publico.pdf` or `contrato-publico.pdf`).
 
     Every click gets its own token (never reused), so there is nothing to
     invalidate on the previous one — it simply expires on its own schedule
@@ -203,7 +237,9 @@ def crear_informe_link(
     hash is stored (`hash_session_token` — the same generic helper
     `core.entities.session.Session` uses, not session-specific despite the
     name), same discipline as a login session: a leaked database row alone
-    can't be replayed as a working link.
+    can't be replayed as a working link. The token scopes access to the
+    Pauta, not to one document — informe and contrato are the same
+    client's own PDFs shared with that same client.
     """
     pauta = uow.pautas.get_by_id(pauta_id)
     if pauta is None:
@@ -225,8 +261,27 @@ def crear_informe_link(
     # `app.api.routers.auth._set_session_cookie` already applies to the
     # session cookie's `secure` flag.
     scheme = "https" if settings.environment == "production" else request.url.scheme
-    url = f"{scheme}://{request.url.netloc}/pautas/{pauta_id}/informe-publico.pdf?token={token}"
+    url = f"{scheme}://{request.url.netloc}/pautas/{pauta_id}/{documento_publico}?token={token}"
     return InformeLinkOut(url=url, expira_en=expires_at)
+
+
+def _validar_token_publico(pauta_id: str, token: str, uow: UnitOfWork) -> None:
+    """Raise `404` for a missing/expired/mismatched token, same as a
+    genuinely-missing Pauta, so a guess reveals nothing either way."""
+    link = uow.informe_links.get_by_token_hash(hash_session_token(token))
+    if link is None or link.pauta_id != pauta_id or link.expires_at < datetime.now(UTC):
+        raise HTTPException(status_code=404, detail="Enlace no válido o expirado")
+
+
+@router.post("/{pauta_id}/informe-link", response_model=InformeLinkOut)
+def crear_informe_link(
+    pauta_id: str,
+    request: Request,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> InformeLinkOut:
+    """Mint a share link to this Pauta's informe — "Enviar al cliente" on
+    the Contratos card. See `_mint_share_link`."""
+    return _mint_share_link(pauta_id, "informe-publico.pdf", request, uow)
 
 
 @router_publico.get("/{pauta_id}/informe-publico.pdf")
@@ -237,10 +292,42 @@ def descargar_informe_pauta_publico(
     media_storage: MediaStorage = Depends(get_media_storage),
 ) -> Response:
     """The unauthenticated side of `crear_informe_link` — what a client
-    actually opens from WhatsApp. `404` for a missing/expired/mismatched
-    token, same as a genuinely-missing Pauta, so a guess reveals nothing
-    either way."""
-    link = uow.informe_links.get_by_token_hash(hash_session_token(token))
-    if link is None or link.pauta_id != pauta_id or link.expires_at < datetime.now(UTC):
-        raise HTTPException(status_code=404, detail="Enlace no válido o expirado")
+    actually opens from WhatsApp."""
+    _validar_token_publico(pauta_id, token, uow)
     return _generar_informe_pdf_response(pauta_id, uow, media_storage)
+
+
+@router.get("/{pauta_id}/contrato.pdf")
+def descargar_contrato_pauta(
+    pauta_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    media_storage: MediaStorage = Depends(get_media_storage),
+) -> Response:
+    """Generate and download the client-facing contract terms for one Pauta —
+    the document sent when the pauta is about to start. See
+    `_generar_contrato_pdf_response`."""
+    return _generar_contrato_pdf_response(pauta_id, uow, media_storage)
+
+
+@router.post("/{pauta_id}/contrato-link", response_model=InformeLinkOut)
+def crear_contrato_link(
+    pauta_id: str,
+    request: Request,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> InformeLinkOut:
+    """Mint a share link to this Pauta's contrato — "Enviar contrato al
+    cliente" on the Contratos card. See `_mint_share_link`."""
+    return _mint_share_link(pauta_id, "contrato-publico.pdf", request, uow)
+
+
+@router_publico.get("/{pauta_id}/contrato-publico.pdf")
+def descargar_contrato_pauta_publico(
+    pauta_id: str,
+    token: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    media_storage: MediaStorage = Depends(get_media_storage),
+) -> Response:
+    """The unauthenticated side of `crear_contrato_link` — what a client
+    actually opens from WhatsApp."""
+    _validar_token_publico(pauta_id, token, uow)
+    return _generar_contrato_pdf_response(pauta_id, uow, media_storage)

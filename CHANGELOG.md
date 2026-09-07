@@ -9,6 +9,21 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **PDF de contrato para el cliente (2026-09-07).** Nuevo documento
+  cliente-facing con los términos de la pauta — cliente, tipo de plan,
+  fechas, publicaciones contratadas, valor, saldo pendiente y
+  observaciones — pensado para enviarlo *apenas se va a iniciar* la
+  pauta, cuando todavía no hay nada que reportar. Mismo lenguaje visual
+  del informe (`app/api/pdf_contrato.py` reutiliza el encabezado de
+  identidad, la tabla de datos y el cierre de `pdf_informe`), sin la
+  mitad de resultados. En la tarjeta de Contratos: botón **"Contrato"**
+  (descarga `GET /pautas/{id}/contrato.pdf`) y **"Enviar contrato"**
+  (`POST /pautas/{id}/contrato-link` → enlace temporal sin login,
+  `GET /pautas/{id}/contrato-publico.pdf?token=`, mismo mecanismo y TTL
+  que el enlace del informe; el botón de WhatsApp del informe pasa a
+  llamarse "Enviar informe"). Sin cambios de esquema: el token de
+  `informe_links` ya está acotado a la pauta, no al documento.
+
 - **Sprint Discovery 3 — resolver la fuente original y preparar el
   Extractor (2026-08-29).** `NewsCandidate` gana `url_fuente_original`/
   `estado_resolucion` (`pendiente/resuelta/fallida`, migración
