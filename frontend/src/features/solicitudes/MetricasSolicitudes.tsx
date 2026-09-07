@@ -45,7 +45,17 @@ export function MetricasSolicitudes({
   }, 0)
 
   const hoyStr = fechaNegocioISO()
-  const publicadasHoy = publicadas.filter((s) => fechaNegocioISO(s.fecha_recepcion) === hoyStr).length
+  // "Hoy" se mide por fecha_cierre (el momento en que la solicitud quedó
+  // publicada), no por fecha_recepcion — una solicitud recibida ayer y
+  // publicada hoy cuenta hoy.
+  const publicadasHoyList = publicadas.filter(
+    (s) => s.fecha_cierre && fechaNegocioISO(s.fecha_cierre) === hoyStr,
+  )
+  const publicadasHoy = publicadasHoyList.length
+  const valorPublicadoHoy = publicadasHoyList.reduce((acc, s) => {
+    const pauta = pautaDe(s)
+    return acc + (pauta ? Number(pauta.peso_comercial) : 0)
+  }, 0)
 
   const horasPendientes = pendientes.map((s) => horasEnEspera(s.fecha_recepcion))
   const tiempoPromedio =
@@ -54,10 +64,11 @@ export function MetricasSolicitudes({
   const criticas = pendientes.filter((s) => scoreSolicitud(s, pautaDe(s), horasEnEspera(s.fecha_recepcion)).emoji === '🔥').length
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
       <StatTile icon={Inbox} valor={pendientes.length} label="Pendientes" />
       <StatTile icon={Target} valor={premiumPendientes} label="Premium pendientes" />
       <StatTile icon={CheckCircle2} valor={publicadasHoy} label="Publicadas hoy" />
+      <StatTile icon={DollarSign} valor={formatMoneda(valorPublicadoHoy)} label="Valor publicado hoy" />
       <StatTile icon={DollarSign} valor={formatMoneda(valorPendiente)} label="Valor pendiente por publicar" />
       <StatTile
         icon={Clock}
