@@ -15,8 +15,9 @@ from core.entities.article import Article, ArticleStatus
 from core.entities.client import Client, ClientType
 from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion, EstadoDestino
 from core.entities.editorial_task import EditorialTask, EditorialTaskStatus
+from core.entities.extracted_content import ExtractedContent
 from core.entities.media_asset import MediaAsset, MediaAssetType
-from core.entities.news_candidate import NewsCandidate
+from core.entities.news_candidate import EstadoNewsCandidate, EstadoResolucionFuente, NewsCandidate
 from core.entities.pauta import Pauta
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.entities.session import Session
@@ -33,6 +34,9 @@ __all__ = [
     "EditorialTask",
     "EditorialTaskStatus",
     "EstadoDestino",
+    "EstadoNewsCandidate",
+    "EstadoResolucionFuente",
+    "ExtractedContent",
     "MediaAsset",
     "MediaAssetType",
     "NewsCandidate",

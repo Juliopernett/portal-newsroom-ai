@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bookmark, ExternalLink, Newspaper, Trash2 } from 'lucide-react'
+import { Bookmark, ChevronDown, ChevronUp, ExternalLink, Newspaper, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -37,6 +38,7 @@ const RADAR_KEY = ['radar-candidatos']
 
 export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) {
   const queryClient = useQueryClient()
+  const [mostrarContenido, setMostrarContenido] = useState(false)
 
   function onExito(mensaje: string) {
     queryClient.invalidateQueries({ queryKey: RADAR_KEY })
@@ -58,8 +60,28 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
     onSuccess: () => onExito('Candidato marcado para crear noticia.'),
     onError: (err) => toast.error(errorMessage(err)),
   })
+  const prepararMutation = useMutation({
+    mutationFn: () => radarApi.preparar(candidato.id),
+    onSuccess: (actualizado) => {
+      queryClient.invalidateQueries({ queryKey: RADAR_KEY })
+      if (actualizado.estado_resolucion === 'resuelta') {
+        toast.success(
+          actualizado.extracted_content
+            ? 'Fuente resuelta y contenido extraído.'
+            : 'Fuente resuelta, pero no se pudo extraer el contenido todavía.',
+        )
+      } else {
+        toast.error('No se pudo resolver la fuente original — puedes volver a intentar más tarde.')
+      }
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
 
-  const isActing = guardarMutation.isPending || descartarMutation.isPending || crearNoticiaMutation.isPending
+  const isActing =
+    guardarMutation.isPending ||
+    descartarMutation.isPending ||
+    crearNoticiaMutation.isPending ||
+    prepararMutation.isPending
   const esTerminal = candidato.estado === 'procesado'
 
   return (
@@ -85,18 +107,43 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
+        {candidato.estado_resolucion === 'resuelta' && candidato.url_fuente_original ? (
+          <a
+            href={candidato.url_fuente_original}
+            target="_blank"
+            rel="noopener"
+            title="URL real del medio, resuelta a partir del enlace de Google Noticias"
+            className="inline-flex items-center gap-1 text-xs font-medium text-brand underline"
+          >
+            <ExternalLink className="size-3.5" /> Fuente original
+          </a>
+        ) : candidato.estado_resolucion === 'fallida' ? (
+          <span className="text-xs text-destructive">No se pudo resolver la fuente</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">Fuente pendiente de resolver</span>
+        )}
+
         <a
           href={candidato.url}
           target="_blank"
           rel="noopener"
-          title="Enlace de Google Noticias — puede no ser la URL del medio original (Discovery 3 lo resolverá)"
-          className="inline-flex items-center gap-1 text-xs text-brand underline"
+          title="Enlace de Google Noticias — puede no ser la URL del medio original"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"
         >
-          <ExternalLink className="size-3.5" /> Ver fuente
+          <ExternalLink className="size-3.5" /> Ver descubrimiento
         </a>
 
         {!esTerminal && (
           <>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isActing}
+              onClick={() => prepararMutation.mutate()}
+            >
+              <Sparkles /> Preparar noticia
+            </Button>
+
             {candidato.estado !== 'guardado' && (
               <Button
                 size="sm"
@@ -142,7 +189,7 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
                   <AlertDialogTitle>¿Crear noticia a partir de este candidato?</AlertDialogTitle>
                   <AlertDialogDescription>
                     Por ahora esto solo marca el candidato como "Procesado" y lo prepara para el
-                    flujo editorial — la redacción automática (Extractor/Writer) todavía no existe,
+                    flujo editorial — la redacción automática con IA (Writer) todavía no existe,
                     llega en un sprint futuro. Es una acción terminal: no podrás volver a
                     guardarlo/descartarlo después.
                   </AlertDialogDescription>
@@ -158,6 +205,29 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
           </>
         )}
       </div>
+
+      {candidato.extracted_content && (
+        <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setMostrarContenido((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 font-medium text-foreground"
+          >
+            <span>
+              Contenido extraído
+              {candidato.extracted_content.site_name ? ` — ${candidato.extracted_content.site_name}` : ''}
+            </span>
+            {mostrarContenido ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+          </button>
+          {mostrarContenido && (
+            <div className="mt-2 space-y-1 text-muted-foreground">
+              <p className="font-medium text-foreground">{candidato.extracted_content.title}</p>
+              {candidato.extracted_content.author && <p>Autor: {candidato.extracted_content.author}</p>}
+              <p className="whitespace-pre-line">{candidato.extracted_content.body}</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

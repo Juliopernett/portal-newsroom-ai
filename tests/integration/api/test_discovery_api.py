@@ -14,7 +14,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import sessionmaker
 
+from agents.extractor.fake_content_extractor import FakeContentExtractor
+from agents.radar.fake_source_resolver import FakeSourceResolver
+from app.api.dependencies import get_content_extractor, get_source_resolver
+from app.api.main import app
 from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
+from core.ports.content_extractor import ContentExtractorError
+from core.ports.source_resolver import ResolvedSource
 from database.repositories.news_candidate_repository import SqlAlchemyNewsCandidateRepository
 
 
@@ -156,6 +162,79 @@ def test_list_candidatos_handles_a_candidate_without_summary_or_published_at(
     body = response.json()
     assert body[0]["summary"] == ""
     assert body[0]["published_at"] is None
+
+
+def test_preparar_resolves_and_extracts_on_success(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    candidato = _candidato()
+    _seed(_test_engine, candidato)
+
+    response = client.post(f"/discovery/{candidato.id}/preparar")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["estado_resolucion"] == "resuelta"
+    assert body["url_fuente_original"] is not None
+    assert body["extracted_content"] is not None
+    assert body["extracted_content"]["title"] == "[DEMO] Titular extraído"
+    # No editorial-state side effect — "preparar" never marks procesado.
+    assert body["estado"] == "nuevo"
+
+
+def test_preparar_does_not_500_when_resolution_fails(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    candidato = _candidato()
+    _seed(_test_engine, candidato)
+    app.dependency_overrides[get_source_resolver] = lambda: FakeSourceResolver(
+        resultado=ResolvedSource(success=False, resolved_url=None, error="timeout")
+    )
+
+    response = client.post(f"/discovery/{candidato.id}/preparar")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["estado_resolucion"] == "fallida"
+    assert body["url_fuente_original"] is None
+    assert body["extracted_content"] is None
+
+
+def test_preparar_does_not_500_when_extraction_fails(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    candidato = _candidato()
+    _seed(_test_engine, candidato)
+    app.dependency_overrides[get_content_extractor] = lambda: FakeContentExtractor(
+        error=ContentExtractorError("sin contenido reconocible")
+    )
+
+    response = client.post(f"/discovery/{candidato.id}/preparar")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["estado_resolucion"] == "resuelta"
+    assert body["extracted_content"] is None
+
+
+def test_preparar_on_a_missing_id_returns_404(client: TestClient) -> None:
+    response = client.post("/discovery/no-existe/preparar")
+
+    assert response.status_code == 404
+
+
+def test_preparar_does_not_lose_a_descartado_candidate(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    """Preparing is independent of estado — even a descartado candidate can be prepared."""
+    candidato = _candidato(estado=EstadoNewsCandidate.DESCARTADO)
+    _seed(_test_engine, candidato)
+
+    response = client.post(f"/discovery/{candidato.id}/preparar")
+
+    assert response.status_code == 200
+    assert response.json()["estado"] == "descartado"
+    assert response.json()["estado_resolucion"] == "resuelta"
 
 
 def test_list_candidatos_orders_nuevos_first_then_most_recent(

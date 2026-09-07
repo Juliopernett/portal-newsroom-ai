@@ -1,7 +1,7 @@
 # Radar Agent
 
 **Estado:** Parcialmente implementado (Sprint Discovery 1, 2026-08-25 —
-Sprint Discovery 2, 2026-08-26).
+Sprint Discovery 3, 2026-08-29).
 
 ## Lo que ya existe
 
@@ -32,22 +32,52 @@ Sprint Discovery 2, 2026-08-26).
   "Crear noticia" **solo** marca `PROCESADO` — no genera contenido ni
   crea `Article`/`PublicationRequest` (ver "Lo que falta" abajo).
 
-## Lo que falta (Discovery 3+)
+## Discovery 3 (2026-08-29) — resolver la fuente + preparar el Extractor
 
+`NewsCandidate.url` (el enlace de Google Noticias) ahora se puede
+resolver a la URL real del medio (`url_fuente_original`,
+`estado_resolucion`) y esa página extraerse a `extracted_content` — ver
+`core/services/source_resolution_service.py`, el puerto nuevo
+`core.ports.source_resolver.SourceResolver` y la primera implementación
+real de `core.ports.content_extractor.ContentExtractor`
+(`agents/extractor/html_content_extractor.py`). Acción nueva en el Radar
+Editorial: **"Preparar noticia"** (`POST /discovery/{id}/preparar`),
+independiente de `Guardar`/`Descartar`/`Crear noticia`.
+
+**Hallazgo real, verificado contra el feed en vivo (20 URLs, sin
+mocks)**: **el resolver por redirect HTTP falla en el 100% de los
+casos actuales** — Google Noticias emite un 302 real, pero apunta a
+*otra* URL dentro de `news.google.com` (el shell de su app cliente),
+que requiere JavaScript para llegar al medio real. Confirmado que no
+depende del `User-Agent` (probado también como Googlebot). Esto no es
+un bug de `HttpRedirectSourceResolver` — es exactamente el escenario
+que su propio diseño anticipa y reporta como `ResolvedSource(success=False)`
+en vez de romper el pipeline. El botón "Preparar noticia" del Radar
+Editorial hoy, con este adaptador, casi siempre terminará en "Fuente
+pendiente de resolver" — esperado, no un error a corregir en este
+sprint.
+
+## Lo que falta (Discovery 4+)
+
+- **Un `SourceResolver` que sí funcione contra Google Noticias** — el
+  puerto ya existe exactamente para esto (ver el hallazgo arriba).
+  Candidatos: ejecutar la redirección con un navegador real
+  (Playwright, ya está en `requirements.txt` sin usar) o decodificar el
+  esquema de URL que Google usa para codificar el destino real
+  (enfoque usado por proyectos open-source de scraping de Google News —
+  no evaluado en este sprint, y frágil por naturaleza: se rompe si
+  Google cambia el formato).
+- Extracción con JavaScript para medios cuya página también lo
+  requiere (mismo motivo — `HtmlContentExtractor` es deliberadamente
+  solo HTTP + BeautifulSoup, ver `agents/extractor/README.md`).
 - Más de una fuente simultánea (`descubrir` ya acepta un `ContentSource`
   por llamada; falta orquestar varias y agregar sus resultados).
-- Resolver el redirect de Google Noticias (`news.google.com/rss/articles/...`)
-  a la URL real del medio — hoy es suficiente para identificar la
-  noticia, pero un futuro Extractor necesita la URL real para sacar el
-  cuerpo del artículo. El botón "Ver fuente" del Radar Editorial abre
-  ese link tal cual, con un aviso visible de la limitación.
 - `Source` persistido y gestionable (hoy se construye a mano en el
   script, no vive en base de datos).
-- Lo que pasa después de "Crear noticia": ni `Article` ni
-  `EditorialTask` tienen hoy un campo que los enlace a un
-  `NewsCandidate`, y no existe `ArticleRepository`/`EditorialTaskRepository`
-  en `core/ports/` ni en `UnitOfWork` — construir esa persistencia real
-  es trabajo de Discovery 3, deliberadamente no resuelto aquí.
+- El Writer real (reescritura con IA) y `Article`/`EditorialTask`
+  persistidos de verdad, enlazados a un `NewsCandidate` — ninguno de
+  los dos tiene hoy ese campo, ni existe `ArticleRepository`/
+  `EditorialTaskRepository` en `core/ports/`/`UnitOfWork`.
 - El mapeo a `PublicationRequest` vía `RadarPublicationInboxAdapter` (ver
   [ADR-003](../../docs/adr/ADR-003-publication-inbox.md)) — ese ADR
   asume campos (`origin`/`is_commercial`) que `PublicationRequest` no

@@ -9,6 +9,44 @@ y este proyecto usa [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Added
 
+- **Sprint Discovery 3 — resolver la fuente original y preparar el
+  Extractor (2026-08-29).** `NewsCandidate` gana `url_fuente_original`/
+  `estado_resolucion` (`pendiente/resuelta/fallida`, migración
+  `7f3a1c9e2b5d`) y `extracted_content` (nueva entidad `ExtractedContent`
+  — título/cuerpo/autor/fecha/medio/imágenes, serializada como JSON en
+  `extracted_content_json`, mismo patrón que `metadata_json`). Nuevo
+  puerto `core.ports.source_resolver.SourceResolver` +
+  `agents.radar.http_redirect_source_resolver.HttpRedirectSourceResolver`
+  (sigue redirects HTTP reales; nunca lanza para un fallo esperado —
+  timeout, ciclo de redirects, host sin cambiar — lo reporta como
+  `ResolvedSource(success=False, ...)`). `core.ports.content_extractor
+  .ContentExtractor` deja de devolver `dict[str, Any]` y ahora devuelve
+  `ExtractedContent` — primera implementación real,
+  `agents.extractor.html_content_extractor.HtmlContentExtractor`
+  (`requests` + `BeautifulSoup`, sin JavaScript). Orquestación nueva y
+  separada de `news_candidate_service`:
+  `core/services/source_resolution_service.py`
+  (`resolver_fuente`/`preparar_contenido`/`preparar_noticia`). Nueva
+  acción en el Radar Editorial, **"Preparar noticia"**
+  (`POST /discovery/{id}/preparar`) — independiente de
+  `Guardar`/`Descartar`/`Crear noticia`, nunca marca `PROCESADO`, nunca
+  falla la petición (un fallo de resolución/extracción se refleja en el
+  candidato devuelto, nunca un 4xx/5xx). La tarjeta del candidato
+  muestra "Fuente original" (si se resolvió), "Ver descubrimiento" (el
+  enlace de Google Noticias, como antes) y el contenido extraído en un
+  bloque colapsable.
+
+  **Hallazgo real de la prueba en vivo contra el feed** (no mocks, 20
+  URLs reales de Google Noticias — vallenato): **0/20 resolvieron** —
+  Google News sí emite un 302 real, pero redirige a *otra* URL dentro
+  de `news.google.com` (el shell de su app cliente), que a su vez
+  necesita JavaScript para llegar al medio real. Confirmado
+  independiente del `User-Agent` (probado también como Googlebot).
+  Limitación esperada y documentada desde el diseño del adaptador —
+  el puerto `SourceResolver` existe exactamente para poder reemplazar
+  este mecanismo (Playwright, o decodificar el esquema de URL de
+  Google) sin tocar el resto del pipeline. Queda para Discovery 4.
+
 - **Sprint Discovery 2 — Radar Editorial (2026-08-26).** Los
   `NewsCandidate` que Discovery 1 empezó a persistir dejan de ser
   invisibles: nueva pantalla **Radar Editorial** en Newsroom

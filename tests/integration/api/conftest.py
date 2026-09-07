@@ -18,11 +18,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 import database.models  # noqa: F401  (registers tables on Base.metadata)
 from agents.ai.fake_provider import FakeAIProvider
+from agents.extractor.fake_content_extractor import FakeContentExtractor
 from agents.meta_social.fake_reader import FakeSocialMediaReader
+from agents.radar.fake_source_resolver import FakeSourceResolver
 from app.api.dependencies import (
     get_ai_provider,
+    get_content_extractor,
     get_login_rate_limiter,
     get_social_media_reader,
+    get_source_resolver,
     get_unit_of_work,
 )
 from app.api.main import app
@@ -84,6 +88,12 @@ def unauthenticated_client(_test_engine: Engine) -> Iterator[TestClient]:
     # a test exercising the AI-failure path overrides this again with
     # FakeAIProvider(error=...).
     app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider()
+    # Sprint Discovery 3 — no real network for `/discovery/{id}/preparar`
+    # tests either; a test exercising the failure path overrides these
+    # again with a forced `ResolvedSource(success=False, ...)`/
+    # `ContentExtractorError`.
+    app.dependency_overrides[get_source_resolver] = lambda: FakeSourceResolver()
+    app.dependency_overrides[get_content_extractor] = lambda: FakeContentExtractor()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

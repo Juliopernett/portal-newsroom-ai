@@ -7,7 +7,8 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
+from core.entities.extracted_content import ExtractedContent
+from core.entities.news_candidate import EstadoNewsCandidate, EstadoResolucionFuente, NewsCandidate
 from database.repositories.news_candidate_repository import SqlAlchemyNewsCandidateRepository
 
 
@@ -121,3 +122,67 @@ def test_estado_survives_the_round_trip_after_a_transition(session: Session) -> 
     resultado = repository.get_by_id(candidato.id)
     assert resultado is not None
     assert resultado.estado == EstadoNewsCandidate.GUARDADO
+
+
+def test_estado_resolucion_defaults_to_pendiente_on_a_freshly_saved_candidate(
+    session: Session,
+) -> None:
+    repository = SqlAlchemyNewsCandidateRepository(session)
+    repository.save(_candidato())
+    session.commit()
+
+    assert repository.list_all()[0].estado_resolucion == EstadoResolucionFuente.PENDIENTE
+
+
+def test_url_fuente_original_and_estado_resolucion_survive_the_round_trip(
+    session: Session,
+) -> None:
+    repository = SqlAlchemyNewsCandidateRepository(session)
+    candidato = _candidato()
+    repository.save(candidato)
+    session.commit()
+
+    resuelto = replace(
+        candidato,
+        url_fuente_original="https://elpilon.com.co/noticia-real",
+        estado_resolucion=EstadoResolucionFuente.RESUELTA,
+    )
+    repository.save(resuelto)
+    session.commit()
+
+    resultado = repository.get_by_id(candidato.id)
+    assert resultado is not None
+    assert resultado.url_fuente_original == "https://elpilon.com.co/noticia-real"
+    assert resultado.estado_resolucion == EstadoResolucionFuente.RESUELTA
+
+
+def test_extracted_content_survives_the_round_trip(session: Session) -> None:
+    repository = SqlAlchemyNewsCandidateRepository(session)
+    candidato = _candidato()
+    repository.save(candidato)
+    session.commit()
+
+    contenido = ExtractedContent(
+        title="Un festival vallenato bate récord de asistencia",
+        body="Cuerpo completo de la noticia extraída.",
+        source_url="https://elpilon.com.co/noticia-real",
+        author="Redacción El Pilón",
+        published_at=datetime(2026, 8, 20, 10, 0, tzinfo=UTC),
+        site_name="El Pilón",
+        image_urls=("https://elpilon.com.co/img/1.jpg", "https://elpilon.com.co/img/2.jpg"),
+    )
+    con_contenido = replace(candidato, extracted_content=contenido)
+    repository.save(con_contenido)
+    session.commit()
+
+    resultado = repository.get_by_id(candidato.id)
+    assert resultado is not None
+    assert resultado.extracted_content == contenido
+
+
+def test_extracted_content_is_none_when_never_set(session: Session) -> None:
+    repository = SqlAlchemyNewsCandidateRepository(session)
+    repository.save(_candidato())
+    session.commit()
+
+    assert repository.list_all()[0].extracted_content is None

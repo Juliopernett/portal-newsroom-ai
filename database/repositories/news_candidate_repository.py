@@ -8,13 +8,46 @@ never sees this module.
 from __future__ import annotations
 
 import json
-from datetime import UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
+from core.entities.extracted_content import ExtractedContent
+from core.entities.news_candidate import EstadoNewsCandidate, EstadoResolucionFuente, NewsCandidate
 from database.models.news_candidate import NewsCandidateModel
+
+
+def _extracted_content_to_json(content: ExtractedContent | None) -> str | None:
+    if content is None:
+        return None
+    return json.dumps(
+        {
+            "title": content.title,
+            "body": content.body,
+            "source_url": content.source_url,
+            "author": content.author,
+            "published_at": content.published_at.isoformat() if content.published_at else None,
+            "site_name": content.site_name,
+            "image_urls": list(content.image_urls),
+        }
+    )
+
+
+def _extracted_content_from_json(raw: str | None) -> ExtractedContent | None:
+    if raw is None:
+        return None
+    data = json.loads(raw)
+    published_at = datetime.fromisoformat(data["published_at"]) if data["published_at"] else None
+    return ExtractedContent(
+        title=data["title"],
+        body=data["body"],
+        source_url=data["source_url"],
+        author=data["author"],
+        published_at=published_at,
+        site_name=data["site_name"],
+        image_urls=tuple(data["image_urls"]),
+    )
 
 
 def _to_model(candidate: NewsCandidate) -> NewsCandidateModel:
@@ -31,6 +64,9 @@ def _to_model(candidate: NewsCandidate) -> NewsCandidateModel:
         metadata_json=json.dumps(candidate.metadata) if candidate.metadata else None,
         confidence=candidate.confidence,
         estado=candidate.estado.value,
+        url_fuente_original=candidate.url_fuente_original,
+        estado_resolucion=candidate.estado_resolucion.value,
+        extracted_content_json=_extracted_content_to_json(candidate.extracted_content),
     )
 
 
@@ -57,6 +93,9 @@ def _to_domain(model: NewsCandidateModel) -> NewsCandidate:
         metadata=json.loads(model.metadata_json) if model.metadata_json is not None else {},
         confidence=model.confidence,
         estado=EstadoNewsCandidate(model.estado),
+        url_fuente_original=model.url_fuente_original,
+        estado_resolucion=EstadoResolucionFuente(model.estado_resolucion),
+        extracted_content=_extracted_content_from_json(model.extracted_content_json),
     )
 
 

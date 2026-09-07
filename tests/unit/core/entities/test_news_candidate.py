@@ -6,7 +6,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from core.entities.news_candidate import NewsCandidate
+from core.entities.extracted_content import ExtractedContent
+from core.entities.news_candidate import EstadoResolucionFuente, NewsCandidate
 
 
 def _build(**overrides: object) -> NewsCandidate:
@@ -30,6 +31,10 @@ def test_create_news_candidate_assigns_defaults() -> None:
     assert candidate.image_url is None
     assert candidate.published_at is None
     assert isinstance(candidate.discovered_at, datetime)
+    assert candidate.url_fuente_original is None
+    assert candidate.estado_resolucion == EstadoResolucionFuente.PENDIENTE
+    assert candidate.extracted_content is None
+    assert candidate.lista_para_extraccion is False
 
 
 def test_create_news_candidate_accepts_explicit_values() -> None:
@@ -67,3 +72,28 @@ def test_news_candidate_is_immutable() -> None:
 
     with pytest.raises(AttributeError):
         candidate.title = "Otro título"  # type: ignore[misc]
+
+
+def test_lista_para_extraccion_requires_estado_resuelta_and_a_url() -> None:
+    pendiente = _build()
+    resuelta = _build(
+        estado_resolucion=EstadoResolucionFuente.RESUELTA,
+        url_fuente_original="https://elpilon.com.co/noticia",
+    )
+    fallida = _build(estado_resolucion=EstadoResolucionFuente.FALLIDA)
+
+    assert pendiente.lista_para_extraccion is False
+    assert resuelta.lista_para_extraccion is True
+    assert fallida.lista_para_extraccion is False
+
+
+def test_news_candidate_accepts_an_extracted_content() -> None:
+    contenido = ExtractedContent(
+        title="Un festival vallenato bate récord de asistencia",
+        body="Cuerpo extraído.",
+        source_url="https://elpilon.com.co/noticia",
+    )
+
+    candidate = _build(extracted_content=contenido)
+
+    assert candidate.extracted_content == contenido

@@ -18,7 +18,9 @@ from fastapi import Cookie, Depends, HTTPException, status
 
 from agents.ai.anthropic_provider import MODELO_POR_DEFECTO, AnthropicAIProvider
 from agents.ai.openrouter_provider import OpenRouterAIProvider
+from agents.extractor.html_content_extractor import HtmlContentExtractor
 from agents.meta_social.client import MetaGraphSocialMediaReader
+from agents.radar.http_redirect_source_resolver import HttpRedirectSourceResolver
 from agents.storage.local_disk import LocalDiskMediaStorage
 from agents.wordpress.client import WordPressCMSPublisher
 from config.settings import get_settings
@@ -27,9 +29,11 @@ from core.entities.session import Session as SessionEntity
 from core.entities.user import User
 from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
+from core.ports.content_extractor import ContentExtractor
 from core.ports.media_storage import MediaStorage
 from core.ports.password_hasher import PasswordHasher
 from core.ports.social_media_reader import SocialMediaReader
+from core.ports.source_resolver import SourceResolver
 from core.ports.unit_of_work import UnitOfWork
 from database.engine import get_session_factory
 from database.unit_of_work import SqlAlchemyUnitOfWork
@@ -114,6 +118,24 @@ def get_social_media_reader() -> SocialMediaReader:
     uses for `WordPressCMSPublisher`.
     """
     return MetaGraphSocialMediaReader(get_settings())
+
+
+def get_source_resolver() -> SourceResolver:
+    """Return the resolver used to follow a candidate's Google News URL to its real source.
+
+    Sprint Discovery 3 (2026-08-29). No configuration error possible here
+    (unlike `get_cms_publisher`) — resolving is plain HTTP, nothing to set
+    up in `.env` beyond the optional timeout.
+    """
+    return HttpRedirectSourceResolver(timeout=get_settings().radar_source_resolver_timeout_seconds)
+
+
+def get_content_extractor() -> ContentExtractor:
+    """Return the extractor used to pull structured content from a resolved source URL.
+
+    Sprint Discovery 3 (2026-08-29).
+    """
+    return HtmlContentExtractor(timeout=get_settings().radar_content_extractor_timeout_seconds)
 
 
 def get_media_storage() -> MediaStorage:

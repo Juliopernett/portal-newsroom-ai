@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     radar_rss_feed_url: str = (
         "https://news.google.com/rss/search?q=vallenato&hl=es-419&gl=CO&ceid=CO:es-419"
     )
+    # Sprint Discovery 3 — resolving a candidate's Google News URL to its
+    # real source, then extracting that page's content. Two separate
+    # settings since resolving is a lightweight redirect-follow (should be
+    # fast) while extraction downloads and parses a full page (can be
+    # slower on a heavy site).
+    radar_source_resolver_timeout_seconds: int = 15
+    radar_content_extractor_timeout_seconds: int = 20
 
     # --- AI providers (used by the future Writer / SEO / AI Orchestrator agents) ---
     openai_api_key: str | None = None

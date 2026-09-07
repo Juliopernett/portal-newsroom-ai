@@ -19,6 +19,14 @@ holds a real `dict`.
 `estado` (Sprint Discovery 2, 2026-08-26) — Radar Editorial's review
 state, same string-enum-value convention as
 `PublicationRequestModel.preparacion_ia_estado`.
+
+`url_fuente_original`/`estado_resolucion`/`extracted_content_json`
+(Sprint Discovery 3, 2026-08-29) — resolving the Google News `url` to
+the real source and extracting its content. `extracted_content_json`
+stores a JSON object (an `ExtractedContent`'s fields) exactly like
+`metadata_json` already does for `metadata: dict[str, str]` — only the
+repository (de)serializes it, the domain entity holds a real
+`ExtractedContent | None`.
 """
 
 from __future__ import annotations
@@ -48,3 +56,6 @@ class NewsCandidateModel(Base):
     metadata_json: Mapped[str | None] = mapped_column(String, nullable=True)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     estado: Mapped[str] = mapped_column(String(20), nullable=False, default="nuevo")
+    url_fuente_original: Mapped[str | None] = mapped_column(String, nullable=True)
+    estado_resolucion: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
+    extracted_content_json: Mapped[str | None] = mapped_column(String, nullable=True)
