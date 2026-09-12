@@ -107,6 +107,18 @@ def _seccion_datos_contrato(pauta: Pauta, styles: _Styles) -> list[Flowable]:
     ]
 
 
+def _seccion_clausulas(styles: _Styles) -> list[Flowable]:
+    return [
+        Paragraph("Cláusulas", styles.subtitulo),
+        Paragraph(
+            "El presente contrato finaliza al ocurrir primero uno de estos dos eventos: "
+            "el vencimiento del plazo pactado (fecha de finalización) o el consumo total "
+            "de las publicaciones contratadas, lo que suceda primero.",
+            styles.celda,
+        ),
+    ]
+
+
 def _seccion_cierre_contrato(nombre_comercial: str, styles: _Styles) -> list[Flowable]:
     """A minimal cierre — no repeated identidad block (see module docstring)."""
     return [
@@ -166,6 +178,9 @@ def generar_contrato_pauta_pdf(
     story.append(Spacer(1, 0.4 * cm))
 
     story.extend(_seccion_datos_contrato(pauta, styles))
+    story.append(Spacer(1, 0.4 * cm))
+
+    story.extend(_seccion_clausulas(styles))
 
     story.extend(_seccion_cierre_contrato(nombre_comercial, styles))
 
