@@ -8,10 +8,12 @@ against the same throwaway SQLite engine `client` already uses.
 
 from __future__ import annotations
 
+import io
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import Engine
 from sqlalchemy.orm import sessionmaker
 
@@ -28,7 +30,7 @@ from app.api.main import app
 from core.entities.extracted_content import ExtractedContent
 from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
 from core.ports.ai_provider import AIProviderError
-from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult
+from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult, MediaSubidaCMS
 from core.ports.content_extractor import ContentExtractorError
 from core.ports.source_resolver import ResolvedSource
 from database.repositories.news_candidate_repository import SqlAlchemyNewsCandidateRepository
@@ -142,6 +144,12 @@ class _FakeCMS:
     def resolver_o_crear_etiqueta(self, nombre: str) -> str:
         return "1"
 
+    def subir_media_con_url(
+        self, contenido: bytes, nombre_archivo: str, content_type: str
+    ) -> MediaSubidaCMS:
+        assert contenido[:2] == b"\xff\xd8"  # a real JPEG, rendered by the real renderer
+        return MediaSubidaCMS(id="7", url="https://www.portalvallenato.com/portada.jpg")
+
 
 def _con_cms_falso() -> None:
     app.dependency_overrides[get_cms_publisher] = lambda: _FakeCMS()
@@ -165,6 +173,27 @@ def test_crear_noticia_creates_a_wordpress_draft_and_marks_procesado(
     assert body["estado"] == "procesado"
     assert body["wp_post_id"] == "42"
     assert body["wp_url"] == "https://www.portalvallenato.com/?p=42"
+
+
+def test_crear_noticia_with_a_photo_renders_and_stores_the_cover(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    _con_cms_falso()
+    candidato = _candidato(extracted_content=_extraido())
+    _seed(_test_engine, candidato)
+    buffer = io.BytesIO()
+    Image.new("RGB", (800, 600), (200, 120, 40)).save(buffer, "JPEG")
+
+    response = client.post(
+        f"/discovery/{candidato.id}/crear-noticia",
+        files={"imagen_base": ("foto.jpg", buffer.getvalue(), "image/jpeg")},
+        data={"variante": "lo_ultimo", "titular_portada": "Titular corto"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["estado"] == "procesado"
+    assert body["portada_url"] == "https://www.portalvallenato.com/portada.jpg"
 
 
 def test_crear_noticia_without_extracted_content_returns_422(

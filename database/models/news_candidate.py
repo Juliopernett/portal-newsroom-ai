@@ -61,3 +61,4 @@ class NewsCandidateModel(Base):
     extracted_content_json: Mapped[str | None] = mapped_column(String, nullable=True)
     wp_post_id: Mapped[str | None] = mapped_column(String(20), nullable=True)
     wp_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    portada_url: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -15,10 +15,13 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { SelectNative } from '@/components/ui/select-native'
 import { errorMessage } from '@/api/client'
 import { formatFechaHoraNegocio } from '@/lib/format'
 import { formatHoras, horasEnEspera } from '@/features/solicitudes/utils'
-import { radarApi, type NewsCandidate } from './api'
+import { radarApi, type NewsCandidate, type OpcionesPortada } from './api'
 
 const ESTADO_LABELS: Record<NewsCandidate['estado'], string> = {
   nuevo: 'Nuevo',
@@ -39,6 +42,12 @@ const RADAR_KEY = ['radar-candidatos']
 export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) {
   const queryClient = useQueryClient()
   const [mostrarContenido, setMostrarContenido] = useState(false)
+  // Opciones de portada del diálogo "Crear noticia" (todas opcionales).
+  const [imagenPortada, setImagenPortada] = useState<File | null>(null)
+  const [imagenCirculo, setImagenCirculo] = useState<File | null>(null)
+  const [variantePortada, setVariantePortada] = useState<OpcionesPortada['variante']>('noticias')
+  const [titularPortada, setTitularPortada] = useState('')
+  const [antetituloPortada, setAntetituloPortada] = useState('')
 
   function onExito(mensaje: string) {
     queryClient.invalidateQueries({ queryKey: RADAR_KEY })
@@ -56,8 +65,25 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
     onError: (err) => toast.error(errorMessage(err)),
   })
   const crearNoticiaMutation = useMutation({
-    mutationFn: () => radarApi.crearNoticia(candidato.id),
-    onSuccess: () => onExito('Borrador creado en WordPress.'),
+    mutationFn: () =>
+      radarApi.crearNoticia(
+        candidato.id,
+        imagenPortada
+          ? {
+              imagenBase: imagenPortada,
+              imagenCirculo,
+              variante: variantePortada,
+              titular: titularPortada,
+              antetitulo: antetituloPortada,
+            }
+          : null,
+      ),
+    onSuccess: () =>
+      onExito(
+        imagenPortada
+          ? 'Borrador creado en WordPress con su portada.'
+          : 'Borrador creado en WordPress.',
+      ),
     onError: (err) => toast.error(errorMessage(err)),
   })
   const prepararMutation = useMutation({
@@ -144,6 +170,18 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
           </a>
         )}
 
+        {candidato.portada_url && (
+          <a
+            href={candidato.portada_url}
+            target="_blank"
+            rel="noopener"
+            title="La misma imagen sirve para subirla a redes sociales"
+            className="inline-flex items-center gap-1 text-xs font-medium text-brand underline"
+          >
+            <ExternalLink className="size-3.5" /> Ver portada (para redes)
+          </a>
+        )}
+
         {!esTerminal && (
           <>
             <Button
@@ -213,6 +251,73 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
                     volver a guardarlo/descartarlo después.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+
+                <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+                  <p className="text-sm font-medium">Portada (opcional)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Sube tu propia foto y se arma la portada con la plantilla de Portal Vallenato:
+                    queda como imagen destacada del borrador y la puedes bajar para redes. Sin foto,
+                    el borrador se crea sin imagen.
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={`portada-foto-${candidato.id}`}>Foto base</Label>
+                    <Input
+                      id={`portada-foto-${candidato.id}`}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(e) => setImagenPortada(e.target.files?.[0] ?? null)}
+                    />
+                  </div>
+                  {imagenPortada && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor={`portada-plantilla-${candidato.id}`}>Plantilla</Label>
+                          <SelectNative
+                            id={`portada-plantilla-${candidato.id}`}
+                            value={variantePortada}
+                            onChange={(e) =>
+                              setVariantePortada(e.target.value as OpcionesPortada['variante'])
+                            }
+                          >
+                            <option value="noticias">Noticias</option>
+                            <option value="lo_ultimo">Lo último</option>
+                          </SelectNative>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor={`portada-circulo-${candidato.id}`}>Foto en círculo</Label>
+                          <Input
+                            id={`portada-circulo-${candidato.id}`}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={(e) => setImagenCirculo(e.target.files?.[0] ?? null)}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor={`portada-antetitulo-${candidato.id}`}>
+                          Antetítulo (ej. ¡CONFIRMADO!)
+                        </Label>
+                        <Input
+                          id={`portada-antetitulo-${candidato.id}`}
+                          maxLength={60}
+                          value={antetituloPortada}
+                          onChange={(e) => setAntetituloPortada(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor={`portada-titular-${candidato.id}`}>Titular de la portada</Label>
+                        <Input
+                          id={`portada-titular-${candidato.id}`}
+                          placeholder="Vacío = el titular que redacte la IA"
+                          maxLength={200}
+                          value={titularPortada}
+                          onChange={(e) => setTitularPortada(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Volver</AlertDialogCancel>
                   <AlertDialogAction onClick={() => crearNoticiaMutation.mutate()}>

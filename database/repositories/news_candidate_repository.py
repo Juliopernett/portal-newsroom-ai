@@ -69,6 +69,7 @@ def _to_model(candidate: NewsCandidate) -> NewsCandidateModel:
         extracted_content_json=_extracted_content_to_json(candidate.extracted_content),
         wp_post_id=candidate.wp_post_id,
         wp_url=candidate.wp_url,
+        portada_url=candidate.portada_url,
     )
 
 
@@ -100,6 +101,7 @@ def _to_domain(model: NewsCandidateModel) -> NewsCandidate:
         extracted_content=_extracted_content_from_json(model.extracted_content_json),
         wp_post_id=model.wp_post_id,
         wp_url=model.wp_url,
+        portada_url=model.portada_url,
     )
 
 

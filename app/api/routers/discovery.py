@@ -29,25 +29,29 @@ decision, see docs/PROJECT_RULES.md rule 11).
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.api.dependencies import (
     get_ai_provider,
     get_cms_publisher,
     get_content_extractor,
     get_current_user,
+    get_portada_renderer,
     get_source_resolver,
     get_unit_of_work,
 )
+from app.api.routers.portadas import leer_imagen_subida
 from app.api.schemas.news_candidate import NewsCandidateOut
 from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
 from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.content_extractor import ContentExtractor
+from core.ports.portada_renderer import PortadaRenderer, VariantePortada
 from core.ports.source_resolver import SourceResolver
 from core.ports.unit_of_work import UnitOfWork
 from core.services.candidate_draft_service import (
     BorradorDesdeCandidatoError,
+    PortadaParaBorrador,
     crear_borrador_desde_candidato,
 )
 from core.services.news_candidate_service import (
@@ -124,8 +128,21 @@ def crear_noticia_desde_candidato(
     uow: UnitOfWork = Depends(get_unit_of_work),
     ai_provider: AIProvider = Depends(get_ai_provider),
     cms_publisher: CMSPublisher = Depends(get_cms_publisher),
+    portada_renderer: PortadaRenderer = Depends(get_portada_renderer),
+    imagen_base: UploadFile | None = File(None),
+    imagen_circulo: UploadFile | None = File(None),
+    variante: VariantePortada = Form(VariantePortada.NOTICIAS),
+    titular_portada: str | None = Form(None, max_length=200),
+    antetitulo: str | None = Form(None, max_length=60),
+    enfoque_x: float = Form(0.5, ge=0, le=1),
+    enfoque_y: float = Form(0.3, ge=0, le=1),
 ) -> NewsCandidate:
     """Rewrite the candidate with the editorial AI and create a WordPress draft.
+
+    Optional multipart fields (Sprint Portadas): `imagen_base` (the operator's
+    own photo) turns on the branded cover as the draft's featured image;
+    `imagen_circulo` selects the two-photo template, `titular_portada` empty
+    means "use the AI's headline". Without `imagen_base`, no image is attached.
 
     Sprint Discovery 5. Needs the candidate prepared first (422 otherwise).
     Never publishes — only a draft (docs/PROJECT_RULES.md rule 1); marks the
@@ -133,9 +150,28 @@ def crear_noticia_desde_candidato(
     AI fails, 502 and nothing is created; if WordPress fails, nothing is
     saved — both safely retriable.
     """
+    portada = None
+    if imagen_base is not None and imagen_base.filename:
+        portada = PortadaParaBorrador(
+            imagen_base=leer_imagen_subida(imagen_base, "imagen base"),
+            variante=variante,
+            titular=(titular_portada or "").strip() or None,
+            antetitulo=(antetitulo or "").strip() or None,
+            imagen_circulo=(
+                leer_imagen_subida(imagen_circulo, "imagen del círculo")
+                if imagen_circulo is not None and imagen_circulo.filename
+                else None
+            ),
+            enfoque_x=enfoque_x,
+            enfoque_y=enfoque_y,
+        )
     try:
         actualizado = crear_borrador_desde_candidato(
-            _get_or_404(uow, candidate_id), ai_provider, cms_publisher
+            _get_or_404(uow, candidate_id),
+            ai_provider,
+            cms_publisher,
+            portada=portada,
+            portada_renderer=portada_renderer,
         )
     except BorradorDesdeCandidatoError as exc:
         raise HTTPException(

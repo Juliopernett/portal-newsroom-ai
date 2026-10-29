@@ -24,17 +24,17 @@ router = APIRouter(
 )
 
 
-async def _leer_imagen(archivo: UploadFile, nombre: str) -> bytes:
+def leer_imagen_subida(archivo: UploadFile, nombre: str) -> bytes:
     if (archivo.content_type or "") not in TIPOS_IMAGEN_PERMITIDOS:
         raise HTTPException(status_code=415, detail=f"La {nombre} debe ser JPG, PNG, WEBP o GIF")
-    contenido = await archivo.read()
+    contenido = archivo.file.read()
     if len(contenido) > get_settings().media_max_bytes_imagen:
         raise HTTPException(status_code=413, detail=f"La {nombre} es demasiado pesada")
     return contenido
 
 
 @router.post("", response_class=Response, responses={200: {"content": {"image/png": {}}}})
-async def generar_portada(
+def generar_portada(
     imagen_base: UploadFile = File(...),
     titular: str = Form(..., min_length=1, max_length=200),
     variante: VariantePortada = Form(VariantePortada.NOTICIAS),
@@ -52,12 +52,12 @@ async def generar_portada(
     an unreadable image or an empty headline.
     """
     solicitud = SolicitudPortada(
-        imagen_base=await _leer_imagen(imagen_base, "imagen base"),
+        imagen_base=leer_imagen_subida(imagen_base, "imagen base"),
         titular=titular,
         variante=variante,
         antetitulo=antetitulo or None,
         imagen_circulo=(
-            await _leer_imagen(imagen_circulo, "imagen del círculo")
+            leer_imagen_subida(imagen_circulo, "imagen del círculo")
             if imagen_circulo is not None and imagen_circulo.filename
             else None
         ),

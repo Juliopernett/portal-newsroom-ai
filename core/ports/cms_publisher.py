@@ -46,6 +46,13 @@ class CMSDraftResult(NamedTuple):
     url: str
 
 
+class MediaSubidaCMS(NamedTuple):
+    """The id and public URL of a file just uploaded to the CMS media library."""
+
+    id: str
+    url: str
+
+
 class CategoriaCMS(NamedTuple):
     """One category already defined in the CMS — id + display name."""
 
@@ -119,6 +126,16 @@ class CMSPublisher(Protocol):
 
         The returned id is what `create_draft` expects as
         `featured_media`.
+        """
+        ...
+
+    def subir_media_con_url(
+        self, contenido: bytes, nombre_archivo: str, content_type: str
+    ) -> MediaSubidaCMS:
+        """Like `subir_media`, but also returns the file's public URL.
+
+        Sprint Portadas (2026-10-29): the Radar keeps the generated cover's
+        URL so the operator can download it for social networks.
         """
         ...
 

@@ -32,6 +32,18 @@ export interface NewsCandidate {
   // Sprint Discovery 5 — borrador creado en WordPress por "Crear noticia".
   wp_post_id: string | null
   wp_url: string | null
+  // Sprint Portadas — portada generada, ya subida a WordPress.
+  portada_url: string | null
+}
+
+// Opciones de portada de "Crear noticia" — todas opcionales: sin
+// `imagenBase` el borrador se crea sin imagen destacada.
+export interface OpcionesPortada {
+  imagenBase: File
+  imagenCirculo: File | null
+  variante: 'noticias' | 'lo_ultimo'
+  titular: string
+  antetitulo: string
 }
 
 export const radarApi = {
@@ -45,7 +57,16 @@ export const radarApi = {
   // Sprint Discovery 5: redacta con IA y crea el BORRADOR en WordPress
   // (nunca publica) y marca el candidato "procesado". Requiere haber
   // pulsado "Preparar noticia" antes.
-  crearNoticia: (id: string) => api.post<NewsCandidate>(`/discovery/${id}/crear-noticia`),
+  crearNoticia: (id: string, portada?: OpcionesPortada | null) => {
+    if (!portada) return api.post<NewsCandidate>(`/discovery/${id}/crear-noticia`)
+    const form = new FormData()
+    form.append('imagen_base', portada.imagenBase)
+    if (portada.imagenCirculo) form.append('imagen_circulo', portada.imagenCirculo)
+    form.append('variante', portada.variante)
+    if (portada.titular.trim()) form.append('titular_portada', portada.titular.trim())
+    if (portada.antetitulo.trim()) form.append('antetitulo', portada.antetitulo.trim())
+    return api.postForm<NewsCandidate>(`/discovery/${id}/crear-noticia`, form)
+  },
   // Sprint Discovery 3: resuelve la fuente real y extrae su contenido —
   // acción técnica, repetible, independiente de "Crear noticia".
   preparar: (id: string) => api.post<NewsCandidate>(`/discovery/${id}/preparar`),

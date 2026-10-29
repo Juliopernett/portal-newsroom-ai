@@ -27,7 +27,13 @@ from typing import Any
 import requests
 
 from config.settings import Settings
-from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult, ConsultaPostCMS, EstadoPostCMS
+from core.ports.cms_publisher import (
+    CategoriaCMS,
+    CMSDraftResult,
+    ConsultaPostCMS,
+    EstadoPostCMS,
+    MediaSubidaCMS,
+)
 
 _REQUEST_TIMEOUT_SECONDS = 30
 # WordPress's own REST API cap on `per_page` — used to fetch categories in
@@ -152,11 +158,23 @@ class WordPressCMSPublisher:
         return str(creacion.json()["id"])
 
     def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
-        """Upload a file to WordPress's media library and return its attachment id.
+        """Upload a file to WordPress's media library and return its attachment id."""
+        return str(self._subir_media(contenido, nombre_archivo, content_type)["id"])
+
+    def subir_media_con_url(
+        self, contenido: bytes, nombre_archivo: str, content_type: str
+    ) -> MediaSubidaCMS:
+        """Upload a file to WordPress's media library; return its attachment id and URL."""
+        data = self._subir_media(contenido, nombre_archivo, content_type)
+        return MediaSubidaCMS(id=str(data["id"]), url=data["source_url"])
+
+    def _subir_media(
+        self, contenido: bytes, nombre_archivo: str, content_type: str
+    ) -> dict[str, Any]:
+        """POST the file to `/wp-json/wp/v2/media` and return WordPress's JSON answer.
 
         Sent as the raw request body with `Content-Disposition`, WordPress's
-        own documented convention for `POST /wp-json/wp/v2/media` — not a
-        multipart form.
+        own documented convention for that endpoint — not a multipart form.
         """
         response = requests.post(
             self._media_url,
@@ -169,7 +187,7 @@ class WordPressCMSPublisher:
             timeout=_REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
-        return str(response.json()["id"])
+        return response.json()
 
     def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
         """Return the real current state of a WordPress post.
@@ -200,7 +218,9 @@ class WordPressCMSPublisher:
                 datetime.fromisoformat(fecha_gmt).replace(tzinfo=UTC) if fecha_gmt else None
             )
             return ConsultaPostCMS(
-                estado=EstadoPostCMS.PUBLICADO, url=data.get("link"), fecha_publicacion=fecha_publicacion
+                estado=EstadoPostCMS.PUBLICADO,
+                url=data.get("link"),
+                fecha_publicacion=fecha_publicacion,
             )
         if estado_wp == "trash":
             return ConsultaPostCMS(estado=EstadoPostCMS.ELIMINADO, url=None, fecha_publicacion=None)

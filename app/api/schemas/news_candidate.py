@@ -51,3 +51,4 @@ class NewsCandidateOut(BaseModel):
     extracted_content: ExtractedContentOut | None
     wp_post_id: str | None
     wp_url: str | None
+    portada_url: str | None
