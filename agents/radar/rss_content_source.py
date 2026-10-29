@@ -25,24 +25,36 @@ from time import struct_time
 import feedparser
 import requests
 
+from agents.radar.url_segura import UrlNoPermitidaError, validar_url_publica
 from core.entities.news_candidate import NewsCandidate
 from core.entities.source import Source
-from core.ports.content_source import ContentSourceError
+from core.ports.content_source import ContentSourceError, ResultadoFetch
 from core.services.deduplication import generate_candidate_hash
 from shared.logger import get_logger
 
 logger = get_logger(__name__)
 
 _REQUEST_TIMEOUT_SECONDS = 15
+_HTTP_NOT_MODIFIED = 304
+_USER_AGENT = "Mozilla/5.0 (compatible; PortalNewsroomAI/1.0; +https://portalvallenato.com)"
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
 class RssContentSource:
     """`ContentSource` implemented against a real RSS/Atom feed URL."""
 
-    def __init__(self, source: Source, *, timeout: int = _REQUEST_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        source: Source,
+        *,
+        timeout: int = _REQUEST_TIMEOUT_SECONDS,
+        validar_url: bool = False,
+    ) -> None:
         self._source = source
         self._timeout = timeout
+        # Operator-entered URLs (Sprint Fuentes) must be checked against internal
+        # addresses; the legacy single-feed callers keep the old behavior.
+        self._validar_url = validar_url
 
     @property
     def source(self) -> Source:
@@ -57,8 +69,32 @@ class RssContentSource:
         `feedparser` exception, so callers only ever need to know about
         this one domain-level error.
         """
+        return self.fetch_condicional(None, None).candidates
+
+    def fetch_condicional(self, etag: str | None, last_modified: str | None) -> ResultadoFetch:
+        """Like `fetch_candidates`, but sends the previous validators.
+
+        If the feed answers `304 Not Modified`, nothing is downloaded or
+        parsed and the result says so (`not_modified=True`). Otherwise the
+        result carries the new `etag`/`last_modified` to send next time.
+        """
+        if self._validar_url:
+            try:
+                validar_url_publica(self._source.url)
+            except UrlNoPermitidaError as exc:
+                raise ContentSourceError(
+                    f"La fuente '{self._source.name}' no se puede consultar: {exc}"
+                ) from exc
+
+        headers = {"User-Agent": _USER_AGENT}
+        if etag:
+            headers["If-None-Match"] = etag
+        if last_modified:
+            headers["If-Modified-Since"] = last_modified
         try:
-            response = requests.get(self._source.url, timeout=self._timeout)
+            response = requests.get(self._source.url, headers=headers, timeout=self._timeout)
+            if response.status_code == _HTTP_NOT_MODIFIED:
+                return ResultadoFetch(etag=etag, last_modified=last_modified, not_modified=True)
             response.raise_for_status()
         except requests.RequestException as exc:
             raise ContentSourceError(
@@ -77,7 +113,13 @@ class RssContentSource:
             candidato = self._build_candidate(entry)
             if candidato is not None:
                 candidatos.append(candidato)
-        return candidatos
+        nuevo_etag = response.headers.get("ETag")
+        nuevo_modificado = response.headers.get("Last-Modified")
+        return ResultadoFetch(
+            candidates=candidatos,
+            etag=nuevo_etag if isinstance(nuevo_etag, str) else None,
+            last_modified=nuevo_modificado if isinstance(nuevo_modificado, str) else None,
+        )
 
     def _build_candidate(self, entry: feedparser.FeedParserDict) -> NewsCandidate | None:
         title = entry.get("title")

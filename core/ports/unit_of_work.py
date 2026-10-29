@@ -25,6 +25,7 @@ from core.ports.pauta_repository import PautaRepository
 from core.ports.plan_pauta_repository import PlanPautaRepository
 from core.ports.publication_request_repository import PublicationRequestRepository
 from core.ports.session_repository import SessionRepository
+from core.ports.source_repository import SourceRepository
 from core.ports.user_repository import UserRepository
 
 
@@ -55,6 +56,7 @@ class UnitOfWork(ABC):
     users: UserRepository
     sessions: SessionRepository
     news_candidates: NewsCandidateRepository
+    sources: SourceRepository
 
     @abstractmethod
     def __enter__(self) -> UnitOfWork:

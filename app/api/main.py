@@ -26,6 +26,7 @@ from app.api.routers import (
     clients,
     dashboard,
     discovery,
+    fuentes_radar,
     gastos,
     identidad_comercial,
     insights,
@@ -50,6 +51,7 @@ app.include_router(auth.router)
 app.include_router(clients.router)
 app.include_router(dashboard.router)
 app.include_router(discovery.router)
+app.include_router(fuentes_radar.router)
 app.include_router(gastos.router)
 app.include_router(identidad_comercial.router)
 app.include_router(identidad_comercial.router_publico)

@@ -29,7 +29,9 @@ decision, see docs/PROJECT_RULES.md rule 11).
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 
 from app.api.dependencies import (
     get_ai_provider,
@@ -75,13 +77,21 @@ router = APIRouter(
 def list_candidatos(
     estado: EstadoNewsCandidate | None = None,
     q: str | None = None,
+    dias: int = Query(30, ge=0, le=3650),
     uow: UnitOfWork = Depends(get_unit_of_work),
 ) -> list[NewsCandidate]:
     """Return every discovered candidate, optionally filtered by `estado` and/or `q`.
 
-    `q` matches (case-insensitive) against `title` or `summary`.
+    `q` matches (case-insensitive) against `title` or `summary`. `dias` limits
+    never-reviewed (`nuevo`) candidates to those discovered in the last N days —
+    reviewed ones (guardado/descartado/procesado) always show; `dias=0` returns
+    everything. Keeps the list small as the Radar's history grows.
     """
-    candidatos = uow.news_candidates.list_all()
+    candidatos = (
+        uow.news_candidates.list_recientes(datetime.now(UTC) - timedelta(days=dias))
+        if dias > 0
+        else uow.news_candidates.list_all()
+    )
     if estado is not None:
         candidatos = [c for c in candidatos if c.estado == estado]
     if q:

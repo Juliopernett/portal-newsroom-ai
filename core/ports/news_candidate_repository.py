@@ -17,6 +17,8 @@ to fetch one specific candidate to transition, same shape as
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from datetime import datetime
 from typing import Protocol
 
 from core.entities.news_candidate import NewsCandidate
@@ -32,4 +34,16 @@ class NewsCandidateRepository(Repository[NewsCandidate], Protocol):
 
     def list_all(self) -> list[NewsCandidate]:
         """Return every persisted `NewsCandidate`."""
+        ...
+
+    def list_recientes(self, desde: datetime) -> list[NewsCandidate]:
+        """Return candidates already reviewed (any age) plus `NUEVO` ones found since `desde`.
+
+        Keeps the Radar list small as history grows: old, never-reviewed
+        candidates stay in the database but stop being loaded.
+        """
+        ...
+
+    def existing_hashes(self, hashes: Sequence[str]) -> set[str]:
+        """Return which of `hashes` are already stored, in one query."""
         ...

@@ -87,6 +87,48 @@ el borrador (502): el texto crudo es de otro medio y no debe republicarse
 tal cual. Sin imagen destacada (la imagen de la nota pertenece al medio
 original; la portada propia es el siguiente paso).
 
+## Sprint Fuentes (2026-10-29) — fuentes paramétricas y escaneo
+
+Las fuentes ya no se arman a mano en un script: viven en la tabla `sources`
+(`core.entities.source.Source`) y se gestionan desde **Radar → Fuentes**
+(agregar con vista previa, pausar, frecuencia). `GET/POST/PATCH
+/radar-fuentes`, `POST /radar-fuentes/probar` y `POST /radar-fuentes/escanear`
+("Escanear ahora"). Hoy hay un tipo, `rss`; `agents/radar/fabrica.py` es el
+único lugar donde se agrega otro (p. ej. Instagram). La fuente de Google
+Noticias se migró con su id de siempre (`radar-google-news-vallenato`) para
+no romper la deduplicación por huella.
+
+**"Actualizar Radar" no escanea**: solo vuelve a leer lo guardado. Trae noticias
+nuevas "Escanear ahora" o el cron.
+
+### Escaneo automático (Railway)
+
+`python -m scripts.escanear_fuentes` solo consulta las fuentes a las que ya les
+toca (cada una tiene su `intervalo_minutos`), así que se puede disparar cada
+hora. Crear en Railway un servicio **Cron** del mismo repo/imagen, con
+`DATABASE_URL` referenciada igual que la app, *Start Command* =
+`python -m scripts.escanear_fuentes` y *Cron Schedule* = `0 * * * *`. El
+contenedor arranca, escanea y termina: no mantiene un proceso encendido.
+
+### Qué se hizo para gastar poco
+
+- Solo se escanean las fuentes vencidas; una que falla espera `intervalo × (1 +
+  fallos seguidos)` (tope 24x) en vez de insistir.
+- Peticiones condicionales (`ETag`/`Last-Modified`): un feed sin cambios responde
+  `304` sin cuerpo que descargar ni interpretar.
+- Descarga en paralelo (4 hilos) y escritura a la base en serie; un solo
+  `SELECT ... IN` por fuente para deduplicar (antes uno por entrada).
+- Tope por fuente: `max_items` (20) y `max_age_days` (7), para que la primera
+  vez no entren años de archivo.
+- El escaneo solo trae metadatos: resolver y extraer sigue siendo bajo demanda.
+- `GET /discovery` solo carga los *nuevos* de los últimos 30 días (más todo lo ya
+  revisado); `?dias=0` trae todo. Índices en `discovered_at` y `estado`.
+- Un solo escaneo a la vez por proceso (409 si ya hay uno).
+
+**Seguridad**: las URL que escribe el operador las consulta el servidor, así que
+se rechazan direcciones internas (`agents/radar/url_segura.py`). Limitación:
+una web pública que redirija a una dirección interna no se detecta.
+
 ## Lo que falta (Discovery 6+)
 - Extracción con JavaScript para medios cuya página también lo
   requiere (mismo motivo — `HtmlContentExtractor` es deliberadamente

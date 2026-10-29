@@ -49,7 +49,13 @@ const ESTADO_BADGE: Record<NewsCandidate['estado'], string> = {
 
 const RADAR_KEY = ['radar-candidatos']
 
-export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) {
+export function RadarCandidateCard({
+  candidato,
+  nombreFuente,
+}: {
+  candidato: NewsCandidate
+  nombreFuente?: string
+}) {
   const queryClient = useQueryClient()
   const [mostrarContenido, setMostrarContenido] = useState(false)
   // Opciones de portada del diálogo "Crear noticia" (todas opcionales).
@@ -130,7 +136,7 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span className="rounded-full bg-muted px-2 py-0.5">{candidato.source}</span>
+        <span className="rounded-full bg-muted px-2 py-0.5">{nombreFuente ?? candidato.source}</span>
         <span>
           Publicado:{' '}
           {candidato.published_at ? formatFechaHoraNegocio(candidato.published_at) : 'Sin fecha'}

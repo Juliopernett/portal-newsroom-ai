@@ -19,6 +19,7 @@ from database.models.pauta import PautaModel
 from database.models.plan_pauta import PlanPautaModel
 from database.models.publication_request import PublicationRequestModel
 from database.models.session import SessionModel
+from database.models.source import SourceModel
 from database.models.user import UserModel
 
 __all__ = [
@@ -33,5 +34,6 @@ __all__ = [
     "PlanPautaModel",
     "PublicationRequestModel",
     "SessionModel",
+    "SourceModel",
     "UserModel",
 ]

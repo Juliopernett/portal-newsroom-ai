@@ -14,10 +14,27 @@ straightforward refinement, not a breaking change to running code.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from core.entities.news_candidate import NewsCandidate
 from core.entities.source import Source
+
+
+@dataclass(frozen=True, slots=True)
+class ResultadoFetch:
+    """Outcome of a conditional fetch (Sprint Fuentes, 2026-10-29).
+
+    `not_modified` means the source answered "nothing changed since the
+    `etag`/`last_modified` I sent" — no body was downloaded and
+    `candidates` is empty. `etag`/`last_modified` are the validators to
+    send on the next fetch (kept as they were when `not_modified`).
+    """
+
+    candidates: list[NewsCandidate] = field(default_factory=list)
+    etag: str | None = None
+    last_modified: str | None = None
+    not_modified: bool = False
 
 
 class ContentSourceError(RuntimeError):
@@ -47,6 +64,10 @@ class ContentSource(Protocol):
 
     def fetch_candidates(self) -> list[NewsCandidate]:
         """Return the candidates currently available from this source.
+
+        An adapter may also offer `fetch_condicional(etag, last_modified) ->
+        ResultadoFetch`; `core.services.source_scan_service` uses it when present
+        so an unchanged source costs one tiny request instead of a full download.
 
         Adapters are responsible for computing each candidate's `hash` (see
         `core.services.deduplication`) — deduplicating across sources is

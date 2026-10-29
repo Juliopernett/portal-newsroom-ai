@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { RefreshCw, Search } from 'lucide-react'
+import { Loader2, RefreshCw, Rss, ScanSearch, Search } from 'lucide-react'
+import { toast } from 'sonner'
 
+import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SelectNative } from '@/components/ui/select-native'
-import { radarApi } from './api'
+import { fuentesApi, radarApi } from './api'
+import { FuentesPanel } from './FuentesPanel'
 import { MetricasRadar } from './MetricasRadar'
 import { RadarCandidateCard } from './RadarCandidateCard'
 
@@ -23,14 +26,20 @@ export function RadarPage() {
   const [filtro, setFiltro] = useState<FiltroEstado>('todos')
   const [busqueda, setBusqueda] = useState('')
   const [fuente, setFuente] = useState('')
+  const [mostrarFuentes, setMostrarFuentes] = useState(false)
+  const [incluirAntiguos, setIncluirAntiguos] = useState(false)
 
-  // Trae todos los candidatos una vez — igual que Solicitudes con su cola
-  // de trabajo — y las pestañas/búsqueda/fuente se resuelven en cliente,
-  // sin refetch por cada clic. El backend igual soporta `estado`/`q` como
-  // filtros propios (ver app/api/routers/discovery.py), por si un
-  // consumidor futuro los necesita.
-  const candidatosQuery = useQuery({ queryKey: ['radar-candidatos'], queryFn: radarApi.listar })
+  // Trae los candidatos una vez — igual que Solicitudes con su cola de
+  // trabajo — y las pestañas/búsqueda/fuente se resuelven en cliente, sin
+  // refetch por cada clic. Por defecto el backend solo manda los nuevos de los
+  // últimos 30 días (más lo ya revisado): la lista no crece sin límite.
+  const candidatosQuery = useQuery({
+    queryKey: ['radar-candidatos', incluirAntiguos],
+    queryFn: () => radarApi.listar(incluirAntiguos),
+  })
+  const fuentesQuery = useQuery({ queryKey: ['radar-fuentes'], queryFn: fuentesApi.listar })
   const queryClient = useQueryClient()
+
   // Al abrir "Procesadas" (y con "Actualizar Radar" estando ahí) se le pregunta
   // a WordPress si los borradores ya se publicaron — una sola petición.
   const { mutate: sincronizar } = useMutation({
@@ -40,9 +49,34 @@ export function RadarPage() {
   useEffect(() => {
     if (filtro === 'procesado') sincronizar()
   }, [filtro, sincronizar])
+
+  // "Escanear ahora": va a las fuentes y trae noticias nuevas. Es lo que
+  // "Actualizar Radar" NO hace (este solo vuelve a leer lo ya guardado).
+  const escanearMutation = useMutation({
+    mutationFn: fuentesApi.escanear,
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ['radar-candidatos'] })
+      queryClient.invalidateQueries({ queryKey: ['radar-fuentes'] })
+      const conError = r.resultados.filter((x) => x.estado === 'error').length
+      toast.success(
+        r.nuevos_total > 0
+          ? `${r.nuevos_total} noticia${r.nuevos_total === 1 ? '' : 's'} nueva${r.nuevos_total === 1 ? '' : 's'}.`
+          : 'No hay noticias nuevas por ahora.',
+      )
+      if (conError > 0) {
+        toast.error(`${conError} fuente${conError === 1 ? '' : 's'} con error — mira el panel Fuentes.`)
+      }
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
   const candidatosData = candidatosQuery.data
   const candidatos = useMemo(() => candidatosData ?? [], [candidatosData])
 
+  const nombresFuente = useMemo(
+    () => new Map((fuentesQuery.data ?? []).map((f) => [f.id, f.name])),
+    [fuentesQuery.data],
+  )
   const fuentes = useMemo(
     () => Array.from(new Set(candidatos.map((c) => c.source))).sort(),
     [candidatos],
@@ -64,26 +98,48 @@ export function RadarPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold">Radar Editorial</h1>
           <p className="text-sm text-muted-foreground">
             Lo que Discovery encontró — revisa, guarda o descarta.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            candidatosQuery.refetch()
-            if (filtro === 'procesado') sincronizar()
-          }}
-          disabled={candidatosQuery.isFetching}
-        >
-          <RefreshCw className={candidatosQuery.isFetching ? 'animate-spin' : ''} />
-          Actualizar Radar
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMostrarFuentes((v) => !v)}
+            aria-pressed={mostrarFuentes}
+          >
+            <Rss /> Fuentes
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            title="Vuelve a leer lo que ya está guardado. Para traer noticias nuevas usa «Escanear ahora»."
+            onClick={() => {
+              candidatosQuery.refetch()
+              if (filtro === 'procesado') sincronizar()
+            }}
+            disabled={candidatosQuery.isFetching}
+          >
+            <RefreshCw className={candidatosQuery.isFetching ? 'animate-spin' : ''} />
+            Actualizar Radar
+          </Button>
+          <Button
+            size="sm"
+            title="Consulta todas las fuentes activas ahora mismo"
+            onClick={() => escanearMutation.mutate()}
+            disabled={escanearMutation.isPending}
+          >
+            {escanearMutation.isPending ? <Loader2 className="animate-spin" /> : <ScanSearch />}
+            Escanear ahora
+          </Button>
+        </div>
       </div>
+
+      {mostrarFuentes && <FuentesPanel />}
 
       {!candidatosQuery.isLoading && <MetricasRadar candidatos={candidatos} />}
 
@@ -119,11 +175,20 @@ export function RadarPage() {
             <option value="">Todas las fuentes</option>
             {fuentes.map((f) => (
               <option key={f} value={f}>
-                {f}
+                {nombresFuente.get(f) ?? f}
               </option>
             ))}
           </SelectNative>
         )}
+
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={incluirAntiguos}
+            onChange={(e) => setIncluirAntiguos(e.target.checked)}
+          />
+          Incluir nuevos de más de 30 días
+        </label>
       </div>
 
       {candidatosQuery.isLoading ? (
@@ -131,13 +196,17 @@ export function RadarPage() {
       ) : visibles.length === 0 ? (
         <p className="rounded-md border border-border bg-card p-4 text-center text-sm text-muted-foreground">
           {candidatos.length === 0
-            ? 'Sin candidatos todavía — corre "python -m scripts.descubrir_noticias" y actualiza el Radar.'
+            ? 'Sin candidatos recientes — pulsa «Escanear ahora» para traer las últimas noticias.'
             : 'Ningún candidato coincide con este filtro.'}
         </p>
       ) : (
         <div className="flex flex-col gap-2">
           {visibles.map((candidato) => (
-            <RadarCandidateCard key={candidato.id} candidato={candidato} />
+            <RadarCandidateCard
+              key={candidato.id}
+              candidato={candidato}
+              nombreFuente={nombresFuente.get(candidato.source)}
+            />
           ))}
         </div>
       )}

@@ -8,9 +8,10 @@ never sees this module.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from core.entities.extracted_content import ExtractedContent
@@ -142,3 +143,19 @@ class SqlAlchemyNewsCandidateRepository:
         """Return every persisted `NewsCandidate`."""
         models = self._session.execute(select(NewsCandidateModel)).scalars().all()
         return [_to_domain(model) for model in models]
+
+    def list_recientes(self, desde: datetime) -> list[NewsCandidate]:
+        """Return reviewed candidates (any age) plus `nuevo` ones discovered since `desde`."""
+        stmt = select(NewsCandidateModel).where(
+            or_(NewsCandidateModel.estado != "nuevo", NewsCandidateModel.discovered_at >= desde)
+        )
+        return [_to_domain(model) for model in self._session.execute(stmt).scalars().all()]
+
+    def existing_hashes(self, hashes: Sequence[str]) -> set[str]:
+        """Return which of `hashes` are already stored, in as few queries as possible."""
+        encontrados: set[str] = set()
+        for inicio in range(0, len(hashes), 500):
+            lote = list(hashes[inicio : inicio + 500])
+            stmt = select(NewsCandidateModel.hash).where(NewsCandidateModel.hash.in_(lote))
+            encontrados.update(self._session.execute(stmt).scalars().all())
+        return encontrados

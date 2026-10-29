@@ -51,11 +51,13 @@ class NewsCandidateModel(Base):
     summary: Mapped[str] = mapped_column(String, nullable=False)
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    discovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    discovered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
     hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     metadata_json: Mapped[str | None] = mapped_column(String, nullable=True)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
-    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="nuevo")
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="nuevo", index=True)
     url_fuente_original: Mapped[str | None] = mapped_column(String, nullable=True)
     estado_resolucion: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
     extracted_content_json: Mapped[str | None] = mapped_column(String, nullable=True)

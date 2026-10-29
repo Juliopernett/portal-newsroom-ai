@@ -428,7 +428,30 @@ def test_list_candidatos_orders_nuevos_first_then_most_recent(
     _seed(_test_engine, guardado_reciente)
     _seed(_test_engine, nuevo_viejo)
 
-    response = client.get("/discovery")
+    response = client.get("/discovery", params={"dias": 0})
 
     body = response.json()
     assert body[0]["title"] == "Nuevo"
+
+
+def test_list_hides_old_unreviewed_candidates_but_never_reviewed_ones(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    viejo = datetime(2026, 1, 1, tzinfo=UTC)
+    _seed(_test_engine, _candidato(hash="h-nuevo-viejo", title="Nuevo viejo", discovered_at=viejo))
+    _seed(
+        _test_engine,
+        _candidato(
+            hash="h-procesado-viejo",
+            title="Procesado viejo",
+            estado=EstadoNewsCandidate.PROCESADO,
+            discovered_at=viejo,
+        ),
+    )
+    _seed(_test_engine, _candidato(hash="h-nuevo-hoy", title="Nuevo hoy"))
+
+    por_defecto = {c["title"] for c in client.get("/discovery").json()}
+    todo = {c["title"] for c in client.get("/discovery", params={"dias": 0}).json()}
+
+    assert por_defecto == {"Procesado viejo", "Nuevo hoy"}
+    assert todo == {"Nuevo viejo", "Procesado viejo", "Nuevo hoy"}

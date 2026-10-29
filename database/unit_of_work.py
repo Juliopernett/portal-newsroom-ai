@@ -33,6 +33,7 @@ from database.repositories.publication_request_repository import (
     SqlAlchemyPublicationRequestRepository,
 )
 from database.repositories.session_repository import SqlAlchemySessionRepository
+from database.repositories.source_repository import SqlAlchemySourceRepository
 from database.repositories.user_repository import SqlAlchemyUserRepository
 
 
@@ -61,6 +62,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.users = SqlAlchemyUserRepository(self._session)
         self.sessions = SqlAlchemySessionRepository(self._session)
         self.news_candidates = SqlAlchemyNewsCandidateRepository(self._session)
+        self.sources = SqlAlchemySourceRepository(self._session)
         return self
 
     def __exit__(

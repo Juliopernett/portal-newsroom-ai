@@ -10,7 +10,7 @@ instead.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from functools import lru_cache
 
@@ -21,6 +21,8 @@ from agents.ai.openrouter_provider import OpenRouterAIProvider
 from agents.extractor.html_content_extractor import HtmlContentExtractor
 from agents.images.pillow_portada_renderer import PillowPortadaRenderer
 from agents.meta_social.client import MetaGraphSocialMediaReader
+from agents.radar.fabrica import crear_adaptador
+from agents.radar.feed_detector import HttpFeedDetector
 from agents.radar.google_news_source_resolver import GoogleNewsSourceResolver
 from agents.radar.http_redirect_source_resolver import HttpRedirectSourceResolver
 from agents.storage.local_disk import LocalDiskMediaStorage
@@ -28,10 +30,13 @@ from agents.wordpress.client import WordPressCMSPublisher
 from config.settings import get_settings
 from core.entities.ai_configuracion import ProveedorIA
 from core.entities.session import Session as SessionEntity
+from core.entities.source import Source
 from core.entities.user import User
 from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.content_extractor import ContentExtractor
+from core.ports.content_source import ContentSource
+from core.ports.feed_detector import FeedDetector
 from core.ports.media_storage import MediaStorage
 from core.ports.password_hasher import PasswordHasher
 from core.ports.portada_renderer import PortadaRenderer
@@ -142,6 +147,16 @@ def get_content_extractor() -> ContentExtractor:
     Sprint Discovery 3 (2026-08-29).
     """
     return HtmlContentExtractor(timeout=get_settings().radar_content_extractor_timeout_seconds)
+
+
+def get_fabrica_adaptadores() -> Callable[[Source], ContentSource]:
+    """Return the factory that builds the adapter for each Radar source (Sprint Fuentes)."""
+    return crear_adaptador
+
+
+def get_detector_feed() -> FeedDetector:
+    """Return the detector that finds the RSS feed behind a website address."""
+    return HttpFeedDetector()
 
 
 def get_portada_renderer() -> PortadaRenderer:
