@@ -9,16 +9,26 @@ against the same throwaway SQLite engine `client` already uses.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import sessionmaker
 
+from agents.ai.fake_provider import FakeAIProvider
 from agents.extractor.fake_content_extractor import FakeContentExtractor
 from agents.radar.fake_source_resolver import FakeSourceResolver
-from app.api.dependencies import get_content_extractor, get_source_resolver
+from app.api.dependencies import (
+    get_ai_provider,
+    get_cms_publisher,
+    get_content_extractor,
+    get_source_resolver,
+)
 from app.api.main import app
+from core.entities.extracted_content import ExtractedContent
 from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
+from core.ports.ai_provider import AIProviderError
+from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult
 from core.ports.content_extractor import ContentExtractorError
 from core.ports.source_resolver import ResolvedSource
 from database.repositories.news_candidate_repository import SqlAlchemyNewsCandidateRepository
@@ -122,16 +132,70 @@ def test_descartar_does_not_physically_delete_the_row(
     assert response.json()[0]["estado"] == "descartado"
 
 
-def test_crear_noticia_marks_the_candidate_procesado(
+class _FakeCMS:
+    def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:
+        return CMSDraftResult(post_id="42", url="https://www.portalvallenato.com/?p=42")
+
+    def listar_categorias(self) -> list[CategoriaCMS]:
+        return []
+
+    def resolver_o_crear_etiqueta(self, nombre: str) -> str:
+        return "1"
+
+
+def _con_cms_falso() -> None:
+    app.dependency_overrides[get_cms_publisher] = lambda: _FakeCMS()
+
+
+def _extraido() -> ExtractedContent:
+    return ExtractedContent(title="T", body="Cuerpo", source_url="https://medio.com/nota")
+
+
+def test_crear_noticia_creates_a_wordpress_draft_and_marks_procesado(
     client: TestClient, _test_engine: Engine
 ) -> None:
-    candidato = _candidato()
+    _con_cms_falso()
+    candidato = _candidato(extracted_content=_extraido())
     _seed(_test_engine, candidato)
 
     response = client.post(f"/discovery/{candidato.id}/crear-noticia")
 
     assert response.status_code == 200
-    assert response.json()["estado"] == "procesado"
+    body = response.json()
+    assert body["estado"] == "procesado"
+    assert body["wp_post_id"] == "42"
+    assert body["wp_url"] == "https://www.portalvallenato.com/?p=42"
+
+
+def test_crear_noticia_without_extracted_content_returns_422(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    _con_cms_falso()
+    candidato = _candidato()
+    _seed(_test_engine, candidato)
+
+    response = client.post(f"/discovery/{candidato.id}/crear-noticia")
+
+    assert response.status_code == 422
+    assert client.get("/discovery").json()[0]["estado"] == "nuevo"
+
+
+def test_crear_noticia_returns_502_and_creates_nothing_when_the_ai_fails(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    _con_cms_falso()
+    app.dependency_overrides[get_ai_provider] = lambda: FakeAIProvider(
+        error=AIProviderError("sin saldo")
+    )
+    candidato = _candidato(extracted_content=_extraido())
+    _seed(_test_engine, candidato)
+
+    response = client.post(f"/discovery/{candidato.id}/crear-noticia")
+
+    assert response.status_code == 502
+    persistido = client.get("/discovery").json()[0]
+    assert persistido["estado"] == "nuevo"
+    assert persistido["wp_post_id"] is None
 
 
 def test_action_on_an_already_procesado_candidate_returns_422(

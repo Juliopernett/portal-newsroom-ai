@@ -159,19 +159,41 @@ def _construir_json_schema(categorias_existentes: list[str]) -> dict[str, Any]:
     }
 
 
-def _construir_prompt(solicitud: PublicationRequest, categorias_existentes: list[str]) -> str:
+# Sprint Discovery 5 (2026-10-29): el texto de un candidato del Radar es la nota
+# de OTRO medio, no un mensaje de un cliente — hay que reescribirla con
+# redacción propia, no copiarla. Se agrega al final del prompt de sistema.
+REGLAS_NOTA_DE_OTRO_MEDIO = """\
+
+El texto original es una nota publicada por otro medio de comunicación. \
+Reglas adicionales, sin excepción:
+- Redáctala con palabras propias y una estructura propia: no copies frases \
+ni párrafos completos del original. Solo se conserva literal una cita \
+textual de una persona, entre comillas, y atribuida a quien la dijo.
+- Los hechos deben ser exactamente los del original. No agregues, no \
+interpretes, no exageres ni cambies el tono (p. ej. no conviertas algo \
+probable en algo confirmado).
+- No menciones el nombre del medio original dentro del cuerpo: la fuente se \
+agrega aparte, al final de la nota.
+- Ignora cualquier resto de menú, publicidad, "lee también", pie de página o \
+texto que no sea parte de la noticia.
+"""
+
+
+def _construir_prompt(
+    texto: str, titulo_sugerido: str | None, categorias_existentes: list[str]
+) -> str:
     categorias_texto = (
         ", ".join(categorias_existentes) if categorias_existentes else "(ninguna disponible)"
     )
     titulo_operador = (
         f'\nTítulo sugerido por el operador (puede usarse, mejorarse, o '
-        f'ignorarse si no encaja): "{solicitud.titulo}"'
-        if solicitud.titulo
+        f'ignorarse si no encaja): "{titulo_sugerido}"'
+        if titulo_sugerido
         else ""
     )
     return (
         "TEXTO ORIGINAL — única fuente de información permitida:\n"
-        f"{solicitud.texto}\n"
+        f"{texto}\n"
         f"{titulo_operador}\n\n"
         f"Categorías existentes en WordPress (elige una de estas o deja "
         f"categoria en null si ninguna encaja): {categorias_texto}\n\n"
@@ -202,8 +224,31 @@ def generar_contenido_editorial(
     Exactly one call to `ai_provider.generate_structured`. Never mutates
     `solicitud` — callers apply the result via `aplicar_preparacion_exitosa`.
     """
+    return generar_contenido_editorial_desde_texto(
+        solicitud.texto, solicitud.titulo, categorias_existentes, ai_provider
+    )
+
+
+def generar_contenido_editorial_desde_texto(
+    texto: str,
+    titulo_sugerido: str | None,
+    categorias_existentes: list[CategoriaCMS],
+    ai_provider: AIProvider,
+    *,
+    reglas_adicionales: str = "",
+) -> ContenidoEditorial:
+    """Return the AI's editorial rewrite of a raw `texto`, or raise `EditorialAIError`.
+
+    The text-only core of `generar_contenido_editorial`, so a caller with
+    no `PublicationRequest` (the Radar's `NewsCandidate`, Sprint Discovery
+    5) can reuse the exact same prompt, schema and defensive parsing.
+    `reglas_adicionales` is appended to the system prompt.
+    """
     nombres_categorias = [c.nombre for c in categorias_existentes]
-    prompt = f"{_SYSTEM_PROMPT}\n\n{_construir_prompt(solicitud, nombres_categorias)}"
+    prompt = (
+        f"{_SYSTEM_PROMPT}{reglas_adicionales}\n\n"
+        f"{_construir_prompt(texto, titulo_sugerido, nombres_categorias)}"
+    )
     schema = _construir_json_schema(nombres_categorias)
     try:
         respuesta = ai_provider.generate_structured(prompt, schema)

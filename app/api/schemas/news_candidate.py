@@ -49,3 +49,5 @@ class NewsCandidateOut(BaseModel):
     url_fuente_original: str | None
     estado_resolucion: EstadoResolucionFuente
     extracted_content: ExtractedContentOut | None
+    wp_post_id: str | None
+    wp_url: str | None

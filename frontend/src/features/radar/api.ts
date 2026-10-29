@@ -29,6 +29,9 @@ export interface NewsCandidate {
   url_fuente_original: string | null
   estado_resolucion: EstadoResolucionFuente
   extracted_content: ExtractedContent | null
+  // Sprint Discovery 5 — borrador creado en WordPress por "Crear noticia".
+  wp_post_id: string | null
+  wp_url: string | null
 }
 
 export const radarApi = {
@@ -39,9 +42,9 @@ export const radarApi = {
   listar: () => api.get<NewsCandidate[]>('/discovery'),
   guardar: (id: string) => api.post<NewsCandidate>(`/discovery/${id}/guardar`),
   descartar: (id: string) => api.post<NewsCandidate>(`/discovery/${id}/descartar`),
-  // Sprint Discovery 2: solo transiciona el estado a "procesado" — no
-  // genera ninguna noticia todavía (el agente Writer no existe aún).
-  // Ver el docstring de `core.services.news_candidate_service.crear_noticia`.
+  // Sprint Discovery 5: redacta con IA y crea el BORRADOR en WordPress
+  // (nunca publica) y marca el candidato "procesado". Requiere haber
+  // pulsado "Preparar noticia" antes.
   crearNoticia: (id: string) => api.post<NewsCandidate>(`/discovery/${id}/crear-noticia`),
   // Sprint Discovery 3: resuelve la fuente real y extrae su contenido —
   // acción técnica, repetible, independiente de "Crear noticia".

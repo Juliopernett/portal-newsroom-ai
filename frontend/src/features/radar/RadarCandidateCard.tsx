@@ -57,7 +57,7 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
   })
   const crearNoticiaMutation = useMutation({
     mutationFn: () => radarApi.crearNoticia(candidato.id),
-    onSuccess: () => onExito('Candidato marcado para crear noticia.'),
+    onSuccess: () => onExito('Borrador creado en WordPress.'),
     onError: (err) => toast.error(errorMessage(err)),
   })
   const prepararMutation = useMutation({
@@ -133,6 +133,17 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
           <ExternalLink className="size-3.5" /> Ver descubrimiento
         </a>
 
+        {candidato.wp_url && (
+          <a
+            href={candidato.wp_url}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-1 text-xs font-medium text-brand underline"
+          >
+            <ExternalLink className="size-3.5" /> Ver borrador en WordPress
+          </a>
+        )}
+
         {!esTerminal && (
           <>
             <Button
@@ -180,7 +191,15 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button size="sm" disabled={isActing}>
+                <Button
+                  size="sm"
+                  disabled={isActing || !candidato.extracted_content}
+                  title={
+                    candidato.extracted_content
+                      ? undefined
+                      : 'Primero pulsa «Preparar noticia» para extraer el contenido'
+                  }
+                >
                   <Newspaper /> Crear noticia
                 </Button>
               </AlertDialogTrigger>
@@ -188,16 +207,16 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
                 <AlertDialogHeader>
                   <AlertDialogTitle>¿Crear noticia a partir de este candidato?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Por ahora esto solo marca el candidato como "Procesado" y lo prepara para el
-                    flujo editorial — la redacción automática con IA (Writer) todavía no existe,
-                    llega en un sprint futuro. Es una acción terminal: no podrás volver a
-                    guardarlo/descartarlo después.
+                    La IA reescribirá la nota con redacción propia, citará la fuente al final y
+                    dejará un BORRADOR en WordPress — no se publica nada hasta que lo revises y lo
+                    publiques allá. Puede tardar unos segundos. Es una acción terminal: no podrás
+                    volver a guardarlo/descartarlo después.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Volver</AlertDialogCancel>
                   <AlertDialogAction onClick={() => crearNoticiaMutation.mutate()}>
-                    Sí, marcar para crear noticia
+                    Sí, crear borrador
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

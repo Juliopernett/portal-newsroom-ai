@@ -77,6 +77,9 @@ class NewsCandidate:
     url_fuente_original: str | None = None
     estado_resolucion: EstadoResolucionFuente = EstadoResolucionFuente.PENDIENTE
     extracted_content: ExtractedContent | None = None
+    # --- Discovery 5: the WordPress draft created by `crear_noticia` ---
+    wp_post_id: str | None = None
+    wp_url: str | None = None
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.confidence <= 1.0:

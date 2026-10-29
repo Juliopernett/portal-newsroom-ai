@@ -74,7 +74,20 @@ deja de funcionar, los candidatos vuelven a quedar en "Fuente pendiente de
 resolver" (no rompe el flujo) — revisar primero el log
 `google_news_source_resolver` ("Google Noticias cambió su formato?").
 
-## Lo que falta (Discovery 5+)
+## Discovery 5 (2026-10-29) — "Crear noticia" redacta con IA y crea el borrador
+
+`POST /discovery/{id}/crear-noticia` ahora (`core/services/candidate_draft_service.py`)
+reescribe el `extracted_content` con la IA editorial (mismo prompt/Yoast que
+las solicitudes, más reglas para notas de otros medios: redacción propia,
+sin copiar), agrega "Fuente: medio" con enlace al final y crea un
+**borrador** en WordPress (nunca publica). Guarda `wp_post_id`/`wp_url` en
+el candidato y lo marca `PROCESADO`. Requiere "Preparar noticia" antes (422).
+A diferencia de las solicitudes de WhatsApp, si la IA falla **no** se crea
+el borrador (502): el texto crudo es de otro medio y no debe republicarse
+tal cual. Sin imagen destacada (la imagen de la nota pertenece al medio
+original; la portada propia es el siguiente paso).
+
+## Lo que falta (Discovery 6+)
 - Extracción con JavaScript para medios cuya página también lo
   requiere (mismo motivo — `HtmlContentExtractor` es deliberadamente
   solo HTTP + BeautifulSoup, ver `agents/extractor/README.md`).

@@ -10,11 +10,11 @@ luego-más-recientes (`core.services.news_candidate_service
 uses in `app.api.routers.publication_requests` — no filter is pushed
 into SQL.
 
-`.../guardar`, `.../descartar`, `.../crear-noticia` each transition one
-candidate's `estado` (see `core.services.news_candidate_service`) —
-`crear-noticia` only marks the candidate `PROCESADO`; it does not create
-an `Article` yet (the Writer agent, still not implemented — see that
-function's own docstring).
+`.../guardar`, `.../descartar` each transition one candidate's `estado`
+(see `core.services.news_candidate_service`). `.../crear-noticia`
+(Sprint Discovery 5) rewrites the prepared candidate with the editorial AI
+and creates a WordPress *draft* (`core.services.candidate_draft_service`),
+marking it `PROCESADO`.
 
 `.../preparar` (Sprint Discovery 3, 2026-08-29) is a separate, repeatable
 technical action — `core.services.source_resolution_service
@@ -32,6 +32,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.dependencies import (
+    get_ai_provider,
+    get_cms_publisher,
     get_content_extractor,
     get_current_user,
     get_source_resolver,
@@ -39,11 +41,16 @@ from app.api.dependencies import (
 )
 from app.api.schemas.news_candidate import NewsCandidateOut
 from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
+from core.ports.ai_provider import AIProvider
+from core.ports.cms_publisher import CMSPublisher
 from core.ports.content_extractor import ContentExtractor
 from core.ports.source_resolver import SourceResolver
 from core.ports.unit_of_work import UnitOfWork
+from core.services.candidate_draft_service import (
+    BorradorDesdeCandidatoError,
+    crear_borrador_desde_candidato,
+)
 from core.services.news_candidate_service import (
-    crear_noticia,
     descartar,
     guardar,
     ordenar_para_revision,
@@ -113,10 +120,27 @@ def descartar_candidato(
 
 @router.post("/{candidate_id}/crear-noticia", response_model=NewsCandidateOut)
 def crear_noticia_desde_candidato(
-    candidate_id: str, uow: UnitOfWork = Depends(get_unit_of_work)
+    candidate_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    ai_provider: AIProvider = Depends(get_ai_provider),
+    cms_publisher: CMSPublisher = Depends(get_cms_publisher),
 ) -> NewsCandidate:
-    """Mark a candidate PROCESADO — only a state transition, see `crear_noticia`'s own docstring."""
-    actualizado = crear_noticia(_get_or_404(uow, candidate_id))
+    """Rewrite the candidate with the editorial AI and create a WordPress draft.
+
+    Sprint Discovery 5. Needs the candidate prepared first (422 otherwise).
+    Never publishes — only a draft (docs/PROJECT_RULES.md rule 1); marks the
+    candidate PROCESADO and stores the draft's `wp_post_id`/`wp_url`. If the
+    AI fails, 502 and nothing is created; if WordPress fails, nothing is
+    saved — both safely retriable.
+    """
+    try:
+        actualizado = crear_borrador_desde_candidato(
+            _get_or_404(uow, candidate_id), ai_provider, cms_publisher
+        )
+    except BorradorDesdeCandidatoError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"No se pudo redactar la noticia con IA: {exc}"
+        ) from exc
     uow.news_candidates.save(actualizado)
     uow.commit()
     return actualizado

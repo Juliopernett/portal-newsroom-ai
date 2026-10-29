@@ -67,6 +67,8 @@ def _to_model(candidate: NewsCandidate) -> NewsCandidateModel:
         url_fuente_original=candidate.url_fuente_original,
         estado_resolucion=candidate.estado_resolucion.value,
         extracted_content_json=_extracted_content_to_json(candidate.extracted_content),
+        wp_post_id=candidate.wp_post_id,
+        wp_url=candidate.wp_url,
     )
 
 
@@ -96,6 +98,8 @@ def _to_domain(model: NewsCandidateModel) -> NewsCandidate:
         url_fuente_original=model.url_fuente_original,
         estado_resolucion=EstadoResolucionFuente(model.estado_resolucion),
         extracted_content=_extracted_content_from_json(model.extracted_content_json),
+        wp_post_id=model.wp_post_id,
+        wp_url=model.wp_url,
     )
 
 
