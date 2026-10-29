@@ -20,6 +20,7 @@ from agents.ai.anthropic_provider import MODELO_POR_DEFECTO, AnthropicAIProvider
 from agents.ai.openrouter_provider import OpenRouterAIProvider
 from agents.extractor.html_content_extractor import HtmlContentExtractor
 from agents.meta_social.client import MetaGraphSocialMediaReader
+from agents.radar.google_news_source_resolver import GoogleNewsSourceResolver
 from agents.radar.http_redirect_source_resolver import HttpRedirectSourceResolver
 from agents.storage.local_disk import LocalDiskMediaStorage
 from agents.wordpress.client import WordPressCMSPublisher
@@ -127,7 +128,10 @@ def get_source_resolver() -> SourceResolver:
     (unlike `get_cms_publisher`) — resolving is plain HTTP, nothing to set
     up in `.env` beyond the optional timeout.
     """
-    return HttpRedirectSourceResolver(timeout=get_settings().radar_source_resolver_timeout_seconds)
+    timeout = get_settings().radar_source_resolver_timeout_seconds
+    return GoogleNewsSourceResolver(
+        fallback=HttpRedirectSourceResolver(timeout=timeout), timeout=timeout
+    )
 
 
 def get_content_extractor() -> ContentExtractor:

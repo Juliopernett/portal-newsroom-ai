@@ -57,16 +57,24 @@ Editorial hoy, con este adaptador, casi siempre terminará en "Fuente
 pendiente de resolver" — esperado, no un error a corregir en este
 sprint.
 
-## Lo que falta (Discovery 4+)
+## Discovery 4 (2026-10-29) — resolver que sí funciona contra Google Noticias
 
-- **Un `SourceResolver` que sí funcione contra Google Noticias** — el
-  puerto ya existe exactamente para esto (ver el hallazgo arriba).
-  Candidatos: ejecutar la redirección con un navegador real
-  (Playwright, ya está en `requirements.txt` sin usar) o decodificar el
-  esquema de URL que Google usa para codificar el destino real
-  (enfoque usado por proyectos open-source de scraping de Google News —
-  no evaluado en este sprint, y frágil por naturaleza: se rompe si
-  Google cambia el formato).
+`agents/radar/google_news_source_resolver.py` (`GoogleNewsSourceResolver`)
+reemplaza al resolver por redirect como el que usa `get_source_resolver`
+(el redirect HTTP queda como `fallback` para URLs que no son de Google).
+Lee la firma/timestamp del artículo en la página de Google Noticias y
+pide la URL real al endpoint interno `batchexecute` (RPC `Fbv4je`).
+Verificado contra el feed en vivo: **20/20 resueltas**, y el
+`HtmlContentExtractor` extrajo título/cuerpo/imagen de El Pilón, Infobae
+y Caracol. Ojo con la calidad de extracción por medio (p. ej. El Heraldo
+trae menús/pie de página en el cuerpo).
+
+**Frágil por naturaleza**: es un endpoint interno no documentado. Si
+deja de funcionar, los candidatos vuelven a quedar en "Fuente pendiente de
+resolver" (no rompe el flujo) — revisar primero el log
+`google_news_source_resolver` ("Google Noticias cambió su formato?").
+
+## Lo que falta (Discovery 5+)
 - Extracción con JavaScript para medios cuya página también lo
   requiere (mismo motivo — `HtmlContentExtractor` es deliberadamente
   solo HTTP + BeautifulSoup, ver `agents/extractor/README.md`).
