@@ -18,7 +18,7 @@ import math
 import re
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, UnidentifiedImageError
 
 from core.ports.portada_renderer import PortadaError, SolicitudPortada, VariantePortada
 
@@ -76,7 +76,7 @@ def _dibujar(
     y: float,
     texto: str,
     fuente: ImageFont.FreeTypeFont,
-    color: tuple[int, int, int],
+    color: tuple[int, ...],
     tracking: float,
 ) -> None:
     """Draw `texto` with its left edge at `x` and baseline at `y`, with letter-spacing.
@@ -183,9 +183,13 @@ class PillowPortadaRenderer:
         fuente = _fuente("Montserrat.ttf", 36, 300)
         hashtag = "#NoticiasVallenatas"
         tracking = -1.5
-        _dibujar(
-            draw, 930.4 - _ancho(hashtag, fuente, tracking), 58, hashtag, fuente, _BLANCO, tracking
-        )
+        x_hashtag = 930.4 - _ancho(hashtag, fuente, tracking)
+        # Soft dark halo (not in the Canva template): without it the thin white
+        # hashtag disappears over light photos.
+        halo = Image.new("RGBA", lienzo.size, (0, 0, 0, 0))
+        _dibujar(ImageDraw.Draw(halo), x_hashtag, 60, hashtag, fuente, (0, 0, 0, 170), tracking)
+        lienzo.alpha_composite(halo.filter(ImageFilter.GaussianBlur(3)))
+        _dibujar(draw, x_hashtag, 58, hashtag, fuente, _BLANCO, tracking)
 
         # Logo circular de 186px que se sale por la esquina superior derecha.
         logo = Image.open(_ASSETS / "logo-pv-original.png").convert("RGBA")

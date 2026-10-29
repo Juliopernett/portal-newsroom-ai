@@ -52,3 +52,8 @@ class NewsCandidateOut(BaseModel):
     wp_post_id: str | None
     wp_url: str | None
     portada_url: str | None
+    tiene_portada_guardada: bool
+    texto_redes: str | None
+    wp_estado: str | None
+    wp_publicado_url: str | None
+    wp_fecha_publicacion: datetime | None

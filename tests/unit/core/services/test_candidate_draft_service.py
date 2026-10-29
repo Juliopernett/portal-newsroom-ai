@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -11,12 +12,19 @@ from agents.ai.fake_provider import FakeAIProvider
 from core.entities.extracted_content import ExtractedContent
 from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
 from core.ports.ai_provider import AIProviderError
-from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult, MediaSubidaCMS
+from core.ports.cms_publisher import (
+    CategoriaCMS,
+    CMSDraftResult,
+    ConsultaPostCMS,
+    EstadoPostCMS,
+    MediaSubidaCMS,
+)
 from core.ports.portada_renderer import SolicitudPortada
 from core.services.candidate_draft_service import (
     BorradorDesdeCandidatoError,
     PortadaParaBorrador,
     crear_borrador_desde_candidato,
+    sincronizar_estado_wordpress,
 )
 
 
@@ -25,6 +33,10 @@ class _FakeCMS:
         self.contenido: dict[str, Any] | None = None
         self.llamadas_create = 0
         self.media_subida: list[tuple[str, bytes]] = []
+        self.consultas = 0
+        self.consulta = ConsultaPostCMS(
+            estado=EstadoPostCMS.BORRADOR, url=None, fecha_publicacion=None
+        )
 
     def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:
         self.llamadas_create += 1
@@ -36,6 +48,10 @@ class _FakeCMS:
     ) -> MediaSubidaCMS:
         self.media_subida.append((nombre_archivo, contenido))
         return MediaSubidaCMS(id="media-9", url="https://www.portalvallenato.com/portada.jpg")
+
+    def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
+        self.consultas += 1
+        return self.consulta
 
     def listar_categorias(self) -> list[CategoriaCMS]:
         return [CategoriaCMS(id="3", nombre="Noticias")]
@@ -74,6 +90,7 @@ _RESPUESTA = json.dumps(
         "meta_titulo": "Meta",
         "meta_descripcion": "Desc",
         "frase_clave": "vallenato",
+        "texto_redes": "Gancho para redes\n#Vallenato #Festival",
     }
 )
 
@@ -178,6 +195,90 @@ def test_without_a_portada_no_image_is_attached() -> None:
     assert cms.contenido is not None
     assert "featured_media" not in cms.contenido
     assert resultado.portada_url is None
+
+
+class _FakeStorage:
+    def __init__(self) -> None:
+        self.guardado: dict[str, bytes] = {}
+
+    def guardar(self, key: str, contenido: bytes) -> None:
+        self.guardado[key] = contenido
+
+    def leer(self, key: str) -> bytes:
+        return self.guardado[key]
+
+    def eliminar(self, key: str) -> None:
+        self.guardado.pop(key, None)
+
+
+def test_keeps_the_jpeg_in_the_app_storage_and_stores_the_social_text() -> None:
+    storage = _FakeStorage()
+    candidato = _candidato()
+
+    resultado = crear_borrador_desde_candidato(
+        candidato,
+        FakeAIProvider(respuesta_json=_RESPUESTA),
+        _FakeCMS(),
+        portada=PortadaParaBorrador(imagen_base=b"foto"),
+        portada_renderer=_FakeRenderer(),
+        media_storage=storage,
+    )
+
+    assert resultado.portada_storage_key == f"portadas/{candidato.id}.jpg"
+    assert storage.guardado[resultado.portada_storage_key] == b"portada-jpeg"
+    assert resultado.tiene_portada_guardada is True
+    assert resultado.texto_redes == "Gancho para redes\n#Vallenato #Festival"
+    assert resultado.wp_estado == "borrador"
+
+
+def _procesado(**overrides: object) -> NewsCandidate:
+    defaults: dict[str, object] = {
+        "estado": EstadoNewsCandidate.PROCESADO,
+        "wp_post_id": "77",
+        "wp_estado": "borrador",
+    }
+    defaults.update(overrides)
+    return _candidato(**defaults)
+
+
+def test_sync_marks_a_published_post_with_its_real_url_and_date() -> None:
+    cms = _FakeCMS()
+    fecha = datetime(2026, 10, 29, tzinfo=UTC)
+    cms.consulta = ConsultaPostCMS(
+        estado=EstadoPostCMS.PUBLICADO,
+        url="https://www.portalvallenato.com/nota/",
+        fecha_publicacion=fecha,
+    )
+
+    resultado = sincronizar_estado_wordpress(_procesado(), cms)
+
+    assert resultado.wp_estado == "publicado"
+    assert resultado.wp_publicado_url == "https://www.portalvallenato.com/nota/"
+    assert resultado.wp_fecha_publicacion == fecha
+
+
+def test_sync_detects_a_trashed_post() -> None:
+    cms = _FakeCMS()
+    cms.consulta = ConsultaPostCMS(estado=EstadoPostCMS.ELIMINADO, url=None, fecha_publicacion=None)
+
+    assert sincronizar_estado_wordpress(_procesado(), cms).wp_estado == "eliminado"
+
+
+def test_sync_keeps_what_was_known_when_wordpress_cannot_be_checked() -> None:
+    cms = _FakeCMS()
+    cms.consulta = ConsultaPostCMS(estado=EstadoPostCMS.ERROR, url=None, fecha_publicacion=None)
+    candidato = _procesado()
+
+    assert sincronizar_estado_wordpress(candidato, cms) == candidato
+
+
+def test_sync_never_asks_wordpress_again_once_published() -> None:
+    cms = _FakeCMS()
+
+    resultado = sincronizar_estado_wordpress(_procesado(wp_estado="publicado"), cms)
+
+    assert resultado.wp_estado == "publicado"
+    assert cms.consultas == 0
 
 
 def test_a_portada_without_renderer_is_rejected() -> None:

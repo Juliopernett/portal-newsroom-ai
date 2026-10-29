@@ -28,7 +28,8 @@ from typing import Any
 
 from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
 from core.ports.ai_provider import AIProvider
-from core.ports.cms_publisher import CMSPublisher
+from core.ports.cms_publisher import CMSPublisher, EstadoPostCMS
+from core.ports.media_storage import MediaStorage
 from core.ports.portada_renderer import PortadaRenderer, SolicitudPortada, VariantePortada
 from core.services.editorial_ai_service import (
     REGLAS_NOTA_DE_OTRO_MEDIO,
@@ -39,6 +40,10 @@ from core.services.editorial_ai_service import (
 from shared.logger import get_logger
 
 logger = get_logger(__name__)
+
+ESTADO_WP_BORRADOR = "borrador"
+ESTADO_WP_PUBLICADO = "publicado"
+ESTADO_WP_ELIMINADO = "eliminado"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -100,6 +105,7 @@ def crear_borrador_desde_candidato(
     *,
     portada: PortadaParaBorrador | None = None,
     portada_renderer: PortadaRenderer | None = None,
+    media_storage: MediaStorage | None = None,
 ) -> NewsCandidate:
     """Rewrite `candidato` with the editorial AI and create its WordPress draft.
 
@@ -138,6 +144,7 @@ def crear_borrador_desde_candidato(
             categorias,
             ai_provider,
             reglas_adicionales=REGLAS_NOTA_DE_OTRO_MEDIO,
+            pedir_texto_redes=True,
         )
     except EditorialAIError as exc:
         logger.warning("Redacción con IA falló para candidato %s: %s", candidato.id, exc)
@@ -155,6 +162,7 @@ def crear_borrador_desde_candidato(
         payload["tags"] = [cms_publisher.resolver_o_crear_etiqueta(e) for e in etiquetas]
 
     portada_url: str | None = None
+    portada_storage_key: str | None = None
     if portada is not None and portada_renderer is not None:
         imagen = portada_renderer.renderizar(
             SolicitudPortada(
@@ -168,6 +176,11 @@ def crear_borrador_desde_candidato(
             ),
             formato="jpeg",
         )
+        if media_storage is not None:
+            # Our own JPEG copy: WordPress converts its upload to WebP, which
+            # Instagram rejects. The key is per candidate, so a retry overwrites.
+            portada_storage_key = f"portadas/{candidato.id}.jpg"
+            media_storage.guardar(portada_storage_key, imagen)
         subida = cms_publisher.subir_media_con_url(
             imagen, f"portada-{contenido.slug}.jpg", "image/jpeg"
         )
@@ -184,4 +197,34 @@ def crear_borrador_desde_candidato(
         wp_post_id=resultado.post_id,
         wp_url=resultado.url,
         portada_url=portada_url,
+        portada_storage_key=portada_storage_key,
+        texto_redes=contenido.texto_redes or None,
+        wp_estado=ESTADO_WP_BORRADOR,
     )
+
+
+def sincronizar_estado_wordpress(
+    candidato: NewsCandidate, cms_publisher: CMSPublisher
+) -> NewsCandidate:
+    """Return `candidato` with its draft's real WordPress state refreshed.
+
+    A candidate without a draft, or whose post is already `publicado`
+    (final), is returned unchanged without asking WordPress. A failed
+    check (`EstadoPostCMS.ERROR`) also changes nothing — "could not verify
+    right now" must never overwrite what was already known.
+    """
+    if candidato.wp_post_id is None or candidato.wp_estado == ESTADO_WP_PUBLICADO:
+        return candidato
+    consulta = cms_publisher.consultar_estado_post(candidato.wp_post_id)
+    if consulta.estado == EstadoPostCMS.PUBLICADO:
+        return replace(
+            candidato,
+            wp_estado=ESTADO_WP_PUBLICADO,
+            wp_publicado_url=consulta.url,
+            wp_fecha_publicacion=consulta.fecha_publicacion,
+        )
+    if consulta.estado == EstadoPostCMS.BORRADOR:
+        return replace(candidato, wp_estado=ESTADO_WP_BORRADOR)
+    if consulta.estado == EstadoPostCMS.ELIMINADO:
+        return replace(candidato, wp_estado=ESTADO_WP_ELIMINADO)
+    return candidato

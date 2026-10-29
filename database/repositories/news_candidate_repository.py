@@ -70,6 +70,11 @@ def _to_model(candidate: NewsCandidate) -> NewsCandidateModel:
         wp_post_id=candidate.wp_post_id,
         wp_url=candidate.wp_url,
         portada_url=candidate.portada_url,
+        portada_storage_key=candidate.portada_storage_key,
+        texto_redes=candidate.texto_redes,
+        wp_estado=candidate.wp_estado,
+        wp_publicado_url=candidate.wp_publicado_url,
+        wp_fecha_publicacion=candidate.wp_fecha_publicacion,
     )
 
 
@@ -83,6 +88,9 @@ def _to_domain(model: NewsCandidateModel) -> NewsCandidate:
     discovered_at = model.discovered_at
     if discovered_at.tzinfo is None:
         discovered_at = discovered_at.replace(tzinfo=UTC)
+    wp_fecha_publicacion = model.wp_fecha_publicacion
+    if wp_fecha_publicacion is not None and wp_fecha_publicacion.tzinfo is None:
+        wp_fecha_publicacion = wp_fecha_publicacion.replace(tzinfo=UTC)
     return NewsCandidate(
         id=model.id,
         source=model.source,
@@ -102,6 +110,11 @@ def _to_domain(model: NewsCandidateModel) -> NewsCandidate:
         wp_post_id=model.wp_post_id,
         wp_url=model.wp_url,
         portada_url=model.portada_url,
+        portada_storage_key=model.portada_storage_key,
+        texto_redes=model.texto_redes,
+        wp_estado=model.wp_estado,
+        wp_publicado_url=model.wp_publicado_url,
+        wp_fecha_publicacion=wp_fecha_publicacion,
     )
 
 

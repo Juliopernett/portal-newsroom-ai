@@ -62,3 +62,10 @@ class NewsCandidateModel(Base):
     wp_post_id: Mapped[str | None] = mapped_column(String(20), nullable=True)
     wp_url: Mapped[str | None] = mapped_column(String, nullable=True)
     portada_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    portada_storage_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    texto_redes: Mapped[str | None] = mapped_column(String, nullable=True)
+    wp_estado: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    wp_publicado_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    wp_fecha_publicacion: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

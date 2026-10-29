@@ -105,6 +105,7 @@ class ContenidoEditorial:
     meta_titulo: str
     meta_descripcion: str
     frase_clave: str
+    texto_redes: str = ""
 
 
 class EditorialAIError(RuntimeError):
@@ -119,7 +120,9 @@ class EditorialAIError(RuntimeError):
     """
 
 
-def _construir_json_schema(categorias_existentes: list[str]) -> dict[str, Any]:
+def _construir_json_schema(
+    categorias_existentes: list[str], pedir_texto_redes: bool = False
+) -> dict[str, Any]:
     """Return the JSON Schema constraining the model's structured output.
 
     `categoria`'s enum is built fresh from the CMS's real categories (plus
@@ -143,6 +146,11 @@ def _construir_json_schema(categorias_existentes: list[str]) -> dict[str, Any]:
             "meta_titulo": {"type": "string", "minLength": 1, "maxLength": 60},
             "meta_descripcion": {"type": "string", "minLength": 1, "maxLength": 156},
             "frase_clave": {"type": "string", "minLength": 1},
+            **(
+                {"texto_redes": {"type": "string", "minLength": 1, "maxLength": 500}}
+                if pedir_texto_redes
+                else {}
+            ),
         },
         "required": [
             "titulo",
@@ -154,6 +162,7 @@ def _construir_json_schema(categorias_existentes: list[str]) -> dict[str, Any]:
             "meta_titulo",
             "meta_descripcion",
             "frase_clave",
+            *(["texto_redes"] if pedir_texto_redes else []),
         ],
         "additionalProperties": False,
     }
@@ -179,14 +188,27 @@ texto que no sea parte de la noticia.
 """
 
 
+_CLAVE_TEXTO_REDES = (
+    '- "texto_redes": string, el texto para publicar la noticia en Instagram y Facebook: '
+    "un gancho de 1 o 2 frases cortas (máximo 220 caracteres en total) que invite a leer, "
+    "fiel a los hechos del texto original (nunca inventes ni exageres), sin enlaces y "
+    "con 1 emoji como máximo; después un salto de línea y una línea con 3 a 5 hashtags "
+    "relevantes (artistas, evento o ciudad mencionados en el texto). No incluyas "
+    "#NoticiasVallenatas ni #portalvallenato: se agregan aparte.\n"
+)
+
+
 def _construir_prompt(
-    texto: str, titulo_sugerido: str | None, categorias_existentes: list[str]
+    texto: str,
+    titulo_sugerido: str | None,
+    categorias_existentes: list[str],
+    pedir_texto_redes: bool = False,
 ) -> str:
     categorias_texto = (
         ", ".join(categorias_existentes) if categorias_existentes else "(ninguna disponible)"
     )
     titulo_operador = (
-        f'\nTítulo sugerido por el operador (puede usarse, mejorarse, o '
+        f"\nTítulo sugerido por el operador (puede usarse, mejorarse, o "
         f'ignorarse si no encaja): "{titulo_sugerido}"'
         if titulo_sugerido
         else ""
@@ -209,6 +231,7 @@ def _construir_prompt(
         '- "meta_titulo": string, título SEO (máx. 60 caracteres)\n'
         '- "meta_descripcion": string, meta descripción SEO (120 a 156 caracteres)\n'
         '- "frase_clave": string, la frase clave SEO de 2 a 4 palabras\n'
+        f"{_CLAVE_TEXTO_REDES if pedir_texto_redes else ''}"
         "No omitas ninguna clave — si un campo no aplica, usa un string vacío "
         "o null según corresponda, nunca la omitas."
     )
@@ -236,20 +259,22 @@ def generar_contenido_editorial_desde_texto(
     ai_provider: AIProvider,
     *,
     reglas_adicionales: str = "",
+    pedir_texto_redes: bool = False,
 ) -> ContenidoEditorial:
     """Return the AI's editorial rewrite of a raw `texto`, or raise `EditorialAIError`.
 
     The text-only core of `generar_contenido_editorial`, so a caller with
     no `PublicationRequest` (the Radar's `NewsCandidate`, Sprint Discovery
     5) can reuse the exact same prompt, schema and defensive parsing.
-    `reglas_adicionales` is appended to the system prompt.
+    `reglas_adicionales` is appended to the system prompt. `pedir_texto_redes`
+    also asks for the Instagram/Facebook text (`ContenidoEditorial.texto_redes`).
     """
     nombres_categorias = [c.nombre for c in categorias_existentes]
     prompt = (
         f"{_SYSTEM_PROMPT}{reglas_adicionales}\n\n"
-        f"{_construir_prompt(texto, titulo_sugerido, nombres_categorias)}"
+        f"{_construir_prompt(texto, titulo_sugerido, nombres_categorias, pedir_texto_redes)}"
     )
-    schema = _construir_json_schema(nombres_categorias)
+    schema = _construir_json_schema(nombres_categorias, pedir_texto_redes)
     try:
         respuesta = ai_provider.generate_structured(prompt, schema)
     except AIProviderError as exc:
@@ -277,6 +302,7 @@ def generar_contenido_editorial_desde_texto(
     meta_titulo = datos.get("meta_titulo")
     meta_descripcion = datos.get("meta_descripcion")
     frase_clave = datos.get("frase_clave")
+    texto_redes = datos.get("texto_redes")
     return ContenidoEditorial(
         titulo=titulo,
         entradilla=entradilla,
@@ -289,13 +315,18 @@ def generar_contenido_editorial_desde_texto(
         # de descartar la reescritura (misma filosofía que entradilla/slug
         # arriba). meta_titulo/meta_descripcion se truncan al límite que
         # Yoast SEO realmente respeta (60 / 156 caracteres).
-        meta_titulo=str(meta_titulo)[:60] if isinstance(meta_titulo, str) and meta_titulo else titulo[:60],
+        meta_titulo=str(meta_titulo)[:60]
+        if isinstance(meta_titulo, str) and meta_titulo
+        else titulo[:60],
         meta_descripcion=(
             str(meta_descripcion)[:156]
             if isinstance(meta_descripcion, str) and meta_descripcion
             else (entradilla or contenido)[:156]
         ),
         frase_clave=str(frase_clave) if isinstance(frase_clave, str) and frase_clave else "",
+        texto_redes=(
+            texto_redes.strip() if isinstance(texto_redes, str) and texto_redes.strip() else ""
+        ),
     )
 
 

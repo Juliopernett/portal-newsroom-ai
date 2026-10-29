@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RefreshCw, Search } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -9,13 +9,14 @@ import { radarApi } from './api'
 import { MetricasRadar } from './MetricasRadar'
 import { RadarCandidateCard } from './RadarCandidateCard'
 
-type FiltroEstado = 'todos' | 'nuevo' | 'guardado' | 'descartado'
+type FiltroEstado = 'todos' | 'nuevo' | 'guardado' | 'descartado' | 'procesado'
 
 const FILTROS: { value: FiltroEstado; label: string }[] = [
   { value: 'todos', label: 'Todos' },
   { value: 'nuevo', label: 'Nuevos' },
   { value: 'guardado', label: 'Guardados' },
   { value: 'descartado', label: 'Descartados' },
+  { value: 'procesado', label: 'Procesadas' },
 ]
 
 export function RadarPage() {
@@ -29,6 +30,16 @@ export function RadarPage() {
   // filtros propios (ver app/api/routers/discovery.py), por si un
   // consumidor futuro los necesita.
   const candidatosQuery = useQuery({ queryKey: ['radar-candidatos'], queryFn: radarApi.listar })
+  const queryClient = useQueryClient()
+  // Al abrir "Procesadas" (y con "Actualizar Radar" estando ahí) se le pregunta
+  // a WordPress si los borradores ya se publicaron — una sola petición.
+  const { mutate: sincronizar } = useMutation({
+    mutationFn: radarApi.sincronizarWordpress,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['radar-candidatos'] }),
+  })
+  useEffect(() => {
+    if (filtro === 'procesado') sincronizar()
+  }, [filtro, sincronizar])
   const candidatosData = candidatosQuery.data
   const candidatos = useMemo(() => candidatosData ?? [], [candidatosData])
 
@@ -63,7 +74,10 @@ export function RadarPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => candidatosQuery.refetch()}
+          onClick={() => {
+            candidatosQuery.refetch()
+            if (filtro === 'procesado') sincronizar()
+          }}
           disabled={candidatosQuery.isFetching}
         >
           <RefreshCw className={candidatosQuery.isFetching ? 'animate-spin' : ''} />

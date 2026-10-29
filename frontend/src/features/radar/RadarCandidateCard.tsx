@@ -1,6 +1,15 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bookmark, ChevronDown, ChevronUp, ExternalLink, Newspaper, Sparkles, Trash2 } from 'lucide-react'
+import {
+  Bookmark,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  ExternalLink,
+  Newspaper,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -22,6 +31,7 @@ import { errorMessage } from '@/api/client'
 import { formatFechaHoraNegocio } from '@/lib/format'
 import { formatHoras, horasEnEspera } from '@/features/solicitudes/utils'
 import { radarApi, type NewsCandidate, type OpcionesPortada } from './api'
+import { PanelPublicacion } from './PanelPublicacion'
 
 const ESTADO_LABELS: Record<NewsCandidate['estado'], string> = {
   nuevo: 'Nuevo',
@@ -170,16 +180,27 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
           </a>
         )}
 
-        {candidato.portada_url && (
+        {candidato.tiene_portada_guardada ? (
           <a
-            href={candidato.portada_url}
-            target="_blank"
-            rel="noopener"
-            title="La misma imagen sirve para subirla a redes sociales"
+            href={`/discovery/${candidato.id}/portada.jpg`}
+            download
+            title="JPEG original, listo para subir a Instagram y Facebook"
             className="inline-flex items-center gap-1 text-xs font-medium text-brand underline"
           >
-            <ExternalLink className="size-3.5" /> Ver portada (para redes)
+            <Download className="size-3.5" /> Descargar portada (JPG)
           </a>
+        ) : (
+          candidato.portada_url && (
+            <a
+              href={candidato.portada_url}
+              target="_blank"
+              rel="noopener"
+              title="Portada en WordPress (puede estar en WebP, que Instagram no acepta)"
+              className="inline-flex items-center gap-1 text-xs font-medium text-brand underline"
+            >
+              <ExternalLink className="size-3.5" /> Ver portada en WordPress
+            </a>
+          )
         )}
 
         {!esTerminal && (
@@ -329,6 +350,8 @@ export function RadarCandidateCard({ candidato }: { candidato: NewsCandidate }) 
           </>
         )}
       </div>
+
+      {candidato.wp_post_id && <PanelPublicacion candidato={candidato} />}
 
       {candidato.extracted_content && (
         <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">

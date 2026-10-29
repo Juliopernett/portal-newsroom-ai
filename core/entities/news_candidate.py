@@ -81,6 +81,16 @@ class NewsCandidate:
     wp_post_id: str | None = None
     wp_url: str | None = None
     portada_url: str | None = None
+    # --- Sprint Procesadas: what happened after "Crear noticia" ---
+    # JPEG kept in the app's own storage (WordPress converts its copy to WebP,
+    # which Instagram rejects); `None` for covers made before this existed.
+    portada_storage_key: str | None = None
+    # Hook + hashtags written by the editorial AI for Instagram/Facebook.
+    texto_redes: str | None = None
+    # Last known state of the WordPress post: borrador | publicado | eliminado.
+    wp_estado: str | None = None
+    wp_publicado_url: str | None = None
+    wp_fecha_publicacion: datetime | None = None
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.confidence <= 1.0:
@@ -93,6 +103,11 @@ class NewsCandidate:
     def es_terminal(self) -> bool:
         """Return whether this candidate is done — no further review transition expected."""
         return self.estado in _ESTADOS_TERMINALES
+
+    @property
+    def tiene_portada_guardada(self) -> bool:
+        """Return whether the cover's JPEG is available for download from this app."""
+        return self.portada_storage_key is not None
 
     @property
     def lista_para_extraccion(self) -> bool:

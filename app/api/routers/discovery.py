@@ -29,13 +29,14 @@ decision, see docs/PROJECT_RULES.md rule 11).
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 
 from app.api.dependencies import (
     get_ai_provider,
     get_cms_publisher,
     get_content_extractor,
     get_current_user,
+    get_media_storage,
     get_portada_renderer,
     get_source_resolver,
     get_unit_of_work,
@@ -46,6 +47,7 @@ from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
 from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.content_extractor import ContentExtractor
+from core.ports.media_storage import MediaStorage
 from core.ports.portada_renderer import PortadaRenderer, VariantePortada
 from core.ports.source_resolver import SourceResolver
 from core.ports.unit_of_work import UnitOfWork
@@ -53,6 +55,7 @@ from core.services.candidate_draft_service import (
     BorradorDesdeCandidatoError,
     PortadaParaBorrador,
     crear_borrador_desde_candidato,
+    sincronizar_estado_wordpress,
 )
 from core.services.news_candidate_service import (
     descartar,
@@ -96,6 +99,63 @@ def _get_or_404(uow: UnitOfWork, candidate_id: str) -> NewsCandidate:
     return candidato
 
 
+# Most recent drafts checked per call — keeps one click from fanning out into
+# dozens of WordPress requests (every PUBLICADO one is final and never re-asked).
+_MAX_SINCRONIZADAS = 30
+
+
+@router.post("/sincronizar-wordpress", response_model=list[NewsCandidateOut])
+def sincronizar_borradores_wordpress(
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    cms_publisher: CMSPublisher = Depends(get_cms_publisher),
+) -> list[NewsCandidate]:
+    """Refresh the WordPress state (borrador/publicado/papelera) of processed candidates.
+
+    One request from the UI; the server asks WordPress about the most recent
+    drafts that are not yet known to be published. Returns every processed
+    candidate, newest first, so the "Procesadas" tab can render from it.
+    """
+    procesados = [c for c in uow.news_candidates.list_all() if c.wp_post_id is not None]
+    pendientes = [c for c in procesados if c.wp_estado != "publicado"][:_MAX_SINCRONIZADAS]
+    ids_pendientes = {c.id for c in pendientes}
+    resultado: list[NewsCandidate] = []
+    for candidato in procesados:
+        if candidato.id in ids_pendientes:
+            actualizado = sincronizar_estado_wordpress(candidato, cms_publisher)
+            if actualizado != candidato:
+                uow.news_candidates.save(actualizado)
+            candidato = actualizado
+        resultado.append(candidato)
+    uow.commit()
+    return sorted(resultado, key=lambda c: c.discovered_at, reverse=True)
+
+
+@router.get("/{candidate_id}/portada.jpg")
+def descargar_portada(
+    candidate_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    media_storage: MediaStorage = Depends(get_media_storage),
+) -> Response:
+    """Download the cover's original JPEG kept by this app (for social networks)."""
+    candidato = _get_or_404(uow, candidate_id)
+    if candidato.portada_storage_key is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Esta portada no se guardó en la app — usa el enlace de WordPress",
+        )
+    try:
+        contenido = media_storage.leer(candidato.portada_storage_key)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="El archivo de la portada ya no existe"
+        ) from exc
+    return Response(
+        content=contenido,
+        media_type="image/jpeg",
+        headers={"Content-Disposition": 'attachment; filename="portada.jpg"'},
+    )
+
+
 @router.post("/{candidate_id}/guardar", response_model=NewsCandidateOut)
 def guardar_candidato(
     candidate_id: str, uow: UnitOfWork = Depends(get_unit_of_work)
@@ -129,6 +189,7 @@ def crear_noticia_desde_candidato(
     ai_provider: AIProvider = Depends(get_ai_provider),
     cms_publisher: CMSPublisher = Depends(get_cms_publisher),
     portada_renderer: PortadaRenderer = Depends(get_portada_renderer),
+    media_storage: MediaStorage = Depends(get_media_storage),
     imagen_base: UploadFile | None = File(None),
     imagen_circulo: UploadFile | None = File(None),
     variante: VariantePortada = Form(VariantePortada.NOTICIAS),
@@ -172,6 +233,7 @@ def crear_noticia_desde_candidato(
             cms_publisher,
             portada=portada,
             portada_renderer=portada_renderer,
+            media_storage=media_storage,
         )
     except BorradorDesdeCandidatoError as exc:
         raise HTTPException(

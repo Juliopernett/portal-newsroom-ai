@@ -24,13 +24,20 @@ from app.api.dependencies import (
     get_ai_provider,
     get_cms_publisher,
     get_content_extractor,
+    get_media_storage,
     get_source_resolver,
 )
 from app.api.main import app
 from core.entities.extracted_content import ExtractedContent
 from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
 from core.ports.ai_provider import AIProviderError
-from core.ports.cms_publisher import CategoriaCMS, CMSDraftResult, MediaSubidaCMS
+from core.ports.cms_publisher import (
+    CategoriaCMS,
+    CMSDraftResult,
+    ConsultaPostCMS,
+    EstadoPostCMS,
+    MediaSubidaCMS,
+)
 from core.ports.content_extractor import ContentExtractorError
 from core.ports.source_resolver import ResolvedSource
 from database.repositories.news_candidate_repository import SqlAlchemyNewsCandidateRepository
@@ -138,6 +145,13 @@ class _FakeCMS:
     def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:
         return CMSDraftResult(post_id="42", url="https://www.portalvallenato.com/?p=42")
 
+    def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
+        return ConsultaPostCMS(
+            estado=EstadoPostCMS.PUBLICADO,
+            url="https://www.portalvallenato.com/la-nota/",
+            fecha_publicacion=datetime(2026, 10, 29, tzinfo=UTC),
+        )
+
     def listar_categorias(self) -> list[CategoriaCMS]:
         return []
 
@@ -194,6 +208,74 @@ def test_crear_noticia_with_a_photo_renders_and_stores_the_cover(
     body = response.json()
     assert body["estado"] == "procesado"
     assert body["portada_url"] == "https://www.portalvallenato.com/portada.jpg"
+
+
+class _MemoriaStorage:
+    def __init__(self) -> None:
+        self.archivos: dict[str, bytes] = {}
+
+    def guardar(self, key: str, contenido: bytes) -> None:
+        self.archivos[key] = contenido
+
+    def leer(self, key: str) -> bytes:
+        return self.archivos[key]
+
+    def eliminar(self, key: str) -> None:
+        self.archivos.pop(key, None)
+
+
+def test_the_stored_jpeg_can_be_downloaded(client: TestClient, _test_engine: Engine) -> None:
+    _con_cms_falso()
+    app.dependency_overrides[get_media_storage] = lambda: storage
+    storage = _MemoriaStorage()
+    candidato = _candidato(extracted_content=_extraido())
+    _seed(_test_engine, candidato)
+    buffer = io.BytesIO()
+    Image.new("RGB", (800, 600), (200, 120, 40)).save(buffer, "JPEG")
+    client.post(
+        f"/discovery/{candidato.id}/crear-noticia",
+        files={"imagen_base": ("foto.jpg", buffer.getvalue(), "image/jpeg")},
+    )
+
+    response = client.get(f"/discovery/{candidato.id}/portada.jpg")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.content[:2] == b"\xff\xd8"
+    assert client.get("/discovery").json()[0]["tiene_portada_guardada"] is True
+
+
+def test_downloading_a_cover_that_was_never_stored_returns_404(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    candidato = _candidato(portada_url="https://wp/portada.webp")
+    _seed(_test_engine, candidato)
+
+    assert client.get(f"/discovery/{candidato.id}/portada.jpg").status_code == 404
+
+
+def test_sincronizar_wordpress_refreshes_processed_candidates(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    _con_cms_falso()
+    procesado = _candidato(
+        hash="h-p",
+        estado=EstadoNewsCandidate.PROCESADO,
+        wp_post_id="42",
+        wp_estado="borrador",
+    )
+    _seed(_test_engine, procesado)
+    _seed(_test_engine, _candidato(hash="h-n"))
+
+    response = client.post("/discovery/sincronizar-wordpress")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1  # only candidates with a WordPress draft
+    assert body[0]["wp_estado"] == "publicado"
+    assert body[0]["wp_publicado_url"] == "https://www.portalvallenato.com/la-nota/"
+    persistido = next(c for c in client.get("/discovery").json() if c["id"] == procesado.id)
+    assert persistido["wp_estado"] == "publicado"
 
 
 def test_crear_noticia_without_extracted_content_returns_422(

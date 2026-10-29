@@ -34,6 +34,12 @@ export interface NewsCandidate {
   wp_url: string | null
   // Sprint Portadas — portada generada, ya subida a WordPress.
   portada_url: string | null
+  // Sprint Procesadas — JPEG guardado en la app, texto para redes y estado real en WordPress.
+  tiene_portada_guardada: boolean
+  texto_redes: string | null
+  wp_estado: 'borrador' | 'publicado' | 'eliminado' | null
+  wp_publicado_url: string | null
+  wp_fecha_publicacion: string | null
 }
 
 // Opciones de portada de "Crear noticia" — todas opcionales: sin
@@ -69,5 +75,8 @@ export const radarApi = {
   },
   // Sprint Discovery 3: resuelve la fuente real y extrae su contenido —
   // acción técnica, repetible, independiente de "Crear noticia".
+  // Pregunta a WordPress por el estado real de los borradores (publicado /
+  // papelera) y devuelve todos los candidatos procesados.
+  sincronizarWordpress: () => api.post<NewsCandidate[]>('/discovery/sincronizar-wordpress'),
   preparar: (id: string) => api.post<NewsCandidate>(`/discovery/${id}/preparar`),
 }
