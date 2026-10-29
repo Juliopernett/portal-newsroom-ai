@@ -23,6 +23,7 @@ argon2-cffi>=23.1,<24
 
 # --- Informe PDF de cierre de contrato (Sprint — identidad comercial) ---
 reportlab>=4.2,<5
+pillow>=11,<13  # portadas (agents/images/pillow_portada_renderer.py)
 
 # --- Extracción de contenido (usadas a partir del agente Extractor) ---
 playwright>=1.44,<2

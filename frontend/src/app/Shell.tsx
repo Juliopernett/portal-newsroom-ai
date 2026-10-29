@@ -11,6 +11,7 @@ import {
   Download,
   LogOut,
   Menu,
+  ImagePlus,
   Radar,
   Settings,
   X,
@@ -45,7 +46,10 @@ const NAV_GROUPS = [
   },
   {
     label: 'Discovery',
-    items: [{ to: '/radar', label: 'Radar Editorial', icon: Radar, end: false }],
+    items: [
+      { to: '/radar', label: 'Radar Editorial', icon: Radar, end: false },
+      { to: '/portadas', label: 'Portadas', icon: ImagePlus, end: false },
+    ],
   },
   {
     label: 'Finanzas',

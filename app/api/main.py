@@ -32,6 +32,7 @@ from app.api.routers import (
     otros_ingresos,
     pautas,
     plan_pauta,
+    portadas,
     publication_requests,
     reportes,
     social,
@@ -57,6 +58,7 @@ app.include_router(otros_ingresos.router)
 app.include_router(pautas.router)
 app.include_router(pautas.router_publico)
 app.include_router(plan_pauta.router)
+app.include_router(portadas.router)
 app.include_router(publication_requests.router)
 app.include_router(reportes.router)
 app.include_router(social.router)

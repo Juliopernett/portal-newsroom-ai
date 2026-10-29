@@ -19,6 +19,7 @@ from fastapi import Cookie, Depends, HTTPException, status
 from agents.ai.anthropic_provider import MODELO_POR_DEFECTO, AnthropicAIProvider
 from agents.ai.openrouter_provider import OpenRouterAIProvider
 from agents.extractor.html_content_extractor import HtmlContentExtractor
+from agents.images.pillow_portada_renderer import PillowPortadaRenderer
 from agents.meta_social.client import MetaGraphSocialMediaReader
 from agents.radar.google_news_source_resolver import GoogleNewsSourceResolver
 from agents.radar.http_redirect_source_resolver import HttpRedirectSourceResolver
@@ -33,6 +34,7 @@ from core.ports.cms_publisher import CMSPublisher
 from core.ports.content_extractor import ContentExtractor
 from core.ports.media_storage import MediaStorage
 from core.ports.password_hasher import PasswordHasher
+from core.ports.portada_renderer import PortadaRenderer
 from core.ports.social_media_reader import SocialMediaReader
 from core.ports.source_resolver import SourceResolver
 from core.ports.unit_of_work import UnitOfWork
@@ -140,6 +142,11 @@ def get_content_extractor() -> ContentExtractor:
     Sprint Discovery 3 (2026-08-29).
     """
     return HtmlContentExtractor(timeout=get_settings().radar_content_extractor_timeout_seconds)
+
+
+def get_portada_renderer() -> PortadaRenderer:
+    """Return the renderer that builds branded news covers (Sprint Portadas, 2026-10-29)."""
+    return PillowPortadaRenderer()
 
 
 def get_media_storage() -> MediaStorage:
