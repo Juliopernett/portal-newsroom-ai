@@ -147,7 +147,7 @@ def _construir_json_schema(
             "meta_descripcion": {"type": "string", "minLength": 1, "maxLength": 156},
             "frase_clave": {"type": "string", "minLength": 1},
             **(
-                {"texto_redes": {"type": "string", "minLength": 1, "maxLength": 500}}
+                {"texto_redes": {"type": "string", "minLength": 1, "maxLength": 1000}}
                 if pedir_texto_redes
                 else {}
             ),
@@ -189,12 +189,20 @@ texto que no sea parte de la noticia.
 
 
 _CLAVE_TEXTO_REDES = (
-    '- "texto_redes": string, el texto para publicar la noticia en Instagram y Facebook: '
-    "un gancho de 1 o 2 frases cortas (máximo 220 caracteres en total) que invite a leer, "
-    "fiel a los hechos del texto original (nunca inventes ni exageres), sin enlaces y "
-    "con 1 emoji como máximo; después un salto de línea y una línea con 3 a 5 hashtags "
-    "relevantes (artistas, evento o ciudad mencionados en el texto). No incluyas "
-    "#NoticiasVallenatas ni #portalvallenato: se agregan aparte.\n"
+    '- "texto_redes": string, el texto para publicar la noticia en Instagram y Facebook, '
+    "pensado para que la gente entre a leer la nota completa en la web. Estructura, en "
+    "párrafos separados por una línea en blanco: (1) un titular-gancho de una frase con "
+    "el hecho principal y los nombres propios clave; (2) un párrafo de 2 a 4 frases con "
+    "los datos concretos más importantes del texto (quién, qué, cuándo, dónde, cifras o "
+    "fechas) para que el lector entienda de qué trata, pero dejando sin contar un detalle "
+    "relevante —la postura completa de alguien, el desenlace, el contexto detallado— que "
+    "se encuentra en la nota; (3) una pregunta o frase corta que invite a seguir leyendo, "
+    "sin escribir el enlace ni 'link en la bio' (eso se agrega aparte). Entre 350 y 700 "
+    "caracteres en total sin contar los hashtags. Fiel a los hechos del texto original: "
+    "nunca inventes, no exageres ni conviertas algo probable en confirmado, y no uses "
+    "clickbait engañoso (el gancho debe cumplirse en la nota). Máximo 3 emojis. Termina "
+    "con una línea de 3 a 5 hashtags relevantes (artistas, evento o ciudad del texto). "
+    "No incluyas #NoticiasVallenatas ni #portalvallenato: se agregan aparte.\n"
 )
 
 

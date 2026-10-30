@@ -16,11 +16,11 @@ const WP_BADGE: Record<string, { label: string; className: string }> = {
 // El enlace de Instagram no es pulsable en un texto, por eso ahí se manda a
 // la bio; en Facebook sí va el enlace de la nota ya publicada.
 function textoFacebook(c: NewsCandidate): string {
-  return `${c.texto_redes}\n\nLee la nota completa 👉 ${c.wp_publicado_url}\n\n${HASHTAGS_FIJOS}`
+  return `${c.texto_redes}\n\n👉 Lee la nota completa en Portal Vallenato: ${c.wp_publicado_url}\n\n${HASHTAGS_FIJOS}`
 }
 
 function textoInstagram(c: NewsCandidate): string {
-  return `${c.texto_redes}\n\nNota completa en el link de la bio.\n\n${HASHTAGS_FIJOS}`
+  return `${c.texto_redes}\n\n👉 Lee la nota completa en portalvallenato.com — link en la bio.\n\n${HASHTAGS_FIJOS}`
 }
 
 async function copiar(texto: string, red: string) {
