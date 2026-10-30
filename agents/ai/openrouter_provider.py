@@ -28,6 +28,20 @@ _CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 _REQUEST_TIMEOUT_SECONDS = 60
 
 
+def _detalle_error(exc: requests.RequestException) -> str:
+    """OpenRouter explains a 4xx in the body (bad model id, no credit…), which
+    `raise_for_status` drops — append it so the operator sees the real cause."""
+    respuesta = getattr(exc, "response", None)
+    if respuesta is None:
+        return ""
+    try:
+        error = respuesta.json().get("error")
+    except ValueError:
+        return ""
+    mensaje = error.get("message") if isinstance(error, dict) else error
+    return f" — {str(mensaje)[:300]}" if mensaje else ""
+
+
 class OpenRouterAIProvider:
     """`AIProvider` implemented against the OpenRouter Chat Completions API."""
 
@@ -60,7 +74,9 @@ class OpenRouterAIProvider:
             )
             response.raise_for_status()
         except requests.RequestException as exc:
-            raise AIProviderError(f"error del proveedor de IA (OpenRouter): {exc}") from exc
+            raise AIProviderError(
+                f"error del proveedor de IA (OpenRouter): {exc}{_detalle_error(exc)}"
+            ) from exc
         data = response.json()
         if "error" in data:
             raise AIProviderError(f"OpenRouter rechazó la solicitud: {data['error']}")

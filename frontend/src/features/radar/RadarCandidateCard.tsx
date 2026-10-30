@@ -6,6 +6,7 @@ import {
   ChevronUp,
   Download,
   ExternalLink,
+  Loader2,
   Newspaper,
   Sparkles,
   Trash2,
@@ -58,6 +59,9 @@ export function RadarCandidateCard({
 }) {
   const queryClient = useQueryClient()
   const [mostrarContenido, setMostrarContenido] = useState(false)
+  // El diálogo "Crear noticia" queda abierto mientras trabaja la IA: así se ve
+  // el avance y, si falla, el error se queda a la vista (un toast se pierde).
+  const [dialogoCrearAbierto, setDialogoCrearAbierto] = useState(false)
   // Opciones de portada del diálogo "Crear noticia" (todas opcionales).
   const [imagenPortada, setImagenPortada] = useState<File | null>(null)
   const [imagenCirculo, setImagenCirculo] = useState<File | null>(null)
@@ -94,12 +98,14 @@ export function RadarCandidateCard({
             }
           : null,
       ),
-    onSuccess: () =>
+    onSuccess: () => {
+      setDialogoCrearAbierto(false)
       onExito(
         imagenPortada
           ? 'Borrador creado en WordPress con su portada.'
           : 'Borrador creado en WordPress.',
-      ),
+      )
+    },
     onError: (err) => toast.error(errorMessage(err)),
   })
   const prepararMutation = useMutation({
@@ -217,7 +223,8 @@ export function RadarCandidateCard({
               disabled={isActing}
               onClick={() => prepararMutation.mutate()}
             >
-              <Sparkles /> Preparar noticia
+              {prepararMutation.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+              {prepararMutation.isPending ? 'Preparando…' : 'Preparar noticia'}
             </Button>
 
             {candidato.estado !== 'guardado' && (
@@ -254,7 +261,14 @@ export function RadarCandidateCard({
               </AlertDialogContent>
             </AlertDialog>
 
-            <AlertDialog>
+            <AlertDialog
+              open={dialogoCrearAbierto}
+              onOpenChange={(abrir) => {
+                if (crearNoticiaMutation.isPending) return
+                if (abrir) crearNoticiaMutation.reset()
+                setDialogoCrearAbierto(abrir)
+              }}
+            >
               <AlertDialogTrigger asChild>
                 <Button
                   size="sm"
@@ -265,7 +279,12 @@ export function RadarCandidateCard({
                       : 'Primero pulsa «Preparar noticia» para extraer el contenido'
                   }
                 >
-                  <Newspaper /> Crear noticia
+                  {crearNoticiaMutation.isPending ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Newspaper />
+                  )}
+                  {crearNoticiaMutation.isPending ? 'Creando…' : 'Crear noticia'}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -345,10 +364,37 @@ export function RadarCandidateCard({
                     </>
                   )}
                 </div>
+                {crearNoticiaMutation.isPending && (
+                  <p
+                    role="status"
+                    className="flex items-center gap-2 rounded-md bg-muted p-3 text-sm"
+                  >
+                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                    Redactando con IA y creando el borrador en WordPress… puede tardar hasta un
+                    minuto. No cierres esta ventana.
+                  </p>
+                )}
+                {crearNoticiaMutation.isError && (
+                  <p
+                    role="alert"
+                    className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+                  >
+                    No se pudo crear la noticia: {errorMessage(crearNoticiaMutation.error)}
+                  </p>
+                )}
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Volver</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => crearNoticiaMutation.mutate()}>
-                    Sí, crear borrador
+                  <AlertDialogCancel disabled={crearNoticiaMutation.isPending}>
+                    Volver
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={crearNoticiaMutation.isPending}
+                    onClick={(e) => {
+                      // No cerrar: el diálogo se cierra solo al terminar bien.
+                      e.preventDefault()
+                      crearNoticiaMutation.mutate()
+                    }}
+                  >
+                    {crearNoticiaMutation.isError ? 'Reintentar' : 'Sí, crear borrador'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

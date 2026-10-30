@@ -25,7 +25,9 @@ def _response(content: str) -> MagicMock:
 
 
 def test_generate_raises_when_api_key_is_missing() -> None:
-    provider = OpenRouterAIProvider(_settings(openrouter_api_key=None), modelo="deepseek/deepseek-chat")
+    provider = OpenRouterAIProvider(
+        _settings(openrouter_api_key=None), modelo="deepseek/deepseek-chat"
+    )
 
     with pytest.raises(AIProviderError, match="OPENROUTER_API_KEY"):
         provider.generate("hola")
@@ -39,7 +41,8 @@ def test_generate_returns_the_message_content() -> None:
     provider = OpenRouterAIProvider(_settings(), modelo="deepseek/deepseek-chat")
 
     with patch(
-        "agents.ai.openrouter_provider.requests.post", return_value=_response("respuesta del modelo")
+        "agents.ai.openrouter_provider.requests.post",
+        return_value=_response("respuesta del modelo"),
     ):
         resultado = provider.generate("hola")
 
@@ -80,6 +83,21 @@ def test_generate_wraps_a_connection_error() -> None:
         side_effect=requests.ConnectionError("no responde"),
     ):
         with pytest.raises(AIProviderError):
+            provider.generate("hola")
+
+
+def test_generate_includes_openrouter_error_detail_on_a_4xx() -> None:
+    provider = OpenRouterAIProvider(_settings(), modelo="claude-sonnet-5-5")
+    respuesta = MagicMock()
+    respuesta.json.return_value = {
+        "error": {"message": "claude-sonnet-5-5 is not a valid model ID"}
+    }
+    respuesta.raise_for_status.side_effect = requests.HTTPError(
+        "400 Client Error", response=respuesta
+    )
+
+    with patch("agents.ai.openrouter_provider.requests.post", return_value=respuesta):
+        with pytest.raises(AIProviderError, match="not a valid model ID"):
             provider.generate("hola")
 
 
