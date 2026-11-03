@@ -63,6 +63,9 @@ export const radarApi = {
     api.get<NewsCandidate[]>(incluirAntiguos ? '/discovery?dias=0' : '/discovery'),
   guardar: (id: string) => api.post<NewsCandidate>(`/discovery/${id}/guardar`),
   descartar: (id: string) => api.post<NewsCandidate>(`/discovery/${id}/descartar`),
+  // Descarta varios de una sola petición (los procesados se omiten).
+  descartarLote: (ids: string[]) =>
+    api.post<{ descartados: number; omitidos: number }>('/discovery/descartar-lote', { ids }),
   // Sprint Discovery 5: redacta con IA y crea el BORRADOR en WordPress
   // (nunca publica) y marca el candidato "procesado". Requiere haber
   // pulsado "Preparar noticia" antes.

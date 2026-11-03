@@ -32,6 +32,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
+from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
     get_ai_provider,
@@ -190,6 +191,41 @@ def descartar_candidato(
     uow.news_candidates.save(actualizado)
     uow.commit()
     return actualizado
+
+
+_MAX_DESCARTE_LOTE = 200
+
+
+class DescarteLoteIn(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=_MAX_DESCARTE_LOTE)
+
+
+class DescarteLoteOut(BaseModel):
+    descartados: int
+    omitidos: int
+
+
+@router.post("/descartar-lote", response_model=DescarteLoteOut)
+def descartar_lote(
+    payload: DescarteLoteIn, uow: UnitOfWork = Depends(get_unit_of_work)
+) -> DescarteLoteOut:
+    """Mark several candidates DESCARTADO in one request (never deletes rows).
+
+    Unknown ids and already-terminal (`PROCESADO`) candidates are skipped, not
+    errors — the response says how many were discarded vs. skipped.
+    """
+    descartados = 0
+    for candidate_id in dict.fromkeys(payload.ids):
+        candidato = uow.news_candidates.get_by_id(candidate_id)
+        if candidato is None or candidato.es_terminal:
+            continue
+        if candidato.estado != EstadoNewsCandidate.DESCARTADO:
+            uow.news_candidates.save(descartar(candidato))
+        descartados += 1
+    uow.commit()
+    return DescarteLoteOut(
+        descartados=descartados, omitidos=len(set(payload.ids)) - descartados
+    )
 
 
 @router.post("/{candidate_id}/crear-noticia", response_model=NewsCandidateOut)

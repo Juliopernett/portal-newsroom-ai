@@ -53,9 +53,14 @@ const RADAR_KEY = ['radar-candidatos']
 export function RadarCandidateCard({
   candidato,
   nombreFuente,
+  seleccionado,
+  onToggleSeleccion,
 }: {
   candidato: NewsCandidate
   nombreFuente?: string
+  seleccionado?: boolean
+  // Solo se pasa en candidatos que se pueden descartar (no procesados).
+  onToggleSeleccion?: () => void
 }) {
   const queryClient = useQueryClient()
   const [mostrarContenido, setMostrarContenido] = useState(false)
@@ -135,7 +140,18 @@ export function RadarCandidateCard({
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="font-medium">{candidato.title}</p>
+        <div className="flex items-start gap-2">
+          {onToggleSeleccion && (
+            <input
+              type="checkbox"
+              className="mt-1 size-4"
+              aria-label="Seleccionar para descartar"
+              checked={!!seleccionado}
+              onChange={onToggleSeleccion}
+            />
+          )}
+          <p className="font-medium">{candidato.title}</p>
+        </div>
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${ESTADO_BADGE[candidato.estado]}`}>
           {ESTADO_LABELS[candidato.estado]}
         </span>

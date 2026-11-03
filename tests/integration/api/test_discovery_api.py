@@ -141,6 +141,22 @@ def test_descartar_does_not_physically_delete_the_row(
     assert response.json()[0]["estado"] == "descartado"
 
 
+def test_descartar_lote_discards_many_and_skips_unknown(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    a = _candidato(hash="hash-a", url="https://example.com/a")
+    b = _candidato(hash="hash-b", url="https://example.com/b")
+    _seed(_test_engine, a)
+    _seed(_test_engine, b)
+
+    response = client.post("/discovery/descartar-lote", json={"ids": [a.id, b.id, "no-existe"]})
+
+    assert response.status_code == 200
+    assert response.json() == {"descartados": 2, "omitidos": 1}
+    estados = {c["id"]: c["estado"] for c in client.get("/discovery").json()}
+    assert estados[a.id] == estados[b.id] == "descartado"
+
+
 class _FakeCMS:
     def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:
         return CMSDraftResult(post_id="42", url="https://www.portalvallenato.com/?p=42")
