@@ -260,6 +260,13 @@ def generar_contenido_editorial(
     )
 
 
+def _extraer_json(respuesta: str | None) -> str:
+    """Strip markdown fences / surrounding prose around a JSON object."""
+    texto = (respuesta or "").strip()
+    inicio, fin = texto.find("{"), texto.rfind("}")
+    return texto[inicio : fin + 1] if 0 <= inicio < fin else texto
+
+
 def generar_contenido_editorial_desde_texto(
     texto: str,
     titulo_sugerido: str | None,
@@ -283,14 +290,26 @@ def generar_contenido_editorial_desde_texto(
         f"{_construir_prompt(texto, titulo_sugerido, nombres_categorias, pedir_texto_redes)}"
     )
     schema = _construir_json_schema(nombres_categorias, pedir_texto_redes)
-    try:
-        respuesta = ai_provider.generate_structured(prompt, schema)
-    except AIProviderError as exc:
-        raise EditorialAIError(str(exc)) from exc
-    try:
-        datos = json.loads(respuesta)
-    except (json.JSONDecodeError, TypeError) as exc:
-        raise EditorialAIError(f"respuesta de IA no es JSON válido: {exc}") from exc
+    # Los modelos gratuitos de OpenRouter a veces devuelven vacío o JSON envuelto
+    # en ```fences```: se tolera lo segundo y se reintenta una vez lo primero.
+    datos: Any = None
+    ultimo_error = ""
+    for _intento in range(2):
+        try:
+            respuesta = ai_provider.generate_structured(prompt, schema)
+        except AIProviderError as exc:
+            raise EditorialAIError(str(exc)) from exc
+        try:
+            datos = json.loads(_extraer_json(respuesta))
+            break
+        except (json.JSONDecodeError, TypeError) as exc:
+            ultimo_error = (
+                "la IA devolvió una respuesta vacía"
+                if not (respuesta or "").strip()
+                else f"respuesta de IA no es JSON válido: {exc}"
+            )
+    else:
+        raise EditorialAIError(f"{ultimo_error} (reintentado una vez) — vuelve a intentarlo")
     # titulo/contenido son lo único verdaderamente indispensable — sin
     # ellos no hay artículo que publicar. entradilla/categoria/etiquetas/
     # slug se rellenan con un valor seguro si el proveedor los omite (no

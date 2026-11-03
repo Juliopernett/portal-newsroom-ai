@@ -243,3 +243,40 @@ def test_aplicar_preparacion_fallida_truncates_a_very_long_error() -> None:
 
     assert actualizada.preparacion_ia_error is not None
     assert len(actualizada.preparacion_ia_error) == 2000
+
+
+class _ProveedorSecuencia:
+    def __init__(self, respuestas: list[str]) -> None:
+        self._respuestas = respuestas
+        self.llamadas = 0
+
+    def generate(self, prompt: str) -> str:
+        return ""
+
+    def generate_structured(self, prompt: str, json_schema: dict[str, Any]) -> str:
+        self.llamadas += 1
+        return self._respuestas.pop(0)
+
+
+def test_desde_texto_reintenta_una_vez_si_la_respuesta_viene_vacia() -> None:
+    from core.services.editorial_ai_service import generar_contenido_editorial_desde_texto
+
+    ok = '```json\n{"titulo": "T", "contenido": "<p>C</p>"}\n```'
+    proveedor = _ProveedorSecuencia(["", ok])
+
+    resultado = generar_contenido_editorial_desde_texto("texto", None, [], proveedor)  # type: ignore[arg-type]
+
+    assert resultado.titulo == "T"
+    assert proveedor.llamadas == 2
+
+
+def test_desde_texto_falla_con_mensaje_claro_si_siempre_viene_vacia() -> None:
+    from core.services.editorial_ai_service import (
+        EditorialAIError,
+        generar_contenido_editorial_desde_texto,
+    )
+
+    with pytest.raises(EditorialAIError, match="respuesta vacía"):
+        generar_contenido_editorial_desde_texto(
+            "texto", None, [], _ProveedorSecuencia(["", ""])  # type: ignore[arg-type]
+        )
