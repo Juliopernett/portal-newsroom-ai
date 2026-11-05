@@ -43,7 +43,9 @@ COPY --from=frontend-build /frontend/dist ./frontend/dist
 # Non-root (security audit 2026-11-05). A mounted media volume must be
 # writable by uid 10001 — on Railway set RAILWAY_RUN_UID=0 if the volume
 # mounts as root-owned.
-RUN useradd --system --create-home --uid 10001 app \n    && mkdir -p /app/database /app/logs \n    && chown -R app:app /app/database /app/logs
+RUN useradd --system --create-home --uid 10001 app \
+    && mkdir -p /app/database /app/logs \
+    && chown -R app:app /app/database /app/logs
 USER app
 
 # --proxy-headers/--forwarded-allow-ips: Railway's proxy sits in front, so
