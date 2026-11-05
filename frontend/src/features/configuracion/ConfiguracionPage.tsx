@@ -14,6 +14,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet'
+import { authApi } from '@/features/auth/api'
 import { formatMoneda } from '@/lib/format'
 import { identidadApi, LOGO_URL, type IdentidadComercialInput } from '@/features/identidad/api'
 import { IdentidadForm } from '@/features/identidad/IdentidadForm'
@@ -25,7 +26,7 @@ const PLANES_KEY = ['planes-pauta']
 const IDENTIDAD_KEY = ['identidad-comercial']
 const AI_CONFIGURACION_KEY = ['ai-configuracion']
 
-type ConfiguracionTab = 'planes' | 'identidad' | 'ia'
+type ConfiguracionTab = 'planes' | 'identidad' | 'ia' | 'cuenta'
 
 function PlanesPautaPanel() {
   const queryClient = useQueryClient()
@@ -337,6 +338,71 @@ function IAPanel() {
   )
 }
 
+const PASSWORD_MIN = 12
+
+function CuentaPanel() {
+  const queryClient = useQueryClient()
+  const [actual, setActual] = useState('')
+  const [nueva, setNueva] = useState('')
+  const [confirmar, setConfirmar] = useState('')
+
+  const cambiar = useMutation({
+    mutationFn: () => authApi.cambiarPassword({ password_actual: actual, password_nueva: nueva }),
+    onSuccess: () => {
+      setActual('')
+      setNueva('')
+      setConfirmar('')
+      toast.success('Contraseña actualizada. Se cerraron tus otras sesiones.')
+    },
+  })
+
+  const cerrarTodas = useMutation({
+    mutationFn: authApi.logoutAll,
+    onSettled: () => {
+      queryClient.clear()
+      window.location.assign('/login')
+    },
+  })
+
+  const noCoinciden = confirmar !== '' && nueva !== confirmar
+  const puedeGuardar =
+    actual !== '' && nueva.length >= PASSWORD_MIN && nueva === confirmar && !cambiar.isPending
+  const error = cambiar.error instanceof ApiError ? cambiar.error.message : null
+
+  return (
+    <div className="flex max-w-md flex-col gap-6">
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (puedeGuardar) cambiar.mutate()
+        }}
+      >
+        <h2 className="text-sm font-semibold">Cambiar contraseña</h2>
+        <Input type="password" autoComplete="current-password" placeholder="Contraseña actual" value={actual} onChange={(e) => setActual(e.target.value)} />
+        <Input type="password" autoComplete="new-password" placeholder={`Nueva contraseña (mín. ${PASSWORD_MIN} caracteres)`} value={nueva} onChange={(e) => setNueva(e.target.value)} />
+        <Input type="password" autoComplete="new-password" placeholder="Repetir nueva contraseña" value={confirmar} onChange={(e) => setConfirmar(e.target.value)} />
+        {noCoinciden && <p className="text-sm text-danger">Las contraseñas no coinciden.</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <Button type="submit" disabled={!puedeGuardar}>
+          {cambiar.isPending ? 'Guardando…' : 'Cambiar contraseña'}
+        </Button>
+      </form>
+
+      <div className="flex flex-col gap-2 border-t border-border pt-4">
+        <h2 className="text-sm font-semibold">Sesiones</h2>
+        <p className="text-sm text-muted-foreground">
+          Cierra tu sesión en todos los dispositivos, incluido este. Úsalo si perdiste un
+          teléfono o sospechas de un acceso ajeno.
+        </p>
+        <Button type="button" variant="outline" disabled={cerrarTodas.isPending} onClick={() => cerrarTodas.mutate()}>
+          Cerrar todas las sesiones
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export function ConfiguracionPage() {
   const [tab, setTab] = useState<ConfiguracionTab>('planes')
 
@@ -352,6 +418,7 @@ export function ConfiguracionPage() {
             { id: 'planes', label: 'Planes de Pauta' },
             { id: 'identidad', label: 'Identidad comercial' },
             { id: 'ia', label: 'IA' },
+            { id: 'cuenta', label: 'Cuenta' },
           ] as const
         ).map((t) => (
           <button
@@ -371,7 +438,7 @@ export function ConfiguracionPage() {
         ))}
       </div>
 
-      {tab === 'planes' ? <PlanesPautaPanel /> : tab === 'identidad' ? <IdentidadPanel /> : <IAPanel />}
+      {tab === 'planes' ? <PlanesPautaPanel /> : tab === 'identidad' ? <IdentidadPanel /> : tab === 'cuenta' ? <CuentaPanel /> : <IAPanel />}
     </div>
   )
 }

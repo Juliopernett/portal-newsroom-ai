@@ -11,7 +11,16 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
+
+
+@pytest.fixture(autouse=True)
+def _hoy_fijo(request: pytest.FixtureRequest) -> None:
+    """Hard-coded 2026-07/08 Pauta dates assume "today" is early August 2026 —
+    except the rentabilidad test, which is relative to the real current month."""
+    if "rentabilidad" not in request.node.name:
+        request.getfixturevalue("congelar_hoy")
 
 
 def _create_client(client: TestClient, **overrides: object) -> str:

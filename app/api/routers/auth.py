@@ -9,6 +9,7 @@ database) only its SHA-256 hash is stored.
 from __future__ import annotations
 
 import secrets
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -24,7 +25,7 @@ from app.api.dependencies import (
     get_unit_of_work,
     hash_session_token,
 )
-from app.api.schemas.auth import LoginRequest, UserOut
+from app.api.schemas.auth import ChangePasswordRequest, LoginRequest, UserOut
 from config.settings import get_settings
 from core.entities.session import Session as SessionEntity
 from core.entities.user import User
@@ -109,6 +110,7 @@ def login(
         expires_at=now + timedelta(hours=settings.session_ttl_hours),
     )
     uow.sessions.save(session)
+    uow.sessions.delete_expired(now)  # housekeeping: expired rows would otherwise pile up
     uow.commit()
 
     _set_session_cookie(response, token, settings.session_ttl_hours)
@@ -131,3 +133,42 @@ def logout(
 def me(user: User = Depends(get_current_user)) -> User:
     """Return the currently authenticated user."""
     return user
+
+
+@router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
+def logout_all(
+    response: Response,
+    session: SessionEntity = Depends(get_current_session),
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> None:
+    """Close every session of this user (all devices), this one included."""
+    uow.sessions.delete_by_user_id(session.user_id)
+    uow.commit()
+    response.delete_cookie(SESSION_COOKIE_NAME)
+
+
+@router.post("/cambiar-password", status_code=status.HTTP_204_NO_CONTENT)
+def cambiar_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    session: SessionEntity = Depends(get_current_session),
+    user: User = Depends(get_current_user),
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    password_hasher: PasswordHasher = Depends(get_password_hasher),
+    ip_limiter: RequestRateLimiter = Depends(get_login_ip_limiter),
+) -> None:
+    """Change the password and close the user's OTHER sessions.
+
+    Requires the current password (a stolen cookie alone can't lock the
+    owner out). Other devices are signed out so a compromised session
+    doesn't survive the change; this one stays open.
+    """
+    ip = client_ip(request)
+    if ip_limiter.esta_bloqueado(ip):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Demasiados intentos")
+    if not password_hasher.verify(payload.password_actual, user.password_hash):
+        ip_limiter.registrar(ip)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Contraseña actual incorrecta")
+    uow.users.save(replace(user, password_hash=password_hasher.hash(payload.password_nueva)))
+    uow.sessions.delete_by_user_id(user.id, except_id=session.id)
+    uow.commit()

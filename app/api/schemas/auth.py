@@ -28,3 +28,13 @@ class UserOut(BaseModel):
     id: str
     email: str
     nombre: str
+
+
+MIN_PASSWORD_LENGTH = 12
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request body for `POST /auth/cambiar-password`."""
+
+    password_actual: str = Field(max_length=256)
+    password_nueva: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=256)

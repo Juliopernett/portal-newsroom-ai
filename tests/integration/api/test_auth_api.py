@@ -151,3 +151,45 @@ def test_protected_endpoint_with_a_session_succeeds(client: TestClient) -> None:
     response = client.get("/clients")
 
     assert response.status_code == 200
+
+
+def test_cambiar_password_requires_the_current_one(client: TestClient) -> None:
+    response = client.post(
+        "/auth/cambiar-password",
+        json={"password_actual": "incorrecta", "password_nueva": "una-clave-nueva-larga"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_cambiar_password_rejects_a_short_new_password(client: TestClient) -> None:
+    response = client.post(
+        "/auth/cambiar-password",
+        json={"password_actual": TEST_USER_PASSWORD, "password_nueva": "corta"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_cambiar_password_then_login_with_the_new_one(
+    client: TestClient, unauthenticated_client: TestClient
+) -> None:
+    nueva = "una-clave-nueva-larga"
+    response = client.post(
+        "/auth/cambiar-password",
+        json={"password_actual": TEST_USER_PASSWORD, "password_nueva": nueva},
+    )
+    assert response.status_code == 204
+    assert client.get("/auth/me").status_code == 200  # this session stays open
+
+    client.cookies.clear()
+    assert (
+        client.post("/auth/login", json={"email": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD}).status_code
+        == 401
+    )
+    assert client.post("/auth/login", json={"email": TEST_USER_EMAIL, "password": nueva}).status_code == 200
+
+
+def test_logout_all_closes_the_session(client: TestClient) -> None:
+    assert client.post("/auth/logout-all").status_code == 204
+    assert client.get("/auth/me").status_code == 401

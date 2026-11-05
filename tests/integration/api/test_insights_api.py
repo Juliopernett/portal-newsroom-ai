@@ -9,7 +9,13 @@ confirm the routes are wired, protected, and serialize what
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
+
+
+@pytest.fixture(autouse=True)
+def _hoy_fijo(congelar_hoy: None) -> None:
+    """Hard-coded 2026-07/08 Pauta dates below assume "today" is mid-August 2026."""
 
 
 def _create_client(client: TestClient, **overrides: object) -> str:

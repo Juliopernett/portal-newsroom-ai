@@ -82,3 +82,33 @@ def test_delete_is_a_noop_when_the_session_does_not_exist(session: SqlAlchemySes
 
     repository.delete("no-existe")  # must not raise
     session.commit()
+
+
+def test_delete_expired_removes_only_expired_sessions(session: SqlAlchemySession) -> None:
+    user = _create_user(session)
+    repository = SqlAlchemySessionRepository(session)
+    now = datetime.now(UTC)
+    repository.save(_session_entity(user.id, token_hash="viejo", created_at=now - timedelta(days=9), expires_at=now - timedelta(days=2)))
+    repository.save(_session_entity(user.id, token_hash="vigente"))
+    session.commit()
+
+    repository.delete_expired(now)
+    session.commit()
+
+    assert repository.get_by_token_hash("viejo") is None
+    assert repository.get_by_token_hash("vigente") is not None
+
+
+def test_delete_by_user_id_keeps_the_excepted_session(session: SqlAlchemySession) -> None:
+    user = _create_user(session)
+    repository = SqlAlchemySessionRepository(session)
+    keep = _session_entity(user.id, token_hash="keep")
+    repository.save(keep)
+    repository.save(_session_entity(user.id, token_hash="otro"))
+    session.commit()
+
+    repository.delete_by_user_id(user.id, except_id=keep.id)
+    session.commit()
+
+    assert repository.get_by_token_hash("keep") is not None
+    assert repository.get_by_token_hash("otro") is None

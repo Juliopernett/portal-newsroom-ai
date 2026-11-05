@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session as SqlAlchemySession
 
 from core.entities.session import Session
@@ -62,3 +62,14 @@ class SqlAlchemySessionRepository:
         model = self._session.get(SessionModel, id)
         if model is not None:
             self._session.delete(model)
+
+    def delete_expired(self, now: datetime) -> None:
+        """Remove every session whose `expires_at` is before `now`."""
+        self._session.execute(delete(SessionModel).where(SessionModel.expires_at < now))
+
+    def delete_by_user_id(self, user_id: str, *, except_id: str | None = None) -> None:
+        """Remove all of a user's sessions, optionally keeping `except_id`."""
+        stmt = delete(SessionModel).where(SessionModel.user_id == user_id)
+        if except_id is not None:
+            stmt = stmt.where(SessionModel.id != except_id)
+        self._session.execute(stmt)

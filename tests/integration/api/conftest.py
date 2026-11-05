@@ -9,6 +9,7 @@ from `.env`.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,7 @@ from agents.radar.fake_source_resolver import FakeSourceResolver
 from app.api.dependencies import (
     get_ai_provider,
     get_content_extractor,
+    get_login_ip_limiter,
     get_login_rate_limiter,
     get_social_media_reader,
     get_source_resolver,
@@ -36,6 +38,7 @@ from database.engine import enable_sqlite_foreign_keys
 from database.repositories.user_repository import SqlAlchemyUserRepository
 from database.unit_of_work import SqlAlchemyUnitOfWork
 from security.login_rate_limiter import LoginRateLimiter
+from security.request_rate_limiter import RequestRateLimiter
 from security.password_hasher import Argon2IdPasswordHasher
 
 TEST_USER_EMAIL = "test@portalvallenato.com"
@@ -78,6 +81,8 @@ def unauthenticated_client(_test_engine: Engine) -> Iterator[TestClient]:
     test_rate_limiter = LoginRateLimiter()
     app.dependency_overrides[get_unit_of_work] = _get_test_unit_of_work
     app.dependency_overrides[get_login_rate_limiter] = lambda: test_rate_limiter
+    test_ip_limiter = RequestRateLimiter(max_eventos=20, ventana=timedelta(minutes=15))
+    app.dependency_overrides[get_login_ip_limiter] = lambda: test_ip_limiter
     # The real dependency needs META_ACCESS_TOKEN/META_PAGE_ID/
     # META_INSTAGRAM_BUSINESS_ACCOUNT_ID (see agents.meta_social) — none of
     # which exist in the test environment, so every test gets the demo
@@ -133,3 +138,23 @@ def client(seeded_user: User, unauthenticated_client: TestClient) -> TestClient:
     )
     assert login_response.status_code == 200, login_response.text
     return unauthenticated_client
+
+
+@pytest.fixture
+def congelar_hoy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the business "now" to 2026-08-03 for tests whose Pauta dates are
+    hard-coded (2026-07/08) — they silently broke once real time passed them."""
+    from datetime import datetime
+
+    from core.clock import BUSINESS_TZ
+
+    fijo = datetime(2026, 8, 3, 12, 0, tzinfo=BUSINESS_TZ)
+    for modulo in (
+        "app.api.routers.dashboard",
+        "app.api.routers.reportes",
+        "core.analytics.analytics_service",
+        "core.analytics.decision_engine",
+        "core.services.pauta_service",
+        "core.clock",
+    ):
+        monkeypatch.setattr(f"{modulo}.now_local", lambda: fijo)

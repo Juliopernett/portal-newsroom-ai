@@ -22,3 +22,12 @@ docker compose up --build
 
 Con `.env` copiado de `.env.example` (SQLite por default), la app queda
 disponible en `http://localhost:8000/`.
+
+## Usuario no-root y el volumen de media (Railway)
+
+La imagen corre como el usuario `app` (uid 10001), no como root. Un Volume
+de Railway se monta con dueño root: si la subida de media o el logo fallan
+con `PermissionError`, define en el servicio la variable
+`RAILWAY_RUN_UID=0` (mantiene el volumen escribible) o ajusta el dueño del
+volumen a 10001. Las rutas `/app/database` y `/app/logs` ya son del usuario
+`app` dentro de la imagen.

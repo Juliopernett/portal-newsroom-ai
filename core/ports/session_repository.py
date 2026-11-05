@@ -10,6 +10,7 @@ session.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 from core.entities.session import Session
@@ -28,4 +29,13 @@ class SessionRepository(Protocol):
 
     def delete(self, id: str) -> None:
         """Remove the `Session` identified by `id` — how logout works."""
+        ...
+
+    def delete_expired(self, now: datetime) -> None:
+        """Remove every session whose `expires_at` is before `now` (housekeeping)."""
+        ...
+
+    def delete_by_user_id(self, user_id: str, *, except_id: str | None = None) -> None:
+        """Remove all of a user's sessions, optionally keeping `except_id` —
+        "cerrar todas las sesiones" and the cleanup after a password change."""
         ...
