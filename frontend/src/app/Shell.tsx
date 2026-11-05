@@ -87,9 +87,17 @@ export function Shell() {
     setMobileOpen(false)
   }, [location.pathname])
 
+  // Escape closes the drawer (keyboard / external-keyboard tablets).
+  useEffect(() => {
+    if (!mobileOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMobileOpen(false)
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [mobileOpen])
+
   return (
     <div className="flex h-svh flex-col md:flex-row">
-      <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3 md:hidden">
+      <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 md:hidden">
         <div className="flex items-center gap-2">
           <AppLogo alt="" className="size-6 object-contain" />
           <p className="text-sm font-semibold">Portal Vallenato Newsroom</p>
@@ -98,7 +106,7 @@ export function Shell() {
           type="button"
           aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
           onClick={() => setMobileOpen((v) => !v)}
-          className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
         >
           {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
         </button>
@@ -114,9 +122,10 @@ export function Shell() {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-border bg-card transition-transform duration-200',
+          'fixed inset-y-0 left-0 z-50 flex w-64 max-w-[85vw] shrink-0 flex-col overflow-y-auto border-r border-border bg-card pt-[env(safe-area-inset-top)] transition-transform duration-200 md:overflow-visible md:pt-0',
           'md:static md:z-auto md:w-56 md:translate-x-0',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+          // invisible (not just off-screen) so a closed drawer's links leave the tab order
+          mobileOpen ? 'translate-x-0' : '-translate-x-full max-md:invisible',
         )}
       >
         <div className="hidden items-center gap-2 px-4 py-5 md:flex">
@@ -138,7 +147,7 @@ export function Shell() {
             type="button"
             aria-label="Cerrar menú"
             onClick={() => setMobileOpen(false)}
-            className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
             <X className="size-5" />
           </button>
@@ -158,7 +167,7 @@ export function Shell() {
                   end={end}
                   className={({ isActive }) =>
                     cn(
-                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      'flex items-center gap-3 rounded-md px-3 py-3 text-sm font-medium transition-colors md:py-2',
                       isActive
                         ? 'bg-brand text-brand-foreground'
                         : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
@@ -177,18 +186,18 @@ export function Shell() {
             </div>
           ))}
         </nav>
-        <div className="px-2 pb-4">
+        <div className="px-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={logout}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-3 text-sm md:py-2 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             <LogOut className="size-4" />
             Cerrar sesión
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto p-4 md:p-6">
+      <main className="flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6">
         <Outlet />
       </main>
     </div>

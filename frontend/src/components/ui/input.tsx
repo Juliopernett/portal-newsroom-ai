@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 // text-base (16px), not text-sm — below 16px, iOS/Android browsers zoom the
 // page in on focus. sm: back to text-sm keeps the compact desktop look.
 const BOX_CLASSES =
-  'h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-colors outline-none sm:text-sm placeholder:text-muted-foreground'
+  'h-11 w-full min-w-0 sm:h-9 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-colors outline-none sm:text-sm placeholder:text-muted-foreground'
 
 function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
   if (type === 'date') {

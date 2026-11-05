@@ -16,7 +16,7 @@ function SelectNative({ className, children, ...props }: React.ComponentProps<'s
         data-slot="select-native"
         className={cn(
           // text-base, not text-sm — see components/ui/input.tsx for why.
-          'flex h-9 w-full appearance-none rounded-md border border-input bg-transparent px-3 py-1 pr-8 text-base shadow-xs transition-colors outline-none sm:text-sm',
+          'flex h-11 w-full appearance-none sm:h-9 rounded-md border border-input bg-transparent px-3 py-1 pr-8 text-base shadow-xs transition-colors outline-none sm:text-sm',
           'focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30',
           'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
           className,

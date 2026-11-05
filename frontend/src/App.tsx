@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
@@ -7,16 +8,19 @@ import { LoginPage } from '@/features/auth/LoginPage'
 import { ProtectedRoute } from '@/features/auth/ProtectedRoute'
 import { Shell } from '@/app/Shell'
 import { useFaviconIdentidad } from '@/app/AppLogo'
-import { GastosPage } from '@/features/gastos/GastosPage'
-import { ClientesPage } from '@/features/clientes/ClientesPage'
-import { ReportesPage } from '@/features/reportes/ReportesPage'
-import { ContratosPage } from '@/features/contratos/ContratosPage'
-import { SolicitudesPage } from '@/features/solicitudes/SolicitudesPage'
-import { PortadasPage } from '@/features/portadas/PortadasPage'
-import { RadarPage } from '@/features/radar/RadarPage'
-import { AlertasPage } from '@/features/alertas/AlertasPage'
-import { DashboardPage } from '@/features/dashboard/DashboardPage'
-import { ConfiguracionPage } from '@/features/configuracion/ConfiguracionPage'
+
+// Each page is its own chunk: a phone on mobile data only downloads the
+// screen it opens (recharts etc. no longer ship with the login page).
+const GastosPage = lazy(() => import('@/features/gastos/GastosPage').then((m) => ({ default: m.GastosPage })))
+const ClientesPage = lazy(() => import('@/features/clientes/ClientesPage').then((m) => ({ default: m.ClientesPage })))
+const ReportesPage = lazy(() => import('@/features/reportes/ReportesPage').then((m) => ({ default: m.ReportesPage })))
+const ContratosPage = lazy(() => import('@/features/contratos/ContratosPage').then((m) => ({ default: m.ContratosPage })))
+const SolicitudesPage = lazy(() => import('@/features/solicitudes/SolicitudesPage').then((m) => ({ default: m.SolicitudesPage })))
+const PortadasPage = lazy(() => import('@/features/portadas/PortadasPage').then((m) => ({ default: m.PortadasPage })))
+const RadarPage = lazy(() => import('@/features/radar/RadarPage').then((m) => ({ default: m.RadarPage })))
+const AlertasPage = lazy(() => import('@/features/alertas/AlertasPage').then((m) => ({ default: m.AlertasPage })))
+const DashboardPage = lazy(() => import('@/features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const ConfiguracionPage = lazy(() => import('@/features/configuracion/ConfiguracionPage').then((m) => ({ default: m.ConfiguracionPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,6 +47,7 @@ export default function App() {
               },
             }}
           />
+          <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Cargando…</p>}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedRoute />}>
@@ -60,6 +65,7 @@ export default function App() {
               </Route>
             </Route>
           </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

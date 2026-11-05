@@ -111,5 +111,9 @@
   }
   body {
     @apply bg-background text-foreground overflow-x-hidden;
+    /* no 300ms tap delay / double-tap zoom on controls, no grey tap flash */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
   }
 }

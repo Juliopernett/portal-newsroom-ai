@@ -55,7 +55,7 @@ export function ActionItem({
           aria-label="Descartar"
           title="Descartar"
           onClick={onDescartar}
-          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          className="shrink-0 rounded-md p-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         >
           <X className="size-3.5" />
         </button>
