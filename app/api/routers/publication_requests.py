@@ -70,6 +70,8 @@ protected automatically instead of by remembering to add it.
 
 from __future__ import annotations
 
+import re
+from urllib.parse import quote
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -97,10 +99,11 @@ from app.api.schemas.publication_request import (
     PublicationRequestUpdate,
 )
 from app.api.schemas.reporte import ReporteSolicitudOut
+from app.api.uploads import ensure_image_matches_type, read_limited
 from config.settings import get_settings
 from core.analytics import AnalyticsService
 from core.entities.destino_publicacion import CanalPublicacion, DestinoPublicacion
-from core.entities.media_asset import MediaAsset
+from core.entities.media_asset import MediaAsset, MediaAssetType
 from core.entities.publication_request import PublicationRequest, PublicationRequestStatus
 from core.entities.user import User
 from core.ports.ai_provider import AIProvider
@@ -128,6 +131,14 @@ from core.services.publication_request_service import (
 )
 from core.services.reporte_service import ReporteSolicitud, construir_reporte
 from core.services.wordpress_publication_service import preparar_y_crear_borrador
+
+def _content_disposition_inline(nombre: str) -> str:
+    """RFC 6266 header: ASCII fallback plus UTF-8 `filename*`, so quotes,
+    CR/LF or non-latin-1 characters in an uploaded filename can't break
+    (or inject into) the header."""
+    ascii_name = re.sub(r"[^A-Za-z0-9._-]", "_", nombre)[:100] or "archivo"
+    return f"inline; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(nombre[:200], safe='')}"
+
 
 router = APIRouter(
     prefix="/publication-requests",
@@ -634,7 +645,12 @@ async def subir_media(
         )
     settings = get_settings()
     tipo = determinar_tipo(archivo.content_type or "")
-    contenido = await archivo.read()
+    limite = max(settings.media_max_bytes_imagen, settings.media_max_bytes_video)
+    if tipo is MediaAssetType.IMAGEN:
+        limite = settings.media_max_bytes_imagen
+    contenido = await read_limited(archivo, limite)
+    if tipo is MediaAssetType.IMAGEN:
+        ensure_image_matches_type(archivo.content_type or "", contenido)
     validar_tamano(
         tipo,
         len(contenido),
@@ -688,7 +704,7 @@ def descargar_media(
     return Response(
         content=contenido,
         media_type=media.content_type,
-        headers={"Content-Disposition": f'inline; filename="{media.nombre_archivo}"'},
+        headers={"Content-Disposition": _content_disposition_inline(media.nombre_archivo)},
     )
 
 

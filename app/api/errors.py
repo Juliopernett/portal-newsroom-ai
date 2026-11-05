@@ -15,6 +15,9 @@ from sqlalchemy.exc import IntegrityError
 
 from agents.meta_social.client import MetaGraphConfigurationError
 from agents.wordpress.client import WordPressConfigurationError
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -53,4 +56,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         """An external HTTP integration (WordPress, Meta Graph API) rejected the
         request or was unreachable."""
-        return JSONResponse(status_code=502, content={"detail": f"External request failed: {exc}"})
+        # Never echo `exc`: its text carries the full request URL, which for
+        # the Meta Graph API includes `access_token` in the query string.
+        logger.warning("External request failed: %s", type(exc).__name__)
+        return JSONResponse(status_code=502, content={"detail": "External request failed"})

@@ -19,6 +19,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, Response
 
+from config.settings import get_settings
 from app.api.errors import register_exception_handlers
 from app.api.routers import (
     ai_configuracion,
@@ -42,7 +43,15 @@ from app.api.routers import (
 FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
 
-app = FastAPI(title="Portal Newsroom AI — Commercial Core API")
+_IS_PRODUCTION = get_settings().environment == "production"
+
+# Interactive API docs are an attack-surface map: off in production.
+app = FastAPI(
+    title="Portal Newsroom AI — Commercial Core API",
+    docs_url=None if _IS_PRODUCTION else "/docs",
+    redoc_url=None if _IS_PRODUCTION else "/redoc",
+    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
+)
 
 register_exception_handlers(app)
 
@@ -90,13 +99,29 @@ _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 }
+
+# CSP for the React SPA: the bundle is same-origin (no inline scripts);
+# styles allow 'unsafe-inline' because Tailwind/Radix/charts set style
+# attributes; images allow https:/data:/blob: (news images, previews).
+# Skipped for /docs, whose Swagger UI needs CDN assets (dev only).
+_CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: blob: https:; media-src 'self' blob:; font-src 'self' data:; "
+    "connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; "
+    "frame-ancestors 'none'"
+)
+_NO_CSP_PREFIXES = ("/docs", "/redoc", "/openapi.json")
 
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next) -> Response:
     response = await call_next(request)
     response.headers.update(_SECURITY_HEADERS)
+    if not request.url.path.startswith(_NO_CSP_PREFIXES):
+        response.headers["Content-Security-Policy"] = _CSP
     return response
 
 

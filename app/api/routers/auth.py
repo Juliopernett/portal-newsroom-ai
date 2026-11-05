@@ -11,12 +11,14 @@ from __future__ import annotations
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.api.dependencies import (
     SESSION_COOKIE_NAME,
     get_current_session,
     get_current_user,
+    client_ip,
+    get_login_ip_limiter,
     get_login_rate_limiter,
     get_password_hasher,
     get_unit_of_work,
@@ -29,6 +31,7 @@ from core.entities.user import User
 from core.ports.password_hasher import PasswordHasher
 from core.ports.unit_of_work import UnitOfWork
 from security.login_rate_limiter import LoginRateLimiter
+from security.request_rate_limiter import RequestRateLimiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -63,10 +66,12 @@ def _set_session_cookie(response: Response, token: str, ttl_hours: int) -> None:
 @router.post("/login", response_model=UserOut)
 def login(
     payload: LoginRequest,
+    request: Request,
     response: Response,
     uow: UnitOfWork = Depends(get_unit_of_work),
     password_hasher: PasswordHasher = Depends(get_password_hasher),
     rate_limiter: LoginRateLimiter = Depends(get_login_rate_limiter),
+    ip_limiter: RequestRateLimiter = Depends(get_login_ip_limiter),
 ) -> User:
     """Verify credentials, open a session, and set its cookie.
 
@@ -75,7 +80,8 @@ def login(
     before touching the database at all.
     """
     clave = payload.email.strip().lower()
-    if rate_limiter.esta_bloqueado(clave):
+    ip = client_ip(request)
+    if rate_limiter.esta_bloqueado(clave) or ip_limiter.esta_bloqueado(ip):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.",
@@ -85,9 +91,11 @@ def login(
     if user is None:
         password_hasher.verify(payload.password, _DUMMY_HASH)  # constant-time-ish decoy
         rate_limiter.registrar_intento_fallido(clave)
+        ip_limiter.registrar(ip)
         raise _invalid_credentials()
     if not password_hasher.verify(payload.password, user.password_hash):
         rate_limiter.registrar_intento_fallido(clave)
+        ip_limiter.registrar(ip)
         raise _invalid_credentials()
 
     rate_limiter.limpiar(clave)

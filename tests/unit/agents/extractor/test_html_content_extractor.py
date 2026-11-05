@@ -51,17 +51,23 @@ _PAGINA_VACIA = """
 
 def _mock_response(html: str, status_ok: bool = True) -> MagicMock:
     response = MagicMock()
+    response.is_redirect = False
     response.text = html
     if not status_ok:
         response.raise_for_status.side_effect = requests.HTTPError("404 Not Found")
     return response
 
 
+@pytest.fixture(autouse=True)
+def _sin_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("agents.radar.url_segura.validar_url_publica", lambda _u: None)
+
+
 def test_extract_reads_meta_tags_when_available() -> None:
     extractor = HtmlContentExtractor()
 
     with patch(
-        "agents.extractor.html_content_extractor.requests.get",
+        "agents.radar.url_segura.requests.get",
         return_value=_mock_response(_PAGINA_COMPLETA),
     ) as mock_get:
         contenido = extractor.extract(_URL)
@@ -83,7 +89,7 @@ def test_extract_falls_back_to_densest_block_without_an_article_tag() -> None:
     extractor = HtmlContentExtractor()
 
     with patch(
-        "agents.extractor.html_content_extractor.requests.get",
+        "agents.radar.url_segura.requests.get",
         return_value=_mock_response(_PAGINA_SIN_ARTICLE),
     ):
         contenido = extractor.extract(_URL)
@@ -100,7 +106,7 @@ def test_extract_raises_when_the_page_has_no_recognizable_content() -> None:
     extractor = HtmlContentExtractor()
 
     with patch(
-        "agents.extractor.html_content_extractor.requests.get",
+        "agents.radar.url_segura.requests.get",
         return_value=_mock_response(_PAGINA_VACIA),
     ), pytest.raises(ContentExtractorError):
         extractor.extract(_URL)
@@ -110,7 +116,7 @@ def test_extract_raises_content_extractor_error_on_network_failure() -> None:
     extractor = HtmlContentExtractor()
 
     with patch(
-        "agents.extractor.html_content_extractor.requests.get",
+        "agents.radar.url_segura.requests.get",
         side_effect=requests.ConnectionError("no se pudo conectar"),
     ), pytest.raises(ContentExtractorError):
         extractor.extract(_URL)
@@ -120,7 +126,7 @@ def test_extract_raises_content_extractor_error_on_a_non_2xx_response() -> None:
     extractor = HtmlContentExtractor()
 
     with patch(
-        "agents.extractor.html_content_extractor.requests.get",
+        "agents.radar.url_segura.requests.get",
         return_value=_mock_response("", status_ok=False),
     ), pytest.raises(ContentExtractorError):
         extractor.extract(_URL)
@@ -130,7 +136,7 @@ def test_extract_raises_content_extractor_error_on_timeout() -> None:
     extractor = HtmlContentExtractor()
 
     with patch(
-        "agents.extractor.html_content_extractor.requests.get",
+        "agents.radar.url_segura.requests.get",
         side_effect=requests.Timeout("tardó demasiado"),
     ), pytest.raises(ContentExtractorError):
         extractor.extract(_URL)

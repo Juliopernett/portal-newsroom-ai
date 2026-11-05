@@ -222,7 +222,7 @@ def test_crear_borrador_wordpress_attaches_the_solicitud_featured_image(
     solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
     client.post(
         f"/publication-requests/{solicitud_id}/media",
-        files={"archivo": ("foto.jpg", b"contenido-de-la-foto", "image/jpeg")},
+        files={"archivo": ("foto.jpg", b"\xff\xd8\xff\xe0fake", "image/jpeg")},
     )
     destino_id = client.post(
         f"/publication-requests/{solicitud_id}/destinos", json={"canal": "wordpress"}
@@ -234,7 +234,7 @@ def test_crear_borrador_wordpress_attaches_the_solicitud_featured_image(
 
     assert response.status_code == 200
     assert fake_cms_publisher.media_subida == [
-        ("foto.jpg", "image/jpeg", len(b"contenido-de-la-foto"))
+        ("foto.jpg", "image/jpeg", len(bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"fake"))
     ]
     assert fake_cms_publisher.contenido_recibido is not None
     assert fake_cms_publisher.contenido_recibido["featured_media"] == "media-1"

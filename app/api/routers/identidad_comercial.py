@@ -26,6 +26,8 @@ from fastapi.responses import Response
 
 from app.api.dependencies import get_current_user, get_media_storage, get_unit_of_work
 from app.api.schemas.identidad_comercial import IdentidadComercialCreate, IdentidadComercialOut
+from app.api.uploads import ensure_image_matches_type, read_limited
+from config.settings import get_settings
 from core.entities.identidad_comercial import ID_UNICO, IdentidadComercial
 from core.ports.media_storage import MediaStorage
 from core.ports.unit_of_work import UnitOfWork
@@ -92,7 +94,8 @@ async def subir_logo(
         raise HTTPException(
             status_code=422, detail="El logo debe ser una imagen (jpeg, png, gif o webp)"
         )
-    contenido = await archivo.read()
+    contenido = await read_limited(archivo, get_settings().media_max_bytes_imagen)
+    ensure_image_matches_type(archivo.content_type or "", contenido)
     if not contenido:
         raise HTTPException(status_code=422, detail="El archivo está vacío")
 

@@ -40,4 +40,13 @@ COPY --from=frontend-build /frontend/dist ./frontend/dist
 # local `docker compose up`, where nothing sets $PORT. `python -m` for
 # both, not the bare `alembic`/`uvicorn` console scripts: whether they
 # land on PATH depends on how pip installs them, `python -m` never does.
-CMD ["sh", "-c", "python -m alembic upgrade head && python -m uvicorn app.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Non-root (security audit 2026-11-05). A mounted media volume must be
+# writable by uid 10001 — on Railway set RAILWAY_RUN_UID=0 if the volume
+# mounts as root-owned.
+RUN useradd --system --create-home --uid 10001 app \n    && mkdir -p /app/database /app/logs \n    && chown -R app:app /app/database /app/logs
+USER app
+
+# --proxy-headers/--forwarded-allow-ips: Railway's proxy sits in front, so
+# without them request.client.host is the proxy and per-IP rate limits
+# would be meaningless.
+CMD ["sh", "-c", "python -m alembic upgrade head && python -m uvicorn app.api.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

@@ -14,7 +14,9 @@ from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from functools import lru_cache
 
-from fastapi import Cookie, Depends, HTTPException, status
+from datetime import timedelta
+
+from fastapi import Cookie, Depends, HTTPException, Request, status
 
 from agents.ai.anthropic_provider import MODELO_POR_DEFECTO, AnthropicAIProvider
 from agents.ai.openrouter_provider import OpenRouterAIProvider
@@ -47,6 +49,7 @@ from database.engine import get_session_factory
 from database.unit_of_work import SqlAlchemyUnitOfWork
 from security.login_rate_limiter import LoginRateLimiter
 from security.password_hasher import Argon2IdPasswordHasher
+from security.request_rate_limiter import RequestRateLimiter
 
 SESSION_COOKIE_NAME = "session_token"
 
@@ -76,6 +79,29 @@ def get_login_rate_limiter() -> LoginRateLimiter:
     across requests within this process without needing a database table.
     """
     return LoginRateLimiter()
+
+
+@lru_cache
+def get_login_ip_limiter() -> RequestRateLimiter:
+    """Failed logins per IP (any email) — complements the per-email limiter."""
+    return RequestRateLimiter(max_eventos=20, ventana=timedelta(minutes=15))
+
+
+@lru_cache
+def _public_download_limiter() -> RequestRateLimiter:
+    return RequestRateLimiter(max_eventos=30, ventana=timedelta(minutes=1))
+
+
+def client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def limit_public_downloads(request: Request) -> None:
+    """Dependency for the unauthenticated token-gated routes: 429 past 30/min per IP."""
+    if not _public_download_limiter().permitir(client_ip(request)):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Demasiadas solicitudes"
+        )
 
 
 def get_cms_publisher() -> CMSPublisher:

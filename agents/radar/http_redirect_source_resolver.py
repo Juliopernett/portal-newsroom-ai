@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from agents.radar.url_segura import UrlNoPermitidaError, get_seguro
 from core.ports.source_resolver import ResolvedSource, SourceResolverError
 from shared.logger import get_logger
 
@@ -47,15 +48,17 @@ class HttpRedirectSourceResolver:
             raise SourceResolverError("url must not be empty")
 
         try:
-            with requests.get(
+            with get_seguro(
                 url,
-                allow_redirects=True,
                 stream=True,
                 timeout=self._timeout,
                 headers={"User-Agent": "Mozilla/5.0 (compatible; PortalNewsroomAI/1.0)"},
             ) as response:
                 response.raise_for_status()
                 resolved_url = response.url
+        except UrlNoPermitidaError as exc:
+            logger.warning("URL no permitida al resolver '%s': %s", url, exc)
+            return ResolvedSource(success=False, resolved_url=None, error=str(exc))
         except requests.TooManyRedirects as exc:
             logger.warning("Redirect loop resolviendo '%s': %s", url, exc)
             return ResolvedSource(

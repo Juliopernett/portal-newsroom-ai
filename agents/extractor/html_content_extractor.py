@@ -17,6 +17,7 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup, Tag
 
+from agents.radar.url_segura import UrlNoPermitidaError, get_seguro
 from core.entities.extracted_content import ExtractedContent
 from core.ports.content_extractor import ContentExtractorError
 from shared.logger import get_logger
@@ -42,13 +43,13 @@ class HtmlContentExtractor:
         extractor cannot run one, see the module docstring).
         """
         try:
-            response = requests.get(
+            response = get_seguro(
                 reference,
                 timeout=self._timeout,
                 headers={"User-Agent": "Mozilla/5.0 (compatible; PortalNewsroomAI/1.0)"},
             )
             response.raise_for_status()
-        except requests.RequestException as exc:
+        except (requests.RequestException, UrlNoPermitidaError) as exc:
             raise ContentExtractorError(f"No se pudo obtener '{reference}': {exc}") from exc
 
         soup = BeautifulSoup(response.text, "html.parser")

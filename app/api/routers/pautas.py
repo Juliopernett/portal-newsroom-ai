@@ -29,6 +29,7 @@ from app.api.dependencies import (
     get_media_storage,
     get_unit_of_work,
     hash_session_token,
+    limit_public_downloads,
 )
 from app.api.pdf_contrato import generar_contrato_pauta_pdf
 from app.api.pdf_informe import generar_informe_pauta_pdf
@@ -42,7 +43,9 @@ from core.services.pauta_service import PautaService
 from core.services.reporte_service import construir_reporte_pauta
 
 router = APIRouter(prefix="/pautas", tags=["pautas"], dependencies=[Depends(get_current_user)])
-router_publico = APIRouter(prefix="/pautas", tags=["pautas"])
+router_publico = APIRouter(
+    prefix="/pautas", tags=["pautas"], dependencies=[Depends(limit_public_downloads)]
+)
 
 _FILENAME_UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 

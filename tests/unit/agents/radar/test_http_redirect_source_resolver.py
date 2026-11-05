@@ -15,6 +15,7 @@ _URL_DESCUBRIMIENTO = "https://news.google.com/rss/articles/CBMi123"
 
 def _mock_response(final_url: str, status_ok: bool = True) -> MagicMock:
     response = MagicMock()
+    response.is_redirect = False
     response.url = final_url
     response.__enter__.return_value = response
     response.__exit__.return_value = False
@@ -23,11 +24,16 @@ def _mock_response(final_url: str, status_ok: bool = True) -> MagicMock:
     return response
 
 
+@pytest.fixture(autouse=True)
+def _sin_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("agents.radar.url_segura.validar_url_publica", lambda _u: None)
+
+
 def test_resolve_follows_a_redirect_to_a_different_host() -> None:
     resolver = HttpRedirectSourceResolver()
 
     with patch(
-        "agents.radar.http_redirect_source_resolver.requests.get",
+        "agents.radar.url_segura.requests.get",
         return_value=_mock_response("https://elpilon.com.co/noticia-real"),
     ) as mock_get:
         resultado = resolver.resolve(_URL_DESCUBRIMIENTO)
@@ -37,7 +43,7 @@ def test_resolve_follows_a_redirect_to_a_different_host() -> None:
     assert resultado.error is None
     args, kwargs = mock_get.call_args
     assert args[0] == _URL_DESCUBRIMIENTO
-    assert kwargs["allow_redirects"] is True
+    assert kwargs["allow_redirects"] is False
     assert kwargs["timeout"] == 15
 
 
@@ -46,7 +52,7 @@ def test_resolve_treats_no_real_redirect_as_a_failure() -> None:
     resolver = HttpRedirectSourceResolver()
 
     with patch(
-        "agents.radar.http_redirect_source_resolver.requests.get",
+        "agents.radar.url_segura.requests.get",
         return_value=_mock_response(_URL_DESCUBRIMIENTO),
     ):
         resultado = resolver.resolve(_URL_DESCUBRIMIENTO)
@@ -60,7 +66,7 @@ def test_resolve_reports_a_timeout_as_a_failure_not_an_exception() -> None:
     resolver = HttpRedirectSourceResolver()
 
     with patch(
-        "agents.radar.http_redirect_source_resolver.requests.get",
+        "agents.radar.url_segura.requests.get",
         side_effect=requests.Timeout("tardó demasiado"),
     ):
         resultado = resolver.resolve(_URL_DESCUBRIMIENTO)
@@ -74,7 +80,7 @@ def test_resolve_reports_a_redirect_loop_as_a_failure_not_an_exception() -> None
     resolver = HttpRedirectSourceResolver()
 
     with patch(
-        "agents.radar.http_redirect_source_resolver.requests.get",
+        "agents.radar.url_segura.requests.get",
         side_effect=requests.TooManyRedirects("ciclo de redirects"),
     ):
         resultado = resolver.resolve(_URL_DESCUBRIMIENTO)
@@ -88,7 +94,7 @@ def test_resolve_reports_a_connection_error_as_a_failure_not_an_exception() -> N
     resolver = HttpRedirectSourceResolver()
 
     with patch(
-        "agents.radar.http_redirect_source_resolver.requests.get",
+        "agents.radar.url_segura.requests.get",
         side_effect=requests.ConnectionError("no se pudo conectar"),
     ):
         resultado = resolver.resolve(_URL_DESCUBRIMIENTO)
@@ -101,7 +107,7 @@ def test_resolve_reports_a_non_2xx_response_as_a_failure_not_an_exception() -> N
     resolver = HttpRedirectSourceResolver()
 
     with patch(
-        "agents.radar.http_redirect_source_resolver.requests.get",
+        "agents.radar.url_segura.requests.get",
         return_value=_mock_response(_URL_DESCUBRIMIENTO, status_ok=False),
     ):
         resultado = resolver.resolve(_URL_DESCUBRIMIENTO)

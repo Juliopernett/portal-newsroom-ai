@@ -7,15 +7,21 @@ would make this app read internal services on the operator's behalf.
 Only public `http`/`https` hosts are allowed: every address the name
 resolves to must be a normal public one.
 
-Limits, stated plainly: this checks the host before the request. A public
-site that then redirects to an internal address is not caught here.
+`get_seguro` closes the redirect gap: it follows redirects by hand and
+validates every hop, so a public site can't bounce the server to an
+internal address. (Residual risk: DNS rebinding between the check and the
+connection — acceptable for this internal tool.)
 """
 
 from __future__ import annotations
 
 import ipaddress
 import socket
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
+
+import requests
+
+_MAX_REDIRECTS = 5
 
 
 class UrlNoPermitidaError(ValueError):
@@ -45,3 +51,22 @@ def validar_url_publica(url: str) -> None:
             or ip.is_unspecified
         ):
             raise UrlNoPermitidaError("La dirección apunta a una red interna, no está permitida")
+
+
+def get_seguro(url: str, *, timeout: int, **kwargs) -> requests.Response:
+    """`requests.get` that validates `url` and every redirect hop as public.
+
+    Raises `UrlNoPermitidaError` for a non-public address and
+    `requests.TooManyRedirects` past `_MAX_REDIRECTS`. The caller owns the
+    returned response (use it as a context manager with `stream=True`).
+    """
+    actual = url
+    for _ in range(_MAX_REDIRECTS + 1):
+        validar_url_publica(actual)
+        response = requests.get(actual, timeout=timeout, allow_redirects=False, **kwargs)
+        if response.is_redirect and response.headers.get("location"):
+            actual = urljoin(actual, response.headers["location"])
+            response.close()
+            continue
+        return response
+    raise requests.TooManyRedirects(f"Más de {_MAX_REDIRECTS} redirecciones")

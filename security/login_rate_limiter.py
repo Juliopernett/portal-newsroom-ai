@@ -5,10 +5,9 @@ MVP scope) — this is a different, coarser thing: an ops-level brake on
 brute force / credential stuffing against `POST /auth/login`, sitting
 entirely outside the domain model.
 
-Keyed by email, not by client IP: Railway terminates TLS in front of
-uvicorn without `--proxy-headers` (see `docker/Dockerfile`), so
-`request.client.host` is Railway's internal proxy address, not the real
-caller's — an IP-keyed limiter would silently rate-limit nothing.
+Keyed by email; a per-IP limiter (`security.request_rate_limiter`) sits
+alongside it, now that uvicorn runs with `--proxy-headers` and
+`request.client.host` is the real caller.
 
 In-memory, not persisted: this app runs as a single Railway instance (no
 horizontal scaling configured), so the state doesn't need to survive a
@@ -44,6 +43,9 @@ class LoginRateLimiter:
     def registrar_intento_fallido(self, clave: str, *, ahora: datetime | None = None) -> None:
         """Record one more failed attempt for `clave`, pruning expired ones."""
         ahora = ahora if ahora is not None else datetime.now(UTC)
+        if len(self._intentos) > 10_000:  # emails are attacker-chosen: bound memory
+            for k in [k for k in self._intentos if not self._vigentes(k, ahora)]:
+                del self._intentos[k]
         self._intentos[clave] = [*self._vigentes(clave, ahora), ahora]
 
     def limpiar(self, clave: str) -> None:

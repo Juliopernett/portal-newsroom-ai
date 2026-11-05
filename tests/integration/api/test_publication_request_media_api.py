@@ -42,7 +42,7 @@ def test_subir_media_attaches_an_imagen(client: TestClient) -> None:
 
     response = client.post(
         f"/publication-requests/{solicitud_id}/media",
-        files={"archivo": ("portada.jpg", b"contenido-fake-jpg", "image/jpeg")},
+        files={"archivo": ("portada.jpg", b"\xff\xd8\xff\xe0fake", "image/jpeg")},
     )
 
     assert response.status_code == 201
@@ -51,7 +51,7 @@ def test_subir_media_attaches_an_imagen(client: TestClient) -> None:
     assert body["tipo"] == "imagen"
     assert body["nombre_archivo"] == "portada.jpg"
     assert body["content_type"] == "image/jpeg"
-    assert body["tamano_bytes"] == len(b"contenido-fake-jpg")
+    assert body["tamano_bytes"] == len(b"\xff\xd8\xff\xe0fake")
 
 
 def test_subir_media_attaches_a_video(client: TestClient) -> None:
@@ -69,7 +69,7 @@ def test_subir_media_attaches_a_video(client: TestClient) -> None:
 def test_subir_media_returns_404_when_solicitud_not_found(client: TestClient) -> None:
     response = client.post(
         "/publication-requests/no-existe/media",
-        files={"archivo": ("foto.jpg", b"contenido", "image/jpeg")},
+        files={"archivo": ("foto.jpg", b"\xff\xd8\xff\xe0fake", "image/jpeg")},
     )
 
     assert response.status_code == 404
@@ -109,14 +109,14 @@ def test_subir_media_rejects_svg(client: TestClient) -> None:
 
 def test_subir_media_rejects_a_file_over_the_imagen_limit(client: TestClient) -> None:
     solicitud_id = _crear_solicitud(client)
-    contenido_grande = b"x" * (10 * 1024 * 1024 + 1)  # 1 byte over the 10 MB default
+    contenido_grande = bytes([0xFF, 0xD8, 0xFF]) + b"x" * (10 * 1024 * 1024)  # over the 10 MB default
 
     response = client.post(
         f"/publication-requests/{solicitud_id}/media",
         files={"archivo": ("grande.jpg", contenido_grande, "image/jpeg")},
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 413  # rejected while streaming, before buffering it all
 
 
 def test_subir_media_rejects_once_solicitud_is_completa(client: TestClient) -> None:
@@ -130,7 +130,7 @@ def test_subir_media_rejects_once_solicitud_is_completa(client: TestClient) -> N
 
     response = client.post(
         f"/publication-requests/{solicitud_id}/media",
-        files={"archivo": ("foto.jpg", b"contenido", "image/jpeg")},
+        files={"archivo": ("foto.jpg", b"\xff\xd8\xff\xe0fake", "image/jpeg")},
     )
 
     assert response.status_code == 409
@@ -140,7 +140,7 @@ def test_list_media_returns_every_media_asset_for_the_solicitud(client: TestClie
     solicitud_id = _crear_solicitud(client)
     client.post(
         f"/publication-requests/{solicitud_id}/media",
-        files={"archivo": ("foto.jpg", b"a", "image/jpeg")},
+        files={"archivo": ("foto.jpg", b"\xff\xd8\xff\xe0fake", "image/jpeg")},
     )
     client.post(
         f"/publication-requests/{solicitud_id}/media",
@@ -164,13 +164,13 @@ def test_descargar_media_returns_the_raw_bytes(client: TestClient) -> None:
     solicitud_id = _crear_solicitud(client)
     media_id = client.post(
         f"/publication-requests/{solicitud_id}/media",
-        files={"archivo": ("foto.jpg", b"contenido-real", "image/jpeg")},
+        files={"archivo": ("foto.jpg", b"\xff\xd8\xff\xe0fake", "image/jpeg")},
     ).json()["id"]
 
     response = client.get(f"/publication-requests/{solicitud_id}/media/{media_id}/contenido")
 
     assert response.status_code == 200
-    assert response.content == b"contenido-real"
+    assert response.content == bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"fake"
     assert response.headers["content-type"] == "image/jpeg"
 
 
@@ -190,7 +190,7 @@ def test_descargar_media_returns_404_when_file_missing_on_disk(
     solicitud_id = _crear_solicitud(client)
     media_id = client.post(
         f"/publication-requests/{solicitud_id}/media",
-        files={"archivo": ("foto.jpg", b"contenido", "image/jpeg")},
+        files={"archivo": ("foto.jpg", b"\xff\xd8\xff\xe0fake", "image/jpeg")},
     ).json()["id"]
     (tmp_path / "media" / solicitud_id / media_id).unlink()
 
@@ -206,7 +206,7 @@ def test_descargar_media_returns_404_when_media_belongs_to_another_solicitud(
     solicitud_b = _crear_solicitud(client)
     media_id = client.post(
         f"/publication-requests/{solicitud_a}/media",
-        files={"archivo": ("foto.jpg", b"contenido", "image/jpeg")},
+        files={"archivo": ("foto.jpg", b"\xff\xd8\xff\xe0fake", "image/jpeg")},
     ).json()["id"]
 
     response = client.get(f"/publication-requests/{solicitud_b}/media/{media_id}/contenido")
@@ -218,7 +218,7 @@ def test_eliminar_media_deletes_it(client: TestClient) -> None:
     solicitud_id = _crear_solicitud(client)
     media_id = client.post(
         f"/publication-requests/{solicitud_id}/media",
-        files={"archivo": ("foto.jpg", b"contenido", "image/jpeg")},
+        files={"archivo": ("foto.jpg", b"\xff\xd8\xff\xe0fake", "image/jpeg")},
     ).json()["id"]
 
     response = client.delete(f"/publication-requests/{solicitud_id}/media/{media_id}")

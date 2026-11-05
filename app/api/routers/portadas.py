@@ -13,6 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 
 from app.api.dependencies import get_current_user, get_portada_renderer
+from app.api.uploads import ensure_image_matches_type
 from config.settings import get_settings
 from core.ports.portada_renderer import PortadaRenderer, SolicitudPortada, VariantePortada
 from core.services.media_asset_service import TIPOS_IMAGEN_PERMITIDOS
@@ -27,9 +28,11 @@ router = APIRouter(
 def leer_imagen_subida(archivo: UploadFile, nombre: str) -> bytes:
     if (archivo.content_type or "") not in TIPOS_IMAGEN_PERMITIDOS:
         raise HTTPException(status_code=415, detail=f"La {nombre} debe ser JPG, PNG, WEBP o GIF")
-    contenido = archivo.file.read()
-    if len(contenido) > get_settings().media_max_bytes_imagen:
+    limite = get_settings().media_max_bytes_imagen
+    contenido = archivo.file.read(limite + 1)  # never buffer more than limit+1 bytes
+    if len(contenido) > limite:
         raise HTTPException(status_code=413, detail=f"La {nombre} es demasiado pesada")
+    ensure_image_matches_type(archivo.content_type or "", contenido)
     return contenido
 
 
