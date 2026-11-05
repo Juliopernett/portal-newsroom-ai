@@ -96,7 +96,7 @@ pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.15.0
     # via -r requirements.txt
-pyee==13.0.1
+pyee==16.0.1
     # via playwright
 python-dotenv==1.2.3
     # via
