@@ -1,6 +1,6 @@
 # Builds the React frontend (frontend/dist) separately so the final image
 # never needs Node installed — only the static build output is copied in.
-FROM node:24-slim AS frontend-build
+FROM node:25-slim AS frontend-build
 
 WORKDIR /frontend
 
