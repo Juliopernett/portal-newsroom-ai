@@ -53,6 +53,9 @@ from core.ports.unit_of_work import UnitOfWork
 from core.services.metricas_service import FilaMetrica, resumir
 from core.services.pauta_service import PautaService
 from core.services.reporte_service import construir_reporte_pauta
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/pautas", tags=["pautas"], dependencies=[Depends(get_current_user)])
 router_publico = APIRouter(
@@ -246,6 +249,24 @@ def descargar_informe_pauta(
     return _generar_informe_pdf_response(pauta_id, uow, media_storage)
 
 
+def _detalle_meta(exc: requests.RequestException) -> str:
+    """Short, operator-readable reason from Meta's error body.
+
+    Meta's `error` object carries `message`/`code` only — never the access
+    token — so it is safe to show; the request URL (which does contain the
+    token) is deliberately never included.
+    """
+    response = getattr(exc, "response", None)
+    if response is None:
+        return "no se pudo conectar con Meta"
+    try:
+        error = response.json().get("error", {})
+    except ValueError:
+        error = {}
+    mensaje = str(error.get("message") or "sin detalle")[:160]
+    return f"Meta respondió {response.status_code} (código {error.get('code', '?')}): {mensaje}"
+
+
 _CANALES_SOCIALES = (CanalPublicacion.FACEBOOK, CanalPublicacion.INSTAGRAM)
 
 
@@ -349,8 +370,10 @@ def actualizar_metricas_pauta(
         )
         try:
             metricas: MetricasPost = reader.metricas_post(fila.canal, destino.meta_post_id or "")
-        except requests.RequestException:
-            errores.append(f"{fila.titulo} ({fila.canal.value}): no se pudo consultar Meta")
+        except requests.RequestException as exc:
+            detalle = _detalle_meta(exc)
+            logger.warning("Metricas Meta fallo %s %s: %s", fila.canal.value, fila.destino_id, detalle)
+            errores.append(f"{fila.titulo[:40]} ({fila.canal.value}): {detalle}")
             continue
         uow.metricas_publicacion.save(
             MetricaPublicacion(destino_id=fila.destino_id, canal=fila.canal, metricas=metricas)
