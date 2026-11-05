@@ -24,7 +24,7 @@ argon2-cffi-bindings==25.1.0
     # via argon2-cffi
 beautifulsoup4==4.15.0
     # via -r requirements.txt
-certifi==2026.7.22
+certifi==2026.10.18
     # via
     #   httpcore
     #   httpx
@@ -76,7 +76,7 @@ mako==1.4.1
     # via alembic
 markupsafe==3.0.3
     # via mako
-pillow==12.3.0
+pillow==13.0.0
     # via reportlab
 playwright==1.62.0
     # via -r requirements.txt
@@ -141,7 +141,7 @@ typing-inspection==0.4.4
     #   pydantic-settings
 tzdata==2026.3
     # via psycopg
-urllib3==2.7.0
+urllib3==2.8.0
     # via requests
 uvicorn[standard]==0.52.4
     # via -r requirements.txt
