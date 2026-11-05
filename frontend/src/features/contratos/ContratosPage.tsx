@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  BarChart3,
   Calendar,
   FileDown,
   FileText,
@@ -27,6 +28,7 @@ import {
 import { clientsApi } from '@/features/clientes/api'
 import { diasHasta, formatFecha, formatMoneda } from '@/lib/format'
 import { PAUTA_TIPO_LABELS, pautasApi, type Pauta, type PautaInput } from './api'
+import { MetricasSheet } from './MetricasSheet'
 import { PautaForm } from './PautaForm'
 import { cupoNivel, CUPO_BAR_COLOR } from './utils'
 
@@ -59,6 +61,7 @@ export function ContratosPage() {
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('vigentes')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Pauta | null>(null)
+  const [metricasPauta, setMetricasPauta] = useState<Pauta | null>(null)
   const [preselectClientId, setPreselectClientId] = useState<string | undefined>()
 
   const pautasQuery = useQuery({ queryKey: PAUTAS_KEY, queryFn: pautasApi.list })
@@ -369,6 +372,9 @@ export function ContratosPage() {
                     >
                       <MessageCircle /> Enviar informe
                     </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setMetricasPauta(pauta)}>
+                      <BarChart3 /> Métricas
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => openEdit(pauta)}>
                       <Pencil /> Editar
                     </Button>
@@ -379,6 +385,8 @@ export function ContratosPage() {
           })}
         </div>
       )}
+
+      <MetricasSheet pauta={metricasPauta} onClose={() => setMetricasPauta(null)} />
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent>

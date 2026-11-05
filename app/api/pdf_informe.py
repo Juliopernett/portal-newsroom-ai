@@ -49,6 +49,7 @@ from reportlab.platypus import (
 from core.entities.destino_publicacion import CanalPublicacion, EstadoDestino
 from core.entities.identidad_comercial import IdentidadComercial
 from core.entities.pauta import PautaTipo
+from core.services.metricas_service import FilaMetrica, ResumenMetricas
 from core.services.reporte_service import ReportePauta, ReporteSolicitud
 
 _TZ_NEGOCIO = ZoneInfo("America/Bogota")
@@ -675,10 +676,81 @@ def _seccion_cierre(
     return elementos
 
 
+def _num(valor: int | None) -> str:
+    """Thousands-separated count, or an em dash when Meta did not report it —
+    never "0" for a number that was simply not measured."""
+    return "—" if valor is None else f"{valor:,}".replace(",", ".")
+
+
+def _seccion_metricas(
+    resumen: ResumenMetricas, filas: list[FilaMetrica], styles: _Styles
+) -> list[Flowable]:
+    """"Resultados en redes sociales" — only built when at least one post has data."""
+    medidas = [f for f in filas if f.metrica is not None and f.metrica.metricas.tiene_datos]
+    if not medidas:
+        return []
+
+    resumen_filas = [
+        _fila_resumen("Alcance total (personas)", _num(resumen.alcance_total), styles),
+        _fila_resumen("Visualizaciones", _num(resumen.vistas_total), styles),
+        _fila_resumen("Interacciones", _num(resumen.interacciones_total), styles),
+        _fila_resumen(
+            "Publicaciones medidas",
+            f"{resumen.publicaciones_con_datos} de {resumen.publicaciones_total}",
+            styles,
+        ),
+    ]
+    encabezado: list[Flowable | str] = [
+        Paragraph("<b>Publicación</b>", styles.celda_tabla),
+        Paragraph("<b>Red</b>", styles.celda_tabla),
+        Paragraph("<b>Alcance</b>", styles.celda_tabla),
+        Paragraph("<b>Visualiz.</b>", styles.celda_tabla),
+        Paragraph("<b>Interacc.</b>", styles.celda_tabla),
+    ]
+    detalle: list[list[Flowable | str]] = [encabezado]
+    for fila in medidas:
+        m = fila.metrica.metricas  # type: ignore[union-attr]  # filtered above
+        detalle.append(
+            [
+                Paragraph(_escape(fila.titulo), styles.celda_tabla),
+                Paragraph(_CANAL_LABELS[fila.canal], styles.celda_tabla),
+                Paragraph(_num(m.alcance), styles.celda_tabla),
+                Paragraph(_num(m.vistas), styles.celda_tabla),
+                Paragraph(_num(m.interacciones), styles.celda_tabla),
+            ]
+        )
+    tabla = Table(detalle, colWidths=[6.6 * cm, 2.4 * cm, 2.4 * cm, 2.6 * cm, 2.6 * cm], repeatRows=1)
+    tabla.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), _COLOR_FONDO_ENCABEZADO),
+                ("GRID", (0, 0), (-1, -1), 0.25, _COLOR_BORDE),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    ultima = max(f.metrica.capturado_en for f in medidas if f.metrica)
+    return [
+        Paragraph("Resultados en redes sociales", styles.subtitulo),
+        _tabla_resumen(resumen_filas),
+        Spacer(1, 0.3 * cm),
+        tabla,
+        Spacer(1, 0.15 * cm),
+        Paragraph(
+            f"Cifras reportadas por Facebook e Instagram al {_fmt_fecha_negocio(ultima)}. "
+            "Pueden seguir aumentando.",
+            styles.contacto,
+        ),
+    ]
+
+
 def generar_informe_pauta_pdf(
     reporte: ReportePauta,
     identidad: IdentidadComercial | None,
     logo_bytes: bytes | None,
+    metricas: tuple[ResumenMetricas, list[FilaMetrica]] | None = None,
 ) -> bytes:
     """Render `reporte` as a PDF (bytes) — the "Generar informe PDF" download.
 
@@ -712,6 +784,12 @@ def generar_informe_pauta_pdf(
     story.append(Spacer(1, 0.4 * cm))
 
     story.extend(_seccion_detalle_publicaciones(reporte, styles))
+
+    if metricas is not None:
+        bloque = _seccion_metricas(metricas[0], metricas[1], styles)
+        if bloque:
+            story.append(Spacer(1, 0.4 * cm))
+            story.extend(bloque)
 
     story.extend(_seccion_cierre(identidad, logo_bytes, styles))
 

@@ -27,6 +27,7 @@ class PautaCreate(BaseModel):
     fecha_pago: date
     saldo_pendiente: Decimal = Decimal("0")
     observaciones: str | None = None
+    incluye_metricas: bool = False
 
 
 class PautaOut(BaseModel):
@@ -48,6 +49,7 @@ class PautaOut(BaseModel):
     saldo_pendiente: Decimal
     fecha_registro: datetime
     observaciones: str | None
+    incluye_metricas: bool
     publicaciones_consumidas: int
     publicaciones_restantes: int
     vigente: bool

@@ -24,6 +24,9 @@ from database.repositories.identidad_comercial_repository import (
     SqlAlchemyIdentidadComercialRepository,
 )
 from database.repositories.informe_link_repository import SqlAlchemyInformeLinkRepository
+from database.repositories.metrica_publicacion_repository import (
+    SqlAlchemyMetricaPublicacionRepository,
+)
 from database.repositories.media_asset_repository import SqlAlchemyMediaAssetRepository
 from database.repositories.news_candidate_repository import SqlAlchemyNewsCandidateRepository
 from database.repositories.otro_ingreso_repository import SqlAlchemyOtroIngresoRepository
@@ -59,6 +62,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.identidad_comercial = SqlAlchemyIdentidadComercialRepository(self._session)
         self.ai_configuracion = SqlAlchemyAIConfiguracionRepository(self._session)
         self.informe_links = SqlAlchemyInformeLinkRepository(self._session)
+        self.metricas_publicacion = SqlAlchemyMetricaPublicacionRepository(self._session)
         self.users = SqlAlchemyUserRepository(self._session)
         self.sessions = SqlAlchemySessionRepository(self._session)
         self.news_candidates = SqlAlchemyNewsCandidateRepository(self._session)

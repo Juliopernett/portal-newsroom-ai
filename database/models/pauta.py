@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, Date, false, DateTime, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database.base import Base
@@ -33,3 +33,6 @@ class PautaModel(Base):
     saldo_pendiente: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     fecha_registro: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     observaciones: Mapped[str | None] = mapped_column(String, nullable=True)
+    incluye_metricas: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )

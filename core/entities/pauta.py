@@ -78,6 +78,10 @@ class Pauta:
     saldo_pendiente: Decimal = Decimal("0")
     fecha_registro: datetime = field(default_factory=lambda: datetime.now(UTC))
     observaciones: str | None = None
+    # Opt-in per contract: most pautas sell social-media reach, but results are
+    # not always flattering — the operator decides whether this client's informe
+    # shows reach/interaction metrics.
+    incluye_metricas: bool = False
 
     def __post_init__(self) -> None:
         if not self.client_id:

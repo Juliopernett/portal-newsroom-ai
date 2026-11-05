@@ -22,6 +22,7 @@ function emptyForm(preselectClientId?: string): PautaInput {
     fecha_pago: '',
     saldo_pendiente: '0',
     observaciones: '',
+    incluye_metricas: false,
   }
 }
 
@@ -62,6 +63,7 @@ export function PautaForm({
             fecha_pago: pauta.fecha_pago,
             saldo_pendiente: pauta.saldo_pendiente,
             observaciones: pauta.observaciones ?? '',
+            incluye_metricas: pauta.incluye_metricas,
           }
         : emptyForm(preselectClientId),
     )
@@ -197,6 +199,21 @@ export function PautaForm({
           onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
         />
       </div>
+      <label className="flex items-start gap-3 rounded-md border border-border p-3 text-sm">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-5 shrink-0"
+          checked={form.incluye_metricas}
+          onChange={(e) => setForm({ ...form, incluye_metricas: e.target.checked })}
+        />
+        <span>
+          <span className="font-medium">Incluir métricas de alcance en el informe</span>
+          <span className="block text-muted-foreground">
+            Muestra alcance, visualizaciones e interacciones de Facebook e Instagram. Puedes ver
+            los números antes (botón «Métricas» del contrato) y decidir si este cliente los ve.
+          </span>
+        </span>
+      </label>
       {error && <p className="text-sm text-danger">{error}</p>}
       <Button type="submit" disabled={isSubmitting} className="mt-2">
         {pauta ? 'Guardar cambios' : 'Crear pauta'}

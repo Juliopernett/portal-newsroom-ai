@@ -21,24 +21,36 @@ import secrets
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
+import requests
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from app.api.dependencies import (
     get_current_user,
     get_media_storage,
+    get_social_media_reader,
     get_unit_of_work,
     hash_session_token,
     limit_public_downloads,
 )
 from app.api.pdf_contrato import generar_contrato_pauta_pdf
 from app.api.pdf_informe import generar_informe_pauta_pdf
+from app.api.schemas.metricas import (
+    FilaMetricaOut,
+    MetricasPautaOut,
+    MetricasPostOut,
+    ResumenMetricasOut,
+)
 from app.api.schemas.pauta import InformeLinkOut, PautaCreate, PautaOut
 from config.settings import get_settings
+from core.entities.destino_publicacion import CanalPublicacion, EstadoDestino
 from core.entities.informe_link import InformeLink
+from core.entities.metrica_publicacion import MetricaPublicacion, MetricasPost
 from core.entities.pauta import Pauta
 from core.ports.media_storage import MediaStorage
+from core.ports.social_media_reader import SocialMediaReader
 from core.ports.unit_of_work import UnitOfWork
+from core.services.metricas_service import FilaMetrica, resumir
 from core.services.pauta_service import PautaService
 from core.services.reporte_service import construir_reporte_pauta
 
@@ -73,6 +85,7 @@ def _to_out(pauta: Pauta, uow: UnitOfWork) -> PautaOut:
         saldo_pendiente=pauta.saldo_pendiente,
         fecha_registro=pauta.fecha_registro,
         observaciones=pauta.observaciones,
+        incluye_metricas=pauta.incluye_metricas,
         publicaciones_consumidas=service.publicaciones_consumidas(pauta, solicitudes, destinos),
         publicaciones_restantes=service.publicaciones_restantes(pauta, solicitudes, destinos),
         vigente=service.esta_vigente(pauta),
@@ -186,7 +199,13 @@ def _generar_informe_pdf_response(
     reporte = construir_reporte_pauta(pauta, solicitudes, destinos, cliente, PautaService())
 
     identidad = uow.identidad_comercial.get()
-    pdf_bytes = generar_informe_pauta_pdf(reporte, identidad, _logo_bytes(uow, media_storage))
+    metricas = None
+    if pauta.incluye_metricas:  # opt-in per contract: never shown otherwise
+        filas = _filas_metricas(pauta_id, uow)
+        metricas = (resumir(filas), filas)
+    pdf_bytes = generar_informe_pauta_pdf(
+        reporte, identidad, _logo_bytes(uow, media_storage), metricas
+    )
     filename = _nombre_archivo("informe", pauta, cliente.nombre if cliente else None)
     return _pdf_response(pdf_bytes, filename)
 
@@ -225,6 +244,119 @@ def descargar_informe_pauta(
     """Generate and download the client-facing closing report for one Pauta
     (Sprint — informe de cierre de contrato). See `_generar_informe_pdf_response`."""
     return _generar_informe_pdf_response(pauta_id, uow, media_storage)
+
+
+_CANALES_SOCIALES = (CanalPublicacion.FACEBOOK, CanalPublicacion.INSTAGRAM)
+
+
+def _filas_metricas(pauta_id: str, uow: UnitOfWork) -> list[FilaMetrica]:
+    """Every published Facebook/Instagram post of this Pauta + its last capture."""
+    pares = []
+    for solicitud in uow.publication_requests.list_by_pauta_id(pauta_id):
+        for destino in uow.destinos_publicacion.list_by_publication_request_id(solicitud.id):
+            if destino.canal in _CANALES_SOCIALES and destino.estado is EstadoDestino.PUBLICADO:
+                pares.append((solicitud, destino))
+    capturas = {
+        m.destino_id: m
+        for m in uow.metricas_publicacion.list_by_destino_ids(d.id for _, d in pares)
+    }
+    return [
+        FilaMetrica(
+            destino_id=destino.id,
+            solicitud_id=solicitud.id,
+            titulo=((solicitud.titulo or solicitud.texto or "").strip()[:80]) or "(sin título)",
+            canal=destino.canal,
+            url=destino.url_publicacion,
+            tiene_meta_post_id=destino.meta_post_id is not None,
+            metrica=capturas.get(destino.id),
+        )
+        for solicitud, destino in pares
+    ]
+
+
+def _metricas_out(
+    pauta: Pauta, filas: list[FilaMetrica], errores: list[str] | None = None
+) -> MetricasPautaOut:
+    return MetricasPautaOut(
+        incluye_metricas=pauta.incluye_metricas,
+        resumen=ResumenMetricasOut(**_resumen_dict(resumir(filas))),
+        filas=[
+            FilaMetricaOut(
+                destino_id=f.destino_id,
+                solicitud_id=f.solicitud_id,
+                titulo=f.titulo,
+                canal=f.canal,
+                url=f.url,
+                tiene_meta_post_id=f.tiene_meta_post_id,
+                capturado_en=f.metrica.capturado_en if f.metrica else None,
+                metricas=(
+                    MetricasPostOut(
+                        alcance=f.metrica.metricas.alcance,
+                        vistas=f.metrica.metricas.vistas,
+                        reacciones=f.metrica.metricas.reacciones,
+                        comentarios=f.metrica.metricas.comentarios,
+                        compartidos=f.metrica.metricas.compartidos,
+                        guardados=f.metrica.metricas.guardados,
+                        interacciones=f.metrica.metricas.interacciones,
+                    )
+                    if f.metrica
+                    else None
+                ),
+            )
+            for f in filas
+        ],
+        errores=errores or [],
+    )
+
+
+def _resumen_dict(resumen: object) -> dict[str, int | None]:
+    return {k: getattr(resumen, k) for k in ResumenMetricasOut.model_fields}
+
+
+@router.get("/{pauta_id}/metricas", response_model=MetricasPautaOut)
+def ver_metricas_pauta(
+    pauta_id: str, uow: UnitOfWork = Depends(get_unit_of_work)
+) -> MetricasPautaOut:
+    """Internal preview of the informe's metrics block — what the client WOULD
+    see — so the operator can decide per contract whether to include it."""
+    pauta = uow.pautas.get_by_id(pauta_id)
+    if pauta is None:
+        raise HTTPException(status_code=404, detail="Pauta not found")
+    return _metricas_out(pauta, _filas_metricas(pauta_id, uow))
+
+
+@router.post("/{pauta_id}/metricas/actualizar", response_model=MetricasPautaOut)
+def actualizar_metricas_pauta(
+    pauta_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    reader: SocialMediaReader = Depends(get_social_media_reader),
+) -> MetricasPautaOut:
+    """Pull fresh numbers from Meta for every published post of this Pauta in
+    ONE request (bulk by design), and save them. A post that fails is
+    reported in `errores` without losing the others. Works whether or not the
+    contract includes metrics in its informe."""
+    pauta = uow.pautas.get_by_id(pauta_id)
+    if pauta is None:
+        raise HTTPException(status_code=404, detail="Pauta not found")
+    errores: list[str] = []
+    for fila in _filas_metricas(pauta_id, uow):
+        if not fila.tiene_meta_post_id:
+            continue
+        destino = next(
+            d
+            for d in uow.destinos_publicacion.list_by_publication_request_id(fila.solicitud_id)
+            if d.id == fila.destino_id
+        )
+        try:
+            metricas: MetricasPost = reader.metricas_post(fila.canal, destino.meta_post_id or "")
+        except requests.RequestException:
+            errores.append(f"{fila.titulo} ({fila.canal.value}): no se pudo consultar Meta")
+            continue
+        uow.metricas_publicacion.save(
+            MetricaPublicacion(destino_id=fila.destino_id, canal=fila.canal, metricas=metricas)
+        )
+    uow.commit()
+    return _metricas_out(pauta, _filas_metricas(pauta_id, uow), errores)
 
 
 def _mint_share_link(

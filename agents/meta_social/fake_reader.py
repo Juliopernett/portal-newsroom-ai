@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from core.entities.destino_publicacion import CanalPublicacion
+from core.entities.metrica_publicacion import MetricasPost
 from core.entities.post_red_social import PostRedSocial
 
 _TEXTOS_FACEBOOK = [
@@ -60,3 +61,15 @@ class FakeSocialMediaReader:
         else:
             raise ValueError(f"no hay posts recientes para canal={canal.value!r}")
         return _posts(canal, textos, datetime.now(UTC))[:limite]
+
+    def metricas_post(self, canal: CanalPublicacion, post_id: str) -> MetricasPost:
+        """Fixed demo numbers derived from the id, so tests are deterministic."""
+        base = sum(ord(c) for c in post_id) % 50 + 1
+        return MetricasPost(
+            alcance=base * 100,
+            vistas=base * 140,
+            reacciones=base * 9,
+            comentarios=base,
+            compartidos=base // 2,
+            guardados=base // 3 if canal is CanalPublicacion.INSTAGRAM else None,
+        )

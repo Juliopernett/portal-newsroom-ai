@@ -28,6 +28,7 @@ def _to_model(pauta: Pauta) -> PautaModel:
         saldo_pendiente=pauta.saldo_pendiente,
         fecha_registro=pauta.fecha_registro,
         observaciones=pauta.observaciones,
+        incluye_metricas=pauta.incluye_metricas,
     )
 
 
@@ -49,6 +50,7 @@ def _to_domain(model: PautaModel) -> Pauta:
         saldo_pendiente=model.saldo_pendiente,
         fecha_registro=fecha_registro,
         observaciones=model.observaciones,
+        incluye_metricas=model.incluye_metricas,
     )
 
 

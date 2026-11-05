@@ -22,6 +22,7 @@ export interface Pauta {
   saldo_pendiente: string
   fecha_registro: string
   observaciones: string | null
+  incluye_metricas: boolean
   publicaciones_consumidas: number
   publicaciones_restantes: number
   vigente: boolean
@@ -40,6 +41,7 @@ export interface PautaInput {
   fecha_pago: string
   saldo_pendiente: string
   observaciones: string | null
+  incluye_metricas: boolean
 }
 
 export interface InformeLink {
@@ -47,7 +49,44 @@ export interface InformeLink {
   expira_en: string
 }
 
+export interface MetricasPost {
+  alcance: number | null
+  vistas: number | null
+  reacciones: number | null
+  comentarios: number | null
+  compartidos: number | null
+  guardados: number | null
+  interacciones: number | null
+}
+
+export interface FilaMetrica {
+  destino_id: string
+  solicitud_id: string
+  titulo: string
+  canal: 'facebook' | 'instagram'
+  url: string | null
+  tiene_meta_post_id: boolean
+  capturado_en: string | null
+  metricas: MetricasPost | null
+}
+
+export interface MetricasPauta {
+  incluye_metricas: boolean
+  resumen: {
+    publicaciones_total: number
+    publicaciones_con_datos: number
+    publicaciones_sin_datos: number
+    alcance_total: number | null
+    vistas_total: number | null
+    interacciones_total: number | null
+  }
+  filas: FilaMetrica[]
+  errores: string[]
+}
+
 export const pautasApi = {
+  metricas: (id: string) => api.get<MetricasPauta>(`/pautas/${id}/metricas`),
+  actualizarMetricas: (id: string) => api.post<MetricasPauta>(`/pautas/${id}/metricas/actualizar`),
   list: () => api.get<Pauta[]>('/pautas'),
   create: (payload: PautaInput) => api.post<Pauta>('/pautas', payload),
   update: (id: string, payload: PautaInput) => api.put<Pauta>(`/pautas/${id}`, payload),

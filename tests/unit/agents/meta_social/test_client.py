@@ -164,3 +164,56 @@ def test_posts_recientes_raises_on_a_non_2xx_response() -> None:
         pytest.raises(requests.HTTPError),
     ):
         reader.posts_recientes(CanalPublicacion.FACEBOOK)
+
+
+def _json_response(payload: dict[str, object], status: int = 200) -> MagicMock:
+    import requests
+
+    response = MagicMock()
+    response.json.return_value = payload
+    if status >= 400:
+        response.raise_for_status.side_effect = requests.HTTPError(f"{status}")
+    return response
+
+
+def test_metricas_instagram_keeps_the_numbers_it_can_get_when_one_metric_is_refused() -> None:
+    """Meta retires/gates insight metrics: a 400 on `saved` must not hide `reach`."""
+    reader = MetaGraphSocialMediaReader(_settings())
+
+    def fake_get(url: str, params: dict[str, str] | None = None, **_: object) -> MagicMock:
+        if url.endswith("/insights"):
+            metrica = (params or {})["metric"]
+            if metrica == "reach":
+                return _json_response({"data": [{"values": [{"value": 321}]}]})
+            return _json_response({}, status=400)  # views/impressions/shares/saved refused
+        return _json_response({"like_count": 12, "comments_count": 3})
+
+    with patch("agents.meta_social.client.requests.get", side_effect=fake_get):
+        m = reader.metricas_post(CanalPublicacion.INSTAGRAM, "media-1")
+
+    assert m.alcance == 321
+    assert m.reacciones == 12 and m.comentarios == 3
+    assert m.guardados is None and m.vistas is None  # unknown, not zero
+
+
+def test_metricas_facebook_treats_a_missing_shares_field_as_zero_shares() -> None:
+    reader = MetaGraphSocialMediaReader(_settings())
+
+    def fake_get(url: str, params: dict[str, str] | None = None, **_: object) -> MagicMock:
+        if url.endswith("/insights"):
+            return _json_response({}, status=400)
+        if url.endswith("/page-123"):
+            return _json_response({"access_token": "page-token"})
+        return _json_response(
+            {
+                "reactions": {"summary": {"total_count": 40}},
+                "comments": {"summary": {"total_count": 4}},
+            }
+        )
+
+    with patch("agents.meta_social.client.requests.get", side_effect=fake_get):
+        m = reader.metricas_post(CanalPublicacion.FACEBOOK, "page-123_999")
+
+    assert m.reacciones == 40 and m.comentarios == 4
+    assert m.compartidos == 0  # Meta omits `shares` when nobody shared it
+    assert m.alcance is None

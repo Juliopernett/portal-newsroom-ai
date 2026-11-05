@@ -19,6 +19,7 @@ import requests
 
 from config.settings import Settings
 from core.entities.destino_publicacion import CanalPublicacion
+from core.entities.metrica_publicacion import MetricasPost
 from core.entities.post_red_social import PostRedSocial
 
 _GRAPH_API_BASE = "https://graph.facebook.com/v21.0"
@@ -71,6 +72,73 @@ class MetaGraphSocialMediaReader:
         response.raise_for_status()
         result: dict[str, Any] = response.json()
         return result
+
+    def metricas_post(self, canal: CanalPublicacion, post_id: str) -> MetricasPost:
+        if canal is CanalPublicacion.FACEBOOK:
+            return self._metricas_facebook(post_id)
+        if canal is CanalPublicacion.INSTAGRAM:
+            return self._metricas_instagram(post_id)
+        raise ValueError(f"no hay metricas para canal={canal.value!r}")
+
+    def _insight(self, post_id: str, token: str, metricas: list[str]) -> int | None:
+        """First insight in `metricas` the platform accepts, else `None`.
+
+        Meta retires/renames insight metrics regularly and some need
+        permissions the token may not have (`read_insights`,
+        `instagram_manage_insights`); each is tried on its own so one
+        unavailable metric never hides the others. Only HTTP errors from
+        Meta are swallowed — an unreachable platform still raises.
+        """
+        for metrica in metricas:
+            try:
+                response = requests.get(
+                    f"{_GRAPH_API_BASE}/{post_id}/insights",
+                    params={"metric": metrica, "access_token": token},
+                    timeout=_REQUEST_TIMEOUT_SECONDS,
+                )
+                response.raise_for_status()
+                items = response.json().get("data", [])
+                if not items:
+                    continue
+                item = items[0]
+                if item.get("values"):
+                    return int(item["values"][0]["value"])
+                if "total_value" in item:
+                    return int(item["total_value"]["value"])
+            except requests.HTTPError:
+                continue
+            except (KeyError, TypeError, ValueError):
+                continue
+        return None
+
+    def _metricas_facebook(self, post_id: str) -> MetricasPost:
+        token = self._facebook_page_token()
+        base = self._get(
+            post_id,
+            fields="reactions.summary(true).limit(0),comments.summary(true).limit(0),shares",
+            token=token,
+        )
+        return MetricasPost(
+            alcance=self._insight(
+                post_id, token, ["post_total_media_view_unique", "post_impressions_unique"]
+            ),
+            vistas=self._insight(post_id, token, ["post_media_view", "post_impressions"]),
+            reacciones=base.get("reactions", {}).get("summary", {}).get("total_count"),
+            comentarios=base.get("comments", {}).get("summary", {}).get("total_count"),
+            # Meta omits `shares` entirely when nobody shared the post.
+            compartidos=base.get("shares", {}).get("count", 0),
+        )
+
+    def _metricas_instagram(self, media_id: str) -> MetricasPost:
+        base = self._get(media_id, fields="like_count,comments_count", token=self._token)
+        return MetricasPost(
+            alcance=self._insight(media_id, self._token, ["reach"]),
+            vistas=self._insight(media_id, self._token, ["views", "impressions"]),
+            reacciones=base.get("like_count"),
+            comentarios=base.get("comments_count"),
+            compartidos=self._insight(media_id, self._token, ["shares"]),
+            guardados=self._insight(media_id, self._token, ["saved"]),
+        )
 
     def _facebook_page_token(self) -> str:
         """Exchange the System User token for a Page-scoped one.

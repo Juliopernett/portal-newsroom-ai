@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from core.entities.destino_publicacion import CanalPublicacion
+from core.entities.metrica_publicacion import MetricasPost
 from core.entities.post_red_social import PostRedSocial
 
 
@@ -28,5 +29,14 @@ class SocialMediaReader(Protocol):
         `canal` must be `FACEBOOK` or `INSTAGRAM` — there is no "recent
         posts" concept for `WORDPRESS` (that channel is created directly
         by this app via `CMSPublisher`, never read back).
+        """
+        ...
+
+    def metricas_post(self, canal: CanalPublicacion, post_id: str) -> MetricasPost:
+        """Return what the platform reports for one already-published post.
+
+        Any number the platform does not provide (missing permission, metric
+        retired, post too old) comes back as `None`, never as zero. Raises
+        `requests.RequestException` when the platform itself is unreachable.
         """
         ...

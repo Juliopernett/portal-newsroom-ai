@@ -18,6 +18,7 @@ from core.ports.destino_publicacion_repository import DestinoPublicacionReposito
 from core.ports.gasto_repository import GastoRepository
 from core.ports.identidad_comercial_repository import IdentidadComercialRepository
 from core.ports.informe_link_repository import InformeLinkRepository
+from core.ports.metrica_publicacion_repository import MetricaPublicacionRepository
 from core.ports.media_asset_repository import MediaAssetRepository
 from core.ports.news_candidate_repository import NewsCandidateRepository
 from core.ports.otro_ingreso_repository import OtroIngresoRepository
@@ -53,6 +54,7 @@ class UnitOfWork(ABC):
     identidad_comercial: IdentidadComercialRepository
     ai_configuracion: AIConfiguracionRepository
     informe_links: InformeLinkRepository
+    metricas_publicacion: MetricaPublicacionRepository
     users: UserRepository
     sessions: SessionRepository
     news_candidates: NewsCandidateRepository
