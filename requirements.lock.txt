@@ -72,7 +72,7 @@ idna==3.19
     #   requests
 jiter==0.16.0
     # via anthropic
-mako==1.4.1
+mako==1.4.3
     # via alembic
 markupsafe==3.0.3
     # via mako
