@@ -78,7 +78,7 @@ markupsafe==3.0.3
     # via mako
 pillow==13.0.0
     # via reportlab
-playwright==1.62.0
+playwright==1.64.1
     # via -r requirements.txt
 psycopg[binary]==3.3.4
     # via -r requirements.txt
