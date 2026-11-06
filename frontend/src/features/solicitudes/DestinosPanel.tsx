@@ -15,6 +15,7 @@ import {
   type PostRedSocial,
   type SolicitudContexto,
 } from './api'
+import { TextoIABlock } from './TextoIABlock'
 import { CANALES_DESTINO, DESTINO_ESTADO_BADGE, DESTINO_ESTADO_LABELS } from './utils'
 
 // Umbral a partir del cual vale la pena destacar una coincidencia — por
@@ -335,6 +336,9 @@ function DestinoRow({
         </span>
       </div>
       {acciones}
+      {destino.canal !== 'wordpress' && destino.estado !== 'cancelado' && (
+        <TextoIABlock solicitudId={solicitudId} destino={destino} onChanged={onChanged} />
+      )}
     </div>
   )
 }

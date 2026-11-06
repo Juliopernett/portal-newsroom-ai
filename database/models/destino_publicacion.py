@@ -38,3 +38,4 @@ class DestinoPublicacionModel(Base):
         DateTime(timezone=True), nullable=True
     )
     ultimo_error: Mapped[str | None] = mapped_column(String, nullable=True)
+    texto_ia: Mapped[str | None] = mapped_column(String, nullable=True)
