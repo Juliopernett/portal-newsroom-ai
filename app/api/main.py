@@ -120,6 +120,11 @@ _NO_CSP_PREFIXES = ("/docs", "/redoc", "/openapi.json")
 async def add_security_headers(request: Request, call_next) -> Response:
     response = await call_next(request)
     response.headers.update(_SECURITY_HEADERS)
+    # `/gastos` and `/reportes` are both a React page AND a JSON API on the
+    # same URL, told apart only by `Accept`. Without `Vary: Accept` the
+    # browser cache can answer the page's own data request with the cached
+    # HTML shell (list showed "no hay gastos" while 48 existed).
+    response.headers.append("Vary", "Accept")
     if not request.url.path.startswith(_NO_CSP_PREFIXES):
         response.headers["Content-Security-Policy"] = _CSP
     return response
@@ -141,6 +146,6 @@ async def serve_frontend(request: Request, call_next) -> Response:
 
     accept = request.headers.get("accept", "")
     if "text/html" in accept and not _HAS_FILE_EXTENSION.search(path):
-        return FileResponse(FRONTEND_INDEX)
+        return FileResponse(FRONTEND_INDEX, headers={"Cache-Control": "no-cache"})
 
     return await call_next(request)

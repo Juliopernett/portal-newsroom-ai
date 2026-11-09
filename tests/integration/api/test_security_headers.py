@@ -22,3 +22,12 @@ def test_security_headers_are_present_even_on_an_authenticated_response(
 
     assert response.status_code == 200
     assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_responses_vary_on_accept_so_page_and_api_sharing_a_url_do_not_collide(
+    client: TestClient,
+) -> None:
+    """`/gastos` is a React page and a JSON API on the same URL."""
+    response = client.get("/gastos")
+
+    assert "accept" in response.headers.get("vary", "").lower()
