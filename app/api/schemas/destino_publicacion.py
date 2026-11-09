@@ -10,9 +10,8 @@ same discipline `PublicationRequestCreate` already applies to `estado`.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from core.entities.destino_publicacion import CanalPublicacion, EstadoDestino
 from core.entities.publication_request import EstadoPreparacionIA
@@ -71,7 +70,6 @@ class DestinoPublicacionOut(BaseModel):
     registrado_por_user_id: str | None
     fecha_publicacion: datetime | None
     ultimo_error: str | None
-    texto_ia: str | None = None
 
 
 class CrearBorradorWordpressOut(BaseModel):
@@ -87,15 +85,3 @@ class CrearBorradorWordpressOut(BaseModel):
     destino: DestinoPublicacionOut
     preparacion_ia_estado: EstadoPreparacionIA
     preparacion_ia_error: str | None
-
-
-class TextoIAGenerar(BaseModel):
-    """Body of `POST .../destinos/{destino_id}/texto-ia`."""
-
-    modo: Literal["ajustar", "redactar"] = "redactar"
-
-
-class TextoIAGuardar(BaseModel):
-    """Body of `PUT .../destinos/{destino_id}/texto-ia` (the operator's edited text)."""
-
-    texto: str | None = Field(default=None, max_length=5000)

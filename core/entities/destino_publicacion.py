@@ -85,10 +85,6 @@ class DestinoPublicacion:
     registrado_por_user_id: str | None = None
     fecha_publicacion: datetime | None = None
     ultimo_error: str | None = None
-    # Texto para publicar en Facebook/Instagram, preparado con IA (o escrito a
-    # mano) a pedido del operador — opcional, nunca automático. Solo aplica a
-    # canales sociales.
-    texto_ia: str | None = None
 
     def __post_init__(self) -> None:
         if not self.publication_request_id:
@@ -112,8 +108,6 @@ class DestinoPublicacion:
                 f"meta_post_id only applies to canal in {canales_validos}, "
                 f"got canal={self.canal.value!r}"
             )
-        if self.canal not in _CANALES_CON_URL_MANUAL and self.texto_ia is not None:
-            raise ValueError("texto_ia only applies to facebook/instagram destinos")
         if self.estado == EstadoDestino.PUBLICADO and self.fecha_publicacion is None:
             raise ValueError("fecha_publicacion is required when estado is 'publicado'")
         if (

@@ -29,7 +29,6 @@ def _to_model(destino: DestinoPublicacion) -> DestinoPublicacionModel:
         registrado_por_user_id=destino.registrado_por_user_id,
         fecha_publicacion=destino.fecha_publicacion,
         ultimo_error=destino.ultimo_error,
-        texto_ia=destino.texto_ia,
     )
 
 
@@ -52,7 +51,6 @@ def _to_domain(model: DestinoPublicacionModel) -> DestinoPublicacion:
         registrado_por_user_id=model.registrado_por_user_id,
         fecha_publicacion=fecha_publicacion,
         ultimo_error=model.ultimo_error,
-        texto_ia=model.texto_ia,
     )
 
 

@@ -71,7 +71,6 @@ protected automatically instead of by remembering to add it.
 from __future__ import annotations
 
 import re
-from dataclasses import replace
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -86,8 +85,6 @@ from app.api.dependencies import (
     get_unit_of_work,
 )
 from app.api.schemas.destino_publicacion import (
-    TextoIAGenerar,
-    TextoIAGuardar,
     CrearBorradorWordpressOut,
     DestinoPublicacionConfirmarPublicacion,
     DestinoPublicacionCorregirEnlace,
@@ -133,13 +130,6 @@ from core.services.publication_request_service import (
     link_pauta,
 )
 from core.services.reporte_service import ReporteSolicitud, construir_reporte
-from core.services.texto_redes_service import (
-    MAX_HASHTAGS,
-    ModoTexto,
-    TextoRedesError,
-    contar_hashtags,
-    generar_texto_red,
-)
 from core.services.wordpress_publication_service import preparar_y_crear_borrador
 
 def _content_disposition_inline(nombre: str) -> str:
@@ -422,68 +412,6 @@ def crear_borrador_wordpress(
         preparacion_ia_estado=solicitud_actualizada.preparacion_ia_estado,
         preparacion_ia_error=solicitud_actualizada.preparacion_ia_error,
     )
-
-
-def _destino_social(uow: UnitOfWork, request_id: str, destino_id: str) -> DestinoPublicacion:
-    destino = uow.destinos_publicacion.get_by_id(destino_id)
-    if destino is None or destino.publication_request_id != request_id:
-        raise HTTPException(status_code=404, detail="DestinoPublicacion not found")
-    if destino.canal not in MAX_HASHTAGS:
-        raise HTTPException(
-            status_code=422, detail="El texto por red solo aplica a Facebook e Instagram."
-        )
-    return destino
-
-
-@router.post("/{request_id}/destinos/{destino_id}/texto-ia", response_model=DestinoPublicacionOut)
-def generar_texto_ia(
-    request_id: str,
-    destino_id: str,
-    payload: TextoIAGenerar,
-    uow: UnitOfWork = Depends(get_unit_of_work),
-    ai_provider: AIProvider = Depends(get_ai_provider),
-) -> DestinoPublicacion:
-    """Draft this destino's post text with AI — on demand, never automatic.
-
-    Saves it in `texto_ia` for the operator to review/edit; nothing is
-    published. Instagram is capped at 5 hashtags in code.
-    """
-    solicitud = uow.publication_requests.get_by_id(request_id)
-    if solicitud is None:
-        raise HTTPException(status_code=404, detail="PublicationRequest not found")
-    destino = _destino_social(uow, request_id, destino_id)
-    try:
-        texto = generar_texto_red(
-            solicitud.texto, solicitud.titulo, destino.canal, ModoTexto(payload.modo), ai_provider
-        )
-    except TextoRedesError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    actualizado = replace(destino, texto_ia=texto)
-    uow.destinos_publicacion.save(actualizado)
-    uow.commit()
-    return actualizado
-
-
-@router.put("/{request_id}/destinos/{destino_id}/texto-ia", response_model=DestinoPublicacionOut)
-def guardar_texto_ia(
-    request_id: str,
-    destino_id: str,
-    payload: TextoIAGuardar,
-    uow: UnitOfWork = Depends(get_unit_of_work),
-) -> DestinoPublicacion:
-    """Save the operator's edited text (or clear it with null/empty)."""
-    destino = _destino_social(uow, request_id, destino_id)
-    texto = (payload.texto or "").strip() or None
-    if texto is not None and contar_hashtags(texto) > MAX_HASHTAGS[destino.canal]:
-        raise HTTPException(
-            status_code=422,
-            detail=f"{destino.canal.value.capitalize()} admite máximo "
-            f"{MAX_HASHTAGS[destino.canal]} hashtags.",
-        )
-    actualizado = replace(destino, texto_ia=texto)
-    uow.destinos_publicacion.save(actualizado)
-    uow.commit()
-    return actualizado
 
 
 @router.post(

@@ -67,7 +67,6 @@ export interface DestinoPublicacion {
   registrado_por_user_id: string | null
   fecha_publicacion: string | null
   ultimo_error: string | null
-  texto_ia: string | null
 }
 
 export type MediaAssetTipo = 'imagen' | 'video'
@@ -187,16 +186,6 @@ export const solicitudesApi = {
         ...(metaPostId ? { meta_post_id: metaPostId } : {}),
       },
     ),
-  // Texto por red con IA (opcional, a pedido): 'ajustar' respeta el texto del
-  // cliente; 'redactar' parte de una idea. Se guarda en el destino.
-  generarTextoIA: (id: string, destinoId: string, modo: 'ajustar' | 'redactar') =>
-    api.post<DestinoPublicacion>(`/publication-requests/${id}/destinos/${destinoId}/texto-ia`, {
-      modo,
-    }),
-  guardarTextoIA: (id: string, destinoId: string, texto: string | null) =>
-    api.put<DestinoPublicacion>(`/publication-requests/${id}/destinos/${destinoId}/texto-ia`, {
-      texto,
-    }),
   cancelarDestino: (id: string, destinoId: string) =>
     api.post<DestinoPublicacion>(`/publication-requests/${id}/destinos/${destinoId}/cancelar`),
   corregirEnlaceDestino: (
