@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { PartyPopper, RefreshCw, Undo2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { AsesorIA } from './AsesorIA'
 import { dashboardApi, insightsApi, type AlertaInteligente } from './api'
 import {
   AccionSugeridaButtons,
@@ -116,6 +117,8 @@ export function AlertasPage() {
           </Button>
         </div>
       </div>
+
+      <AsesorIA />
 
       {sinNovedades && (
         <div className="flex items-center gap-3 rounded-lg border border-success/30 bg-success-bg p-4 text-success">

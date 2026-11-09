@@ -24,6 +24,23 @@ from core.analytics.decision_view_models import (
 from core.entities.pauta import PautaTipo
 
 
+class SugerenciaOut(BaseModel):
+    """One advisor suggestion — read-only advice, never an action."""
+
+    titulo: str
+    detalle: str
+    prioridad: str
+    area: str
+    cliente: str | None
+
+
+class AsesorOut(BaseModel):
+    """Response of `POST /insights/asesor`."""
+
+    resumen: str
+    sugerencias: list[SugerenciaOut]
+
+
 class ClienteScoreSaludOut(BaseModel):
     """One row of `GET /insights/salud-clientes`."""
 

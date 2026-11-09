@@ -67,7 +67,21 @@ export interface OportunidadComercial {
   porcentaje_consumido: string | null
 }
 
+export interface SugerenciaAsesor {
+  titulo: string
+  detalle: string
+  prioridad: 'alta' | 'media' | 'baja'
+  area: string
+  cliente: string | null
+}
+
+export interface AnalisisAsesor {
+  resumen: string
+  sugerencias: SugerenciaAsesor[]
+}
+
 export const insightsApi = {
+  asesor: () => api.post<AnalisisAsesor>('/insights/asesor'),
   centroAlertas: () => api.get<AlertaInteligente[]>('/insights/centro-alertas'),
   riesgoAbandono: () => api.get<ClienteRiesgoAbandono[]>('/insights/riesgo-abandono'),
   cuentasPorCobrar: () => api.get<ClienteCuentaPorCobrar[]>('/insights/cuentas-por-cobrar'),
