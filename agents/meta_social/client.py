@@ -12,6 +12,7 @@ does not.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -23,7 +24,18 @@ from core.entities.metrica_publicacion import MetricasPost
 from core.entities.post_red_social import PostRedSocial
 
 _GRAPH_API_BASE = "https://graph.facebook.com/v21.0"
-_REQUEST_TIMEOUT_SECONDS = 15
+_REQUEST_TIMEOUT_SECONDS = 25
+_INTENTOS = 2
+_log = logging.getLogger(__name__)
+
+
+def _error_meta(response: requests.Response) -> str:
+    """Meta's own error code/message (never the request URL, which carries the token)."""
+    try:
+        error = response.json().get("error", {})
+        return f"code={error.get('code')} {str(error.get('message', ''))[:200]}"
+    except ValueError:
+        return "(sin detalle)"
 _SIN_TEXTO = "(sin texto)"
 
 
@@ -64,14 +76,32 @@ class MetaGraphSocialMediaReader:
         params: dict[str, str | int] = {"fields": fields, "access_token": token}
         if limite is not None:
             params["limit"] = limite
-        response = requests.get(
-            f"{_GRAPH_API_BASE}/{path}",
-            params=params,
-            timeout=_REQUEST_TIMEOUT_SECONDS,
-        )
-        response.raise_for_status()
-        result: dict[str, Any] = response.json()
-        return result
+        # Meta's Graph API fails transiently (timeouts, 5xx, "reduce the amount
+        # of data") — one retry turns most of those into a normal answer.
+        for intento in range(_INTENTOS):
+            ultimo = intento == _INTENTOS - 1
+            try:
+                response = requests.get(
+                    f"{_GRAPH_API_BASE}/{path}",
+                    params=params,
+                    timeout=_REQUEST_TIMEOUT_SECONDS,
+                )
+                response.raise_for_status()
+            except (requests.Timeout, requests.ConnectionError):
+                _log.warning("Meta Graph %s: sin respuesta (intento %s)", path, intento + 1)
+                if ultimo:
+                    raise
+            except requests.HTTPError as exc:
+                fallo = exc.response
+                codigo = fallo.status_code if fallo is not None else 0
+                detalle = _error_meta(fallo) if fallo is not None else "(sin detalle)"
+                _log.warning("Meta Graph %s respondió %s: %s", path, codigo, detalle)
+                if ultimo or not (codigo >= 500 or codigo == 429):
+                    raise
+            else:
+                result: dict[str, Any] = response.json()
+                return result
+        raise AssertionError("unreachable")  # pragma: no cover
 
     def metricas_post(self, canal: CanalPublicacion, post_id: str) -> MetricasPost:
         if canal is CanalPublicacion.FACEBOOK:

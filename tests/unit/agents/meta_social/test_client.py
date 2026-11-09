@@ -217,3 +217,30 @@ def test_metricas_facebook_treats_a_missing_shares_field_as_zero_shares() -> Non
     assert m.reacciones == 40 and m.comentarios == 4
     assert m.compartidos == 0  # Meta omits `shares` when nobody shared it
     assert m.alcance is None
+
+
+def test_transient_meta_failure_is_retried_once() -> None:
+    import requests
+
+    ok = MagicMock()
+    ok.json.return_value = {"data": []}
+    reader = MetaGraphSocialMediaReader(_settings())
+
+    with patch(
+        "agents.meta_social.client.requests.get", side_effect=[requests.Timeout(), ok]
+    ) as get:
+        assert reader._get("pagina/posts", fields="id", token="t") == {"data": []}
+
+    assert get.call_count == 2
+
+
+def test_a_second_timeout_is_raised() -> None:
+    import requests
+
+    reader = MetaGraphSocialMediaReader(_settings())
+
+    with (
+        patch("agents.meta_social.client.requests.get", side_effect=requests.Timeout()),
+        pytest.raises(requests.Timeout),
+    ):
+        reader._get("pagina/posts", fields="id", token="t")
