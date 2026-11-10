@@ -8,6 +8,7 @@ only needs one import to register every table on `Base.metadata`.
 
 from __future__ import annotations
 
+from database.models.chart import ChartCanalModel, ChartSnapshotModel, ChartVideoModel
 from database.models.client import ClientModel
 from database.models.destino_publicacion import DestinoPublicacionModel
 from database.models.gasto import GastoModel
@@ -24,6 +25,9 @@ from database.models.source import SourceModel
 from database.models.user import UserModel
 
 __all__ = [
+    "ChartCanalModel",
+    "ChartSnapshotModel",
+    "ChartVideoModel",
     "ClientModel",
     "DestinoPublicacionModel",
     "GastoModel",

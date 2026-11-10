@@ -29,7 +29,8 @@ from agents.radar.google_news_source_resolver import GoogleNewsSourceResolver
 from agents.radar.http_redirect_source_resolver import HttpRedirectSourceResolver
 from agents.storage.local_disk import LocalDiskMediaStorage
 from agents.wordpress.client import WordPressCMSPublisher
-from config.settings import get_settings
+from agents.youtube.client import YouTubeDataApiReader
+from config.settings import Settings, get_settings
 from core.entities.ai_configuracion import ProveedorIA
 from core.entities.session import Session as SessionEntity
 from core.entities.source import Source
@@ -43,6 +44,7 @@ from core.ports.media_storage import MediaStorage
 from core.ports.password_hasher import PasswordHasher
 from core.ports.portada_renderer import PortadaRenderer
 from core.ports.social_media_reader import SocialMediaReader
+from core.ports.youtube_reader import YouTubeReader
 from core.ports.source_resolver import SourceResolver
 from core.ports.unit_of_work import UnitOfWork
 from database.engine import get_session_factory
@@ -152,6 +154,21 @@ def get_social_media_reader() -> SocialMediaReader:
     uses for `WordPressCMSPublisher`.
     """
     return MetaGraphSocialMediaReader(get_settings())
+
+
+def get_settings_dep() -> Settings:
+    """Expose the settings to routes that only need to read a flag from them."""
+    return get_settings()
+
+
+def get_youtube_reader() -> YouTubeReader:
+    """Return the YouTube reader for the Chart Vallenato.
+
+    Raises `agents.youtube.client.YouTubeConfigurationError` (a 503 via
+    `app.api.errors`) when `YOUTUBE_API_KEY` is not set — same convention as
+    `get_social_media_reader`.
+    """
+    return YouTubeDataApiReader(get_settings())
 
 
 def get_source_resolver() -> SourceResolver:

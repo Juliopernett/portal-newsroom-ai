@@ -24,6 +24,7 @@ from app.api.errors import register_exception_handlers
 from app.api.routers import (
     ai_configuracion,
     auth,
+    chart,
     clients,
     dashboard,
     discovery,
@@ -57,6 +58,8 @@ register_exception_handlers(app)
 
 app.include_router(ai_configuracion.router)
 app.include_router(auth.router)
+app.include_router(chart.router)
+app.include_router(chart.router_publico)
 app.include_router(clients.router)
 app.include_router(dashboard.router)
 app.include_router(discovery.router)

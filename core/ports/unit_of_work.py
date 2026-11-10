@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from types import TracebackType
 
 from core.ports.ai_configuracion_repository import AIConfiguracionRepository
+from core.ports.chart_repository import ChartRepository
 from core.ports.client_repository import ClientRepository
 from core.ports.destino_publicacion_repository import DestinoPublicacionRepository
 from core.ports.gasto_repository import GastoRepository
@@ -55,6 +56,7 @@ class UnitOfWork(ABC):
     ai_configuracion: AIConfiguracionRepository
     informe_links: InformeLinkRepository
     metricas_publicacion: MetricaPublicacionRepository
+    chart: ChartRepository
     users: UserRepository
     sessions: SessionRepository
     news_candidates: NewsCandidateRepository

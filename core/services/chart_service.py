@@ -1,0 +1,239 @@
+"""Chart Vallenato: ranking by views gained and the daily collector.
+
+Pure ranking (`calcular_chart`) plus an orchestrating collector
+(`recolectar_chart`). The ranking only uses snapshots handed to it — it never
+touches a repository or the network — so every rule below is unit-tested
+without fakes beyond plain data.
+
+Rules (agreed with the owner, 2026-11-10):
+- Ranked by **views gained over the last 7 days** = latest snapshot minus the
+  one from ~7 days ago. With less history (3 to 6 days) the gain is scaled up
+  to 7 days and the row is flagged `parcial`; under 3 days a video is not
+  ranked yet (a figure from one or two days is mostly noise).
+- Excluded videos never appear. Pinned videos are forced to their position.
+- The trend arrow compares with the ranking as it stood 7 days earlier; when
+  there is no earlier ranking at all (the chart's first weeks) the trend is
+  unknown (`None`), never claimed as "new".
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field, replace
+from datetime import UTC, date, datetime, timedelta
+from enum import StrEnum
+
+from core.entities.chart import SnapshotVistas, VideoChart
+from core.ports.unit_of_work import UnitOfWork
+from core.ports.youtube_reader import YouTubeError, YouTubeReader
+
+DIAS_VENTANA = 7
+MIN_DIAS_HISTORIAL = 3
+MAX_DIAS_SNAPSHOT_VIEJO = 2  # latest snapshot must be this recent, else the video is stale
+TOP_POR_DEFECTO = 10
+VENTANA_DESCUBRIMIENTO_DIAS = 120
+_LOTE_ESTADISTICAS = 50
+
+
+class Tendencia(StrEnum):
+    SUBE = "sube"
+    BAJA = "baja"
+    IGUAL = "igual"
+    NUEVO = "nuevo"
+
+
+@dataclass(frozen=True, slots=True)
+class PosicionChart:
+    posicion: int
+    video: VideoChart
+    vistas_semana: int
+    vistas_totales: int
+    tendencia: Tendencia | None
+    posicion_anterior: int | None
+    fijado: bool
+    parcial: bool
+
+
+def _vistas_ganadas(
+    snaps: list[SnapshotVistas], hoy: date, dias: int
+) -> tuple[int, int, bool] | None:
+    """Return (views gained normalized to `dias`, total views, parcial) or None."""
+    validos = sorted((s for s in snaps if s.fecha <= hoy), key=lambda s: s.fecha)
+    if not validos:
+        return None
+    ultimo = validos[-1]
+    if (hoy - ultimo.fecha).days > MAX_DIAS_SNAPSHOT_VIEJO:
+        return None
+    base = None
+    for s in validos:
+        if s.fecha <= ultimo.fecha - timedelta(days=dias):
+            base = s
+    parcial = False
+    if base is None:
+        base = validos[0]
+        parcial = True
+    dias_reales = (ultimo.fecha - base.fecha).days
+    if dias_reales < MIN_DIAS_HISTORIAL:
+        return None
+    ganadas = max(0, ultimo.vistas - base.vistas)
+    if parcial:
+        ganadas = round(ganadas * dias / dias_reales)
+    return ganadas, ultimo.vistas, parcial
+
+
+def _ranking_base(
+    videos: list[VideoChart],
+    snapshots: dict[str, list[SnapshotVistas]],
+    hoy: date,
+    dias: int,
+) -> list[tuple[VideoChart, int, int, bool]]:
+    filas: list[tuple[VideoChart, int, int, bool]] = []
+    for v in videos:
+        if v.excluido:
+            continue
+        r = _vistas_ganadas(snapshots.get(v.video_id, []), hoy, dias)
+        if r is None:
+            continue
+        filas.append((v, r[0], r[1], r[2]))
+    filas.sort(key=lambda f: (-f[1], -f[2], f[0].titulo.lower()))
+    return filas
+
+
+def calcular_chart(
+    videos: list[VideoChart],
+    snapshots: dict[str, list[SnapshotVistas]],
+    hoy: date,
+    *,
+    top: int = TOP_POR_DEFECTO,
+    dias: int = DIAS_VENTANA,
+) -> list[PosicionChart]:
+    """Return the chart for `hoy`: pinned videos in place, the rest by views gained."""
+    actual = _ranking_base(videos, snapshots, hoy, dias)
+    anterior = _ranking_base(videos, snapshots, hoy - timedelta(days=dias), dias)
+    pos_anterior = {f[0].video_id: i + 1 for i, f in enumerate(anterior)}
+
+    datos = {f[0].video_id: f for f in actual}
+    por_posicion = {
+        v.fijado_posicion: v for v in videos if not v.excluido and v.fijado_posicion is not None
+    }
+    libres = iter(f for f in actual if f[0].fijado_posicion is None)
+
+    ordenados: list[tuple[VideoChart, int, int, bool, bool]] = []
+    posicion = 1
+    while len(ordenados) < top:
+        fijado = por_posicion.get(posicion)
+        if fijado is not None:
+            f = datos.get(fijado.video_id)
+            ordenados.append(
+                (fijado, f[1] if f else 0, f[2] if f else 0, f[3] if f else False, True)
+            )
+        else:
+            siguiente = next(libres, None)
+            if siguiente is None:
+                if any(p > posicion for p in por_posicion):
+                    posicion += 1  # keep a hole-free chart: skip ahead to the next pin
+                    continue
+                break
+            ordenados.append((siguiente[0], siguiente[1], siguiente[2], siguiente[3], False))
+        posicion += 1
+
+    resultado: list[PosicionChart] = []
+    hay_historial = bool(anterior)
+    for i, (v, ganadas, total, parcial, fijado_) in enumerate(ordenados, start=1):
+        previa = pos_anterior.get(v.video_id)
+        tendencia: Tendencia | None
+        if not hay_historial:
+            tendencia = None
+        elif previa is None:
+            tendencia = Tendencia.NUEVO
+        elif previa > i:
+            tendencia = Tendencia.SUBE
+        elif previa < i:
+            tendencia = Tendencia.BAJA
+        else:
+            tendencia = Tendencia.IGUAL
+        resultado.append(
+            PosicionChart(
+                posicion=i,
+                video=v,
+                vistas_semana=ganadas,
+                vistas_totales=total,
+                tendencia=tendencia,
+                posicion_anterior=previa,
+                fijado=fijado_,
+                parcial=parcial,
+            )
+        )
+    return resultado
+
+
+@dataclass(slots=True)
+class ResultadoRecoleccion:
+    canales_ok: int = 0
+    canales_con_error: list[str] = field(default_factory=list)
+    videos_nuevos: int = 0
+    videos_seguidos: int = 0
+    snapshots: int = 0
+    error_estadisticas: str | None = None
+
+
+def recolectar_chart(
+    uow: UnitOfWork, reader: YouTubeReader, hoy: date | None = None
+) -> ResultadoRecoleccion:
+    """Discover new uploads of every active channel and save today's view counts.
+
+    Idempotent within a day (one snapshot per video per day). A failing
+    channel is reported and skipped — it never aborts the rest. Editor
+    decisions (`excluido`, `fijado_posicion`, `manual`) survive re-discovery.
+    """
+    hoy = hoy or datetime.now(UTC).date()
+    desde = datetime.combine(hoy, datetime.min.time(), tzinfo=UTC) - timedelta(
+        days=VENTANA_DESCUBRIMIENTO_DIAS
+    )
+    res = ResultadoRecoleccion()
+
+    for canal in uow.chart.list_canales(solo_activos=True):
+        try:
+            encontrados = reader.videos_recientes(canal.canal_id, desde=desde)
+        except YouTubeError as exc:
+            res.canales_con_error.append(f"{canal.nombre}: {exc}")
+            continue
+        res.canales_ok += 1
+        for yt in encontrados:
+            existente = uow.chart.get_video(yt.video_id)
+            nuevo = VideoChart(
+                video_id=yt.video_id,
+                canal_id=yt.canal_id,
+                titulo=yt.titulo,
+                artista=canal.artista,
+                publicado_en=yt.publicado_en,
+                miniatura_url=yt.miniatura_url,
+            )
+            if existente is None:
+                res.videos_nuevos += 1
+                uow.chart.save_video(nuevo)
+            else:
+                uow.chart.save_video(
+                    replace(
+                        nuevo,
+                        artista=existente.artista or canal.artista,
+                        excluido=existente.excluido,
+                        fijado_posicion=existente.fijado_posicion,
+                        manual=existente.manual,
+                    )
+                )
+
+    seguidos = [v for v in uow.chart.list_videos() if v.manual or _aware(v.publicado_en) >= desde]
+    res.videos_seguidos = len(seguidos)
+    ids = [v.video_id for v in seguidos]
+    try:
+        for i in range(0, len(ids), _LOTE_ESTADISTICAS):
+            for vid, n in reader.estadisticas(ids[i : i + _LOTE_ESTADISTICAS]).items():
+                uow.chart.save_snapshot(SnapshotVistas(video_id=vid, fecha=hoy, vistas=n))
+                res.snapshots += 1
+    except YouTubeError as exc:
+        res.error_estadisticas = str(exc)
+    return res
+
+
+def _aware(valor: datetime) -> datetime:
+    return valor if valor.tzinfo is not None else valor.replace(tzinfo=UTC)

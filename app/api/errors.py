@@ -15,6 +15,8 @@ from sqlalchemy.exc import IntegrityError
 
 from agents.meta_social.client import MetaGraphConfigurationError
 from agents.wordpress.client import WordPressConfigurationError
+from agents.youtube.client import YouTubeConfigurationError
+from core.ports.youtube_reader import YouTubeError
 from shared.logger import get_logger
 
 logger = get_logger(__name__)
@@ -49,6 +51,18 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         """Meta Graph API credentials are not set in `.env` yet (see agents.meta_social)."""
         return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+    @app.exception_handler(YouTubeConfigurationError)
+    async def handle_youtube_configuration_error(
+        _request: Request, exc: YouTubeConfigurationError
+    ) -> JSONResponse:
+        """`YOUTUBE_API_KEY` is not set yet (see agents.youtube)."""
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+    @app.exception_handler(YouTubeError)
+    async def handle_youtube_error(_request: Request, exc: YouTubeError) -> JSONResponse:
+        """A YouTube call failed (quota, rejected key, outage): safe, readable message."""
+        return JSONResponse(status_code=502, content={"detail": str(exc)})
 
     @app.exception_handler(requests.RequestException)
     async def handle_external_request_error(

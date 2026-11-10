@@ -30,7 +30,9 @@ from app.api.dependencies import (
     get_social_media_reader,
     get_source_resolver,
     get_unit_of_work,
+    get_youtube_reader,
 )
+from agents.youtube.fake_reader import FakeYouTubeReader
 from app.api.main import app
 from core.entities.user import User
 from database.base import Base
@@ -88,6 +90,8 @@ def unauthenticated_client(_test_engine: Engine) -> Iterator[TestClient]:
     # which exist in the test environment, so every test gets the demo
     # reader instead of a 503.
     app.dependency_overrides[get_social_media_reader] = lambda: FakeSocialMediaReader()
+    # No YOUTUBE_API_KEY in tests: the Chart Vallenato gets the [DEMO] reader.
+    app.dependency_overrides[get_youtube_reader] = lambda: FakeYouTubeReader()
     # No ANTHROPIC_API_KEY in the test environment either — every test gets
     # a canned successful AI response by default (see agents.ai.fake_provider);
     # a test exercising the AI-failure path overrides this again with

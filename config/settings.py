@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     meta_page_id: str | None = None
     meta_instagram_business_account_id: str | None = None
 
+    # --- YouTube Data API v3 (Chart Vallenato). A plain API key restricted to
+    # "YouTube Data API v3" in Google Cloud — see agents/youtube/client.py. ---
+    youtube_api_key: str | None = None
+
     # --- Media storage (MediaAsset — see docs/adr/ADR-007-media-assets.md) ---
     # `media_storage_dir` points at a Railway Volume in production; a
     # plain local directory otherwise (see `agents/storage/local_disk.py`).

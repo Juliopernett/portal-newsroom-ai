@@ -1,0 +1,48 @@
+"""Port for reading public data from YouTube (read-only, never uploads)."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Protocol
+
+
+class YouTubeError(RuntimeError):
+    """A YouTube request failed or the reference could not be resolved."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class VideoYouTube:
+    video_id: str
+    canal_id: str
+    titulo: str
+    publicado_en: datetime
+    miniatura_url: str | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CanalResuelto:
+    canal_id: str
+    nombre: str
+
+
+class YouTubeReader(Protocol):
+    """Contract for the few YouTube lookups the chart needs."""
+
+    def resolver_canal(self, referencia: str) -> CanalResuelto:
+        """Resolve a channel URL, `@handle` or `UC…` id to its id and name."""
+        ...
+
+    def videos_recientes(
+        self, canal_id: str, *, desde: datetime, maximo: int = 50
+    ) -> list[VideoYouTube]:
+        """Return the channel's uploads published on/after `desde`, newest first."""
+        ...
+
+    def obtener_video(self, referencia: str) -> VideoYouTube:
+        """Resolve a video URL or id (for videos added by hand)."""
+        ...
+
+    def estadisticas(self, video_ids: list[str]) -> dict[str, int]:
+        """Return the current total view count per video (missing ids omitted)."""
+        ...

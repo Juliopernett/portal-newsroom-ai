@@ -15,6 +15,7 @@ from core.ports.unit_of_work import UnitOfWork
 from database.repositories.ai_configuracion_repository import (
     SqlAlchemyAIConfiguracionRepository,
 )
+from database.repositories.chart_repository import SqlAlchemyChartRepository
 from database.repositories.client_repository import SqlAlchemyClientRepository
 from database.repositories.destino_publicacion_repository import (
     SqlAlchemyDestinoPublicacionRepository,
@@ -63,6 +64,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.ai_configuracion = SqlAlchemyAIConfiguracionRepository(self._session)
         self.informe_links = SqlAlchemyInformeLinkRepository(self._session)
         self.metricas_publicacion = SqlAlchemyMetricaPublicacionRepository(self._session)
+        self.chart = SqlAlchemyChartRepository(self._session)
         self.users = SqlAlchemyUserRepository(self._session)
         self.sessions = SqlAlchemySessionRepository(self._session)
         self.news_candidates = SqlAlchemyNewsCandidateRepository(self._session)
