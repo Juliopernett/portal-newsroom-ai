@@ -87,7 +87,13 @@ app.include_router(social.router)
 # always reach a router (a CSV download, a media file stream: both opened
 # via `target="_blank"`, which is *also* a full-page `text/html` request,
 # so Accept alone can't tell them apart from a page visit).
-_ALWAYS_BACKEND_PREFIXES = ("/publication-requests", "/docs", "/redoc", "/openapi.json")
+_ALWAYS_BACKEND_PREFIXES = (
+    "/publication-requests",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/chart-vallenato/embed",
+)
 _HAS_FILE_EXTENSION = re.compile(r"\.[A-Za-z0-9]{2,5}$")
 
 # Baseline security headers on every response (security audit 2026-08-20,
@@ -117,12 +123,21 @@ _CSP = (
     "frame-ancestors 'none'"
 )
 _NO_CSP_PREFIXES = ("/docs", "/redoc", "/openapi.json")
+# The only page meant to be framed by other websites (the Chart Vallenato
+# card). It is server-rendered, has no script and sets its own CSP.
+_EMBEBIBLE_PREFIX = "/chart-vallenato/embed"
 
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next) -> Response:
     response = await call_next(request)
     response.headers.update(_SECURITY_HEADERS)
+    if request.url.path.startswith(_EMBEBIBLE_PREFIX):
+        # Framing is the whole point here; the route sets its own CSP
+        # (no script, `frame-ancestors *`).
+        del response.headers["X-Frame-Options"]
+        response.headers.append("Vary", "Accept")
+        return response
     # `/gastos` and `/reportes` are both a React page AND a JSON API on the
     # same URL, told apart only by `Accept`. Without `Vary: Accept` the
     # browser cache can answer the page's own data request with the cached

@@ -68,7 +68,9 @@ def test_only_one_video_per_pinned_position(client: TestClient) -> None:
 
     client.patch(f"/chart-vallenato/videos/{b}", json={"fijar_en": 2})
 
-    estado = {v["video_id"]: v["fijado_posicion"] for v in client.get("/chart-vallenato").json()["videos"]}
+    estado = {
+        v["video_id"]: v["fijado_posicion"] for v in client.get("/chart-vallenato").json()["videos"]
+    }
     assert estado[b] == 2 and estado[a] is None
 
 
@@ -122,7 +124,6 @@ def test_admin_routes_require_login(unauthenticated_client: TestClient) -> None:
     assert unauthenticated_client.post("/chart-vallenato/recolectar").status_code == 401
 
 
-
 def test_collection_stores_the_duration_and_flags_shorts(client: TestClient) -> None:
     from app.api.dependencies import get_unit_of_work
     from app.api.main import app
@@ -144,3 +145,57 @@ def test_collection_stores_the_duration_and_flags_shorts(client: TestClient) -> 
     uow.commit()
     estado = {v["video_id"]: v for v in client.get("/chart-vallenato").json()["videos"]}
     assert estado[videos[0]["video_id"]]["es_short"] is True
+
+
+def test_embed_can_be_framed_and_always_carries_the_credit(
+    unauthenticated_client: TestClient,
+) -> None:
+    r = unauthenticated_client.get("/chart-vallenato/embed")
+
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    assert "x-frame-options" not in r.headers
+    assert "frame-ancestors *" in r.headers["content-security-policy"]
+    assert "script-src" not in r.headers["content-security-policy"]
+    assert "un producto de" in r.text
+    assert 'href="https://portalvallenato.com/chart-vallenato/"' in r.text
+
+
+def test_the_rest_of_the_app_still_refuses_to_be_framed(
+    unauthenticated_client: TestClient,
+) -> None:
+    r = unauthenticated_client.get("/chart-vallenato/publico.json")
+
+    assert r.headers["x-frame-options"] == "DENY"
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+
+
+def test_embed_validates_the_row_count(unauthenticated_client: TestClient) -> None:
+    assert unauthenticated_client.get("/chart-vallenato/embed?n=2").status_code == 422
+    assert unauthenticated_client.get("/chart-vallenato/embed?n=5").status_code == 200
+
+
+def test_embed_escapes_titles_and_urls() -> None:
+    from app.api.routers.chart import _html_embed
+    from app.api.schemas.chart import FilaChartOut
+
+    fila = FilaChartOut(
+        posicion=1,
+        video_id="x",
+        titulo='<script>alert(1)</script> "tema"',
+        artista="A & B",
+        miniatura_url='https://i.ytimg.com/x.jpg" onerror="alert(1)',
+        url="https://youtu.be/x",
+        vistas_semana=10,
+        vistas_totales=20,
+        tendencia="sube",
+        posicion_anterior=2,
+        fijado=False,
+        parcial=False,
+    )
+
+    salida = _html_embed([fila], None)
+
+    assert "<script>alert" not in salida
+    assert "&lt;script&gt;" in salida and "A &amp; B" in salida
+    assert 'onerror="alert' not in salida

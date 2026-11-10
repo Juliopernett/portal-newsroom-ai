@@ -9,10 +9,12 @@ public data (titles, positions, public view counts).
 
 from __future__ import annotations
 
+import html
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import HTMLResponse
 
 from app.api.dependencies import (
     get_current_user,
@@ -258,3 +260,89 @@ def chart_publico(
     )
     response.headers["Vary"] = "Origin"
     return ChartPublicoOut(actualizado=ultimo, filas=[_fila(p) for p in filas])
+
+
+_URL_PAGINA_CHART = "https://portalvallenato.com/chart-vallenato/"
+_CSP_EMBED = (
+    "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; frame-ancestors *"
+)
+_FLECHAS = {
+    "sube": ("▲", "#1a9d4a"),
+    "baja": ("▼", "#d33a2c"),
+    "igual": ("=", "#8a97a6"),
+    "nuevo": ("NEW", "#e0a100"),
+}
+_CSS_EMBED = (
+    "body{margin:0;font-family:Roboto,Arial,sans-serif;background:#fff;color:#1c2733}"
+    ".t{margin:0;padding:10px 12px;background:#3B5998;color:#fff;font-weight:700;text-transform:uppercase;"  # noqa: E501
+    "letter-spacing:-.5px;font-size:16px}.t small{display:block;font-weight:400;text-transform:none;"  # noqa: E501
+    "letter-spacing:0;font-size:12px;opacity:.85;margin-top:2px}"
+    "ol{list-style:none;margin:0;padding:0}li{border-top:1px solid #e3e8ef}"
+    "a{color:inherit;text-decoration:none}li a{display:flex;align-items:center;gap:8px;padding:8px 10px}"  # noqa: E501
+    "li a:hover{background:#f2f6fb}.n{flex:0 0 26px;text-align:center;font-weight:700;font-size:18px;color:#3B5998}"  # noqa: E501
+    ".i{flex:0 0 56px;height:42px;object-fit:cover;background:#dde3ec}.x{flex:1;min-width:0}"
+    ".s{display:block;font-weight:600;font-size:13px;line-height:1.25}"
+    ".a{display:block;font-size:12px;color:#5c6b7a;margin-top:2px}"
+    ".d{flex:0 0 30px;text-align:center;font-size:13px;font-weight:700}"
+    ".v{padding:16px 12px;font-size:13px;color:#5c6b7a}"
+    ".f{padding:8px 12px;font-size:11px;color:#5c6b7a;border-top:1px solid #e3e8ef;background:#f7f9fc}"  # noqa: E501
+    ".f a{color:#3B5998;font-weight:700}"
+)
+
+
+def _html_embed(filas: list[FilaChartOut], actualizado: date | None) -> str:
+    e = html.escape
+    if filas:
+        items = []
+        for f in filas:
+            flecha = _FLECHAS.get(f.tendencia or "")
+            miniatura = (
+                f'<img class="i" src="{e(f.miniatura_url, quote=True)}" alt="" loading="lazy">'
+                if f.miniatura_url
+                else ""
+            )
+            artista = f'<span class="a">{e(f.artista)}</span>' if f.artista else ""
+            dir_ = f'<span class="d" style="color:{flecha[1]}">{flecha[0]}</span>' if flecha else ""
+            items.append(
+                f'<li><a href="{e(f.url, quote=True)}" target="_blank" rel="noopener nofollow">'
+                f'<span class="n">{f.posicion}</span>{miniatura}'
+                f'<span class="x"><span class="s">{e(f.titulo)}</span>{artista}</span>{dir_}</a></li>'  # noqa: E501
+            )
+        cuerpo = "<ol>" + "".join(items) + "</ol>"
+    else:
+        cuerpo = (
+            '<div class="v">El ranking aparece cuando haya al menos tres días de mediciones.</div>'
+        )
+    fecha = f" · actualizado {actualizado.isoformat()}" if actualizado else ""
+    return (
+        '<!doctype html><html lang="es"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        "<title>Chart Vallenato</title>"
+        f"<style>{_CSS_EMBED}</style></head><body>"
+        '<h1 class="t">Chart Vallenato<small>Lo más escuchado de la semana en YouTube</small></h1>'
+        f"{cuerpo}"
+        f'<div class="f">Chart Vallenato · un producto de '
+        f'<a href="{_URL_PAGINA_CHART}" target="_blank" rel="noopener">www.portalvallenato.com</a>'
+        f"{e(fecha)}</div></body></html>"
+    )
+
+
+@router_publico.get("/embed", response_class=HTMLResponse)
+def chart_embed(
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    n: int = Query(default=10, ge=3, le=10, description="Cuántas posiciones mostrar"),
+) -> HTMLResponse:
+    """The chart as a ready-made card other websites can put in an `<iframe>`.
+
+    Server-rendered (no script), always carries the credit "un producto de
+    www.portalvallenato.com" with a link back, and is the only route that
+    allows being framed (see `app.api.main.add_security_headers`).
+    """
+    _, filas, ultimo, _ = _calcular(uow)
+    return HTMLResponse(
+        _html_embed([_fila(p) for p in filas][:n], ultimo),
+        headers={
+            "Cache-Control": "public, max-age=900",
+            "Content-Security-Policy": _CSP_EMBED,
+        },
+    )
