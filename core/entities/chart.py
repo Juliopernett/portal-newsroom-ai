@@ -8,10 +8,21 @@ videos, so the weekly figure is a difference between two snapshots (see
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 
 MAX_POSICION_FIJADA = 20
+# YouTube does not flag Shorts in its API. A video this short, or one titled
+# with the #shorts hashtag, is treated as a Short and kept out of the chart
+# (a song is never under a minute; Shorts were the noise the owner reported).
+MAX_SEGUNDOS_SHORT = 60
+_HASHTAG_SHORT = re.compile(r"#shorts?(?![a-z])", re.IGNORECASE)
+# Clips uploaded without a real title: only a full date ("6 de noviembre de 2026"),
+# or only emojis/digits/punctuation. A song always has a name made of letters.
+_TITULO_SIN_NOMBRE = re.compile(
+    r"^\s*\d{1,2}\s+de\s+[^\W\d_]+\s+de\s+\d{4}\s*$|^[\W\d_]*$", re.IGNORECASE
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -46,6 +57,7 @@ class VideoChart:
     excluido: bool = False
     fijado_posicion: int | None = None
     manual: bool = False
+    duracion_segundos: int | None = None  # None = not known yet (or a live stream)
 
     def __post_init__(self) -> None:
         if not self.video_id.strip():
@@ -54,6 +66,17 @@ class VideoChart:
             1 <= self.fijado_posicion <= MAX_POSICION_FIJADA
         ):
             raise ValueError(f"fijado_posicion must be between 1 and {MAX_POSICION_FIJADA}")
+
+    @property
+    def es_short(self) -> bool:
+        """Whether this is a Short or a clip rather than a song.
+
+        True for: tagged #shorts, 60 s or less, or a title that is only a date
+        or only emojis. (The name stays `es_short` for the API; it covers clips.)
+        """
+        if _HASHTAG_SHORT.search(self.titulo) or _TITULO_SIN_NOMBRE.match(self.titulo):
+            return True
+        return self.duracion_segundos is not None and self.duracion_segundos <= MAX_SEGUNDOS_SHORT
 
     @property
     def url(self) -> str:

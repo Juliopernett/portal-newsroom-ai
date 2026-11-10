@@ -35,6 +35,7 @@ class ChartVideoModel(Base):
     excluido: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     fijado_posicion: Mapped[int | None] = mapped_column(Integer, nullable=True)
     manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    duracion_segundos: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class ChartSnapshotModel(Base):

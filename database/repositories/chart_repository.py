@@ -32,6 +32,7 @@ def _video(m: ChartVideoModel) -> VideoChart:
         excluido=m.excluido,
         fijado_posicion=m.fijado_posicion,
         manual=m.manual,
+        duracion_segundos=m.duracion_segundos,
     )
 
 
@@ -78,6 +79,7 @@ class SqlAlchemyChartRepository:
                 excluido=video.excluido,
                 fijado_posicion=video.fijado_posicion,
                 manual=video.manual,
+                duracion_segundos=video.duracion_segundos,
             )
         )
         self._session.flush()

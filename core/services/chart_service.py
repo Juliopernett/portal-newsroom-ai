@@ -88,8 +88,8 @@ def _ranking_base(
 ) -> list[tuple[VideoChart, int, int, bool]]:
     filas: list[tuple[VideoChart, int, int, bool]] = []
     for v in videos:
-        if v.excluido:
-            continue
+        if v.excluido or (v.es_short and v.fijado_posicion is None):
+            continue  # Shorts are not songs; a pin is the editor's explicit override
         r = _vistas_ganadas(snapshots.get(v.video_id, []), hoy, dias)
         if r is None:
             continue
@@ -219,17 +219,22 @@ def recolectar_chart(
                         excluido=existente.excluido,
                         fijado_posicion=existente.fijado_posicion,
                         manual=existente.manual,
+                        duracion_segundos=existente.duracion_segundos,
                     )
                 )
 
     seguidos = [v for v in uow.chart.list_videos() if v.manual or _aware(v.publicado_en) >= desde]
     res.videos_seguidos = len(seguidos)
-    ids = [v.video_id for v in seguidos]
+    por_id = {v.video_id: v for v in seguidos}
+    ids = list(por_id)
     try:
         for i in range(0, len(ids), _LOTE_ESTADISTICAS):
-            for vid, n in reader.estadisticas(ids[i : i + _LOTE_ESTADISTICAS]).items():
-                uow.chart.save_snapshot(SnapshotVistas(video_id=vid, fecha=hoy, vistas=n))
+            for vid, d in reader.detalles(ids[i : i + _LOTE_ESTADISTICAS]).items():
+                uow.chart.save_snapshot(SnapshotVistas(video_id=vid, fecha=hoy, vistas=d.vistas))
                 res.snapshots += 1
+                video = por_id[vid]
+                if d.duracion_segundos != video.duracion_segundos:
+                    uow.chart.save_video(replace(video, duracion_segundos=d.duracion_segundos))
     except YouTubeError as exc:
         res.error_estadisticas = str(exc)
     return res

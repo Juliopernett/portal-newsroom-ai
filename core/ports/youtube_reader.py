@@ -26,6 +26,14 @@ class CanalResuelto:
     nombre: str
 
 
+@dataclass(frozen=True, slots=True)
+class DetalleVideo:
+    """Current total views and length of one video."""
+
+    vistas: int
+    duracion_segundos: int | None  # None for live streams / unknown
+
+
 class YouTubeReader(Protocol):
     """Contract for the few YouTube lookups the chart needs."""
 
@@ -43,6 +51,6 @@ class YouTubeReader(Protocol):
         """Resolve a video URL or id (for videos added by hand)."""
         ...
 
-    def estadisticas(self, video_ids: list[str]) -> dict[str, int]:
-        """Return the current total view count per video (missing ids omitted)."""
+    def detalles(self, video_ids: list[str]) -> dict[str, DetalleVideo]:
+        """Return the current views and duration per video (missing ids omitted)."""
         ...

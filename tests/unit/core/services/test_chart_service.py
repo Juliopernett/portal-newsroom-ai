@@ -112,3 +112,52 @@ def test_trend_compares_with_the_ranking_a_week_earlier() -> None:
     assert chart["b"].tendencia is Tendencia.SUBE and chart["b"].posicion_anterior == 2
     assert chart["a"].tendencia is Tendencia.BAJA
     assert chart["n"].tendencia is Tendencia.NUEVO and chart["n"].posicion_anterior is None
+
+
+def test_shorts_are_kept_out_of_the_chart_by_length_or_hashtag() -> None:
+    videos = [
+        _video("cancion", duracion_segundos=215),
+        _video("corto", duracion_segundos=45),
+        VideoChart(
+            video_id="tag",
+            canal_id="UCx",
+            titulo="Adelanto #Shorts",
+            publicado_en=datetime(2026, 10, 1, tzinfo=UTC),
+            duracion_segundos=200,
+        ),
+    ]
+    snaps = {v.video_id: _snaps(v.video_id, {7: 0, 0: 9_000}) for v in videos}
+
+    assert [p.video.video_id for p in calcular_chart(videos, snaps, HOY)] == ["cancion"]
+
+
+def test_unknown_duration_is_not_treated_as_a_short() -> None:
+    video = _video("a")  # duracion_segundos=None until the next collection
+
+    assert video.es_short is False
+    chart = calcular_chart([video], {"a": _snaps("a", {7: 0, 0: 5_000})}, HOY)
+    assert len(chart) == 1
+
+
+def test_an_explicit_pin_overrides_the_short_filter() -> None:
+    video = _video("a", duracion_segundos=30, fijado_posicion=1)
+
+    chart = calcular_chart([video], {}, HOY)
+
+    assert [p.video.video_id for p in chart] == ["a"] and chart[0].fijado is True
+
+
+def test_clips_titled_only_with_a_date_or_emojis_are_not_songs() -> None:
+    def titulo(t: str) -> VideoChart:
+        return VideoChart(
+            video_id="x",
+            canal_id="UCx",
+            titulo=t,
+            publicado_en=datetime(2026, 10, 1, tzinfo=UTC),
+            duracion_segundos=200,
+        )
+
+    for sin_nombre in ("6 de noviembre de 2026", "🎶🪗", "❤️🙏🏻", "2026"):
+        assert titulo(sin_nombre).es_short is True, sin_nombre
+    for cancion in ("La Playita", "20 de julio", "31 de octubre", "De noviembre a diciembre", "Adelanto de mi canción"):
+        assert titulo(cancion).es_short is False, cancion

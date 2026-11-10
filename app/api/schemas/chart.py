@@ -33,6 +33,8 @@ class VideoSeguidoOut(BaseModel):
     url: str
     manual: bool
     excluido: bool
+    es_short: bool  # looks like a YouTube Short: kept out of the chart
+    duracion_segundos: int | None
     fijado_posicion: int | None
     vistas_semana: int | None  # None = not ranked yet (less than 3 days of history)
 

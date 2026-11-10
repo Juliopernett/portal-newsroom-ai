@@ -121,3 +121,26 @@ def test_admin_routes_require_login(unauthenticated_client: TestClient) -> None:
     assert unauthenticated_client.get("/chart-vallenato").status_code == 401
     assert unauthenticated_client.post("/chart-vallenato/recolectar").status_code == 401
 
+
+
+def test_collection_stores_the_duration_and_flags_shorts(client: TestClient) -> None:
+    from app.api.dependencies import get_unit_of_work
+    from app.api.main import app
+
+    _canal(client)
+    client.post("/chart-vallenato/recolectar")
+    videos = client.get("/chart-vallenato").json()["videos"]
+
+    # The demo reader gives every video a song-like length, so none is a Short.
+    assert all(v["duracion_segundos"] and not v["es_short"] for v in videos)
+
+    # A video later found to be 40 s long is flagged and dropped from the ranking.
+    from dataclasses import replace
+
+    gen = app.dependency_overrides[get_unit_of_work]()
+    uow = next(gen)
+    video = uow.chart.get_video(videos[0]["video_id"])
+    uow.chart.save_video(replace(video, duracion_segundos=40))
+    uow.commit()
+    estado = {v["video_id"]: v for v in client.get("/chart-vallenato").json()["videos"]}
+    assert estado[videos[0]["video_id"]]["es_short"] is True

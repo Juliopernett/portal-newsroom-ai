@@ -13,7 +13,7 @@ from typing import Any
 import requests
 
 from config.settings import Settings
-from core.ports.youtube_reader import CanalResuelto, VideoYouTube, YouTubeError
+from core.ports.youtube_reader import CanalResuelto, DetalleVideo, VideoYouTube, YouTubeError
 
 _API = "https://www.googleapis.com/youtube/v3"
 _TIMEOUT_SECONDS = 20
@@ -37,6 +37,19 @@ def _miniatura(snippet: dict[str, Any]) -> str | None:
             url = miniaturas[tamano].get("url")
             return str(url) if url else None
     return None
+
+
+_DURACION = re.compile(r"^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$")
+
+
+def _segundos(iso: str | None) -> int | None:
+    """Parse an ISO 8601 duration ("PT1M30S") to seconds; 0 / unknown → None (live streams)."""
+    m = _DURACION.match(iso or "")
+    if not m:
+        return None
+    d, h, mi, s = (int(x or 0) for x in m.groups())
+    total = d * 86400 + h * 3600 + mi * 60 + s
+    return total or None
 
 
 def _id_de_video(referencia: str) -> str:
@@ -159,12 +172,17 @@ class YouTubeDataApiReader:
             miniatura_url=_miniatura(snippet),
         )
 
-    def estadisticas(self, video_ids: list[str]) -> dict[str, int]:
+    def detalles(self, video_ids: list[str]) -> dict[str, DetalleVideo]:
         if not video_ids:
             return {}
-        datos = self._get("videos", part="statistics", id=",".join(video_ids[:50]))
+        datos = self._get(
+            "videos", part="statistics,contentDetails", id=",".join(video_ids[:50])
+        )
         return {
-            item["id"]: int(item["statistics"]["viewCount"])
+            item["id"]: DetalleVideo(
+                vistas=int(item["statistics"]["viewCount"]),
+                duracion_segundos=_segundos(item.get("contentDetails", {}).get("duration")),
+            )
             for item in datos.get("items", [])
             if "viewCount" in item.get("statistics", {})
         }

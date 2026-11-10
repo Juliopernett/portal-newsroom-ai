@@ -22,6 +22,8 @@ export interface VideoSeguido {
   url: string
   manual: boolean
   excluido: boolean
+  es_short: boolean
+  duracion_segundos: number | null
   fijado_posicion: number | null
   vistas_semana: number | null
 }

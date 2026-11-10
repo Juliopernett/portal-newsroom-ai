@@ -179,6 +179,7 @@ export function ChartPanel() {
                   {v.manual ? ' · manual' : ''}
                   {v.vistas_semana != null ? ` · +${num(v.vistas_semana)} semana` : ' · sin medir aún'}
                   {v.excluido ? ' · EXCLUIDO' : ''}
+                  {v.es_short && v.fijado_posicion == null ? ' · Short/clip (omitido)' : ''}
                   {v.fijado_posicion ? ` · fijado en #${v.fijado_posicion}` : ''}
                 </p>
               </div>

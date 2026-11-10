@@ -106,6 +106,8 @@ def obtener_chart(
                 url=v.url,
                 manual=v.manual,
                 excluido=v.excluido,
+                es_short=v.es_short,
+                duracion_segundos=v.duracion_segundos,
                 fijado_posicion=v.fijado_posicion,
                 vistas_semana=r[0] if r else None,
             )
@@ -197,6 +199,8 @@ def agregar_video_manual(
         url=video.url,
         manual=True,
         excluido=False,
+        es_short=video.es_short,
+        duracion_segundos=video.duracion_segundos,
         fijado_posicion=None,
         vistas_semana=None,
     )
@@ -234,6 +238,8 @@ def decidir_video(
         url=video.url,
         manual=video.manual,
         excluido=video.excluido,
+        es_short=video.es_short,
+        duracion_segundos=video.duracion_segundos,
         fijado_posicion=video.fijado_posicion,
         vistas_semana=None,
     )

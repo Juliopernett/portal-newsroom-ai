@@ -11,7 +11,7 @@ from __future__ import annotations
 import zlib
 from datetime import UTC, date, datetime, timedelta
 
-from core.ports.youtube_reader import CanalResuelto, VideoYouTube, YouTubeError
+from core.ports.youtube_reader import CanalResuelto, DetalleVideo, VideoYouTube, YouTubeError
 
 
 def _n(texto: str, modulo: int) -> int:
@@ -61,8 +61,11 @@ class FakeYouTubeReader:
             publicado_en=datetime.now(UTC) - timedelta(days=5),
         )
 
-    def estadisticas(self, video_ids: list[str]) -> dict[str, int]:
+    def detalles(self, video_ids: list[str]) -> dict[str, DetalleVideo]:
         return {
-            vid: 50_000 + _n(vid, 400_000) + self._dia() * (200 + _n(vid, 3_000))
+            vid: DetalleVideo(
+                vistas=50_000 + _n(vid, 400_000) + self._dia() * (200 + _n(vid, 3_000)),
+                duracion_segundos=200 + _n(vid, 120),
+            )
             for vid in video_ids
         }

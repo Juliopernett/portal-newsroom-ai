@@ -67,10 +67,34 @@ def test_recent_videos_come_from_the_uploads_playlist_and_skip_old_and_private()
     assert get.call_args.kwargs["params"]["playlistId"] == "UU" + "a" * 22
 
 
-def test_statistics_returns_view_counts_as_ints() -> None:
-    body = {"items": [{"id": "AAAAAAAAAAA", "statistics": {"viewCount": "12345"}}, {"id": "x", "statistics": {}}]}
+def test_details_return_views_and_duration_in_seconds() -> None:
+    body = {
+        "items": [
+            {
+                "id": "AAAAAAAAAAA",
+                "statistics": {"viewCount": "12345"},
+                "contentDetails": {"duration": "PT3M25S"},
+            },
+            {
+                "id": "SHORTSSSSSS",
+                "statistics": {"viewCount": "9"},
+                "contentDetails": {"duration": "PT45S"},
+            },
+            {
+                "id": "LIVEEEEEEEE",
+                "statistics": {"viewCount": "5"},
+                "contentDetails": {"duration": "P0D"},
+            },
+            {"id": "x", "statistics": {}},
+        ]
+    }
     with patch("agents.youtube.client.requests.get", return_value=_resp(body)):
-        assert _reader().estadisticas(["AAAAAAAAAAA", "x"]) == {"AAAAAAAAAAA": 12345}
+        d = _reader().detalles(["AAAAAAAAAAA", "SHORTSSSSSS", "LIVEEEEEEEE", "x"])
+
+    assert d["AAAAAAAAAAA"].vistas == 12345 and d["AAAAAAAAAAA"].duracion_segundos == 205
+    assert d["SHORTSSSSSS"].duracion_segundos == 45
+    assert d["LIVEEEEEEEE"].duracion_segundos is None  # live stream: unknown length
+    assert "x" not in d
 
 
 def test_channel_reference_accepts_handle_url_and_id() -> None:
@@ -94,7 +118,7 @@ def test_quota_error_is_readable_and_never_leaks_the_key() -> None:
         patch("agents.youtube.client.requests.get", return_value=_resp(body, 403)),
         pytest.raises(YouTubeError) as err,
     ):
-        _reader().estadisticas(["AAAAAAAAAAA"])
+        _reader().detalles(["AAAAAAAAAAA"])
 
     assert "cuota" in str(err.value).lower() and SECRETA not in str(err.value)
 
@@ -104,7 +128,7 @@ def test_network_failure_does_not_leak_the_key_either() -> None:
 
     boom = requests.ConnectionError(f"https://x/?key={SECRETA}")
     with patch("agents.youtube.client.requests.get", side_effect=boom), pytest.raises(YouTubeError) as err:
-        _reader().estadisticas(["AAAAAAAAAAA"])
+        _reader().detalles(["AAAAAAAAAAA"])
 
     assert SECRETA not in str(err.value)
 
