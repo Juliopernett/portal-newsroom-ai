@@ -4,6 +4,7 @@ import {
   Bookmark,
   ChevronDown,
   ChevronUp,
+  ClipboardPaste,
   Download,
   ExternalLink,
   Loader2,
@@ -27,6 +28,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { SelectNative } from '@/components/ui/select-native'
 import { errorMessage } from '@/api/client'
 import { formatFechaHoraNegocio } from '@/lib/format'
@@ -64,6 +66,10 @@ export function RadarCandidateCard({
 }) {
   const queryClient = useQueryClient()
   const [mostrarContenido, setMostrarContenido] = useState(false)
+  // «Pegar texto»: para medios que bloquean la extracción automática.
+  const [pegarAbierto, setPegarAbierto] = useState(false)
+  const [textoPegado, setTextoPegado] = useState('')
+  const [tituloPegado, setTituloPegado] = useState('')
   // El diálogo "Crear noticia" queda abierto mientras trabaja la IA: así se ve
   // el avance y, si falla, el error se queda a la vista (un toast se pierde).
   const [dialogoCrearAbierto, setDialogoCrearAbierto] = useState(false)
@@ -130,11 +136,23 @@ export function RadarCandidateCard({
     onError: (err) => toast.error(errorMessage(err)),
   })
 
+  const textoManualMutation = useMutation({
+    mutationFn: () => radarApi.textoManual(candidato.id, textoPegado, tituloPegado),
+    onSuccess: () => {
+      setPegarAbierto(false)
+      setTextoPegado('')
+      setTituloPegado('')
+      onExito('Texto guardado. Ya puedes pulsar «Crear noticia».')
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
   const isActing =
     guardarMutation.isPending ||
     descartarMutation.isPending ||
     crearNoticiaMutation.isPending ||
-    prepararMutation.isPending
+    prepararMutation.isPending ||
+    textoManualMutation.isPending
   const esTerminal = candidato.estado === 'procesado'
 
   return (
@@ -243,6 +261,18 @@ export function RadarCandidateCard({
               {prepararMutation.isPending ? 'Preparando…' : 'Preparar noticia'}
             </Button>
 
+            {!candidato.extracted_content && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isActing}
+                title="Para medios que bloquean la lectura automática: copia el texto de la nota y pégalo aquí"
+                onClick={() => setPegarAbierto((v) => !v)}
+              >
+                <ClipboardPaste /> Pegar texto de la nota
+              </Button>
+            )}
+
             {candidato.estado !== 'guardado' && (
               <Button
                 size="sm"
@@ -292,7 +322,7 @@ export function RadarCandidateCard({
                   title={
                     candidato.extracted_content
                       ? undefined
-                      : 'Primero pulsa «Preparar noticia» para extraer el contenido'
+                      : 'Primero pulsa «Preparar noticia», o «Pegar texto de la nota» si el medio bloquea la lectura'
                   }
                 >
                   {crearNoticiaMutation.isPending ? (
@@ -420,6 +450,38 @@ export function RadarCandidateCard({
       </div>
 
       {candidato.wp_post_id && <PanelPublicacion candidato={candidato} />}
+
+      {pegarAbierto && !esTerminal && !candidato.extracted_content && (
+        <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3">
+          <p className="text-xs text-muted-foreground">
+            Abre la nota en el medio, copia el texto y pégalo aquí. La IA la reescribe con tus
+            reglas y el borrador cita al medio como fuente. Mínimo 200 caracteres.
+          </p>
+          <Input
+            placeholder="Título (opcional; si lo dejas vacío se usa el del Radar)"
+            value={tituloPegado}
+            maxLength={300}
+            onChange={(e) => setTituloPegado(e.target.value)}
+          />
+          <Textarea
+            rows={8}
+            placeholder="Pega aquí el texto de la nota…"
+            value={textoPegado}
+            onChange={(e) => setTextoPegado(e.target.value)}
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              disabled={textoPegado.trim().length < 200 || textoManualMutation.isPending}
+              onClick={() => textoManualMutation.mutate()}
+            >
+              {textoManualMutation.isPending ? <Loader2 className="animate-spin" /> : <ClipboardPaste />}
+              Usar este texto
+            </Button>
+            <span className="text-xs text-muted-foreground">{textoPegado.trim().length} caracteres</span>
+          </div>
+        </div>
+      )}
 
       {candidato.extracted_content && (
         <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">

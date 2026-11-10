@@ -65,7 +65,7 @@ from core.services.news_candidate_service import (
     guardar,
     ordenar_para_revision,
 )
-from core.services.source_resolution_service import preparar_noticia
+from core.services.source_resolution_service import cargar_texto_manual, preparar_noticia
 
 router = APIRouter(
     prefix="/discovery",
@@ -223,9 +223,7 @@ def descartar_lote(
             uow.news_candidates.save(descartar(candidato))
         descartados += 1
     uow.commit()
-    return DescarteLoteOut(
-        descartados=descartados, omitidos=len(set(payload.ids)) - descartados
-    )
+    return DescarteLoteOut(descartados=descartados, omitidos=len(set(payload.ids)) - descartados)
 
 
 @router.post("/{candidate_id}/crear-noticia", response_model=NewsCandidateOut)
@@ -308,6 +306,35 @@ def preparar_candidato(
     unreachable the first time.
     """
     actualizado = preparar_noticia(_get_or_404(uow, candidate_id), resolver, extractor)
+    uow.news_candidates.save(actualizado)
+    uow.commit()
+    return actualizado
+
+
+class TextoManualIn(BaseModel):
+    texto: str = Field(min_length=1, max_length=60_000)
+    titulo: str | None = Field(default=None, max_length=300)
+
+
+@router.post("/{candidate_id}/texto-manual", response_model=NewsCandidateOut)
+def cargar_texto_manual_candidato(
+    candidate_id: str,
+    payload: TextoManualIn,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> NewsCandidate:
+    """Use text the editor pasted when the outlet blocks automatic extraction.
+
+    The candidate then behaves as if "Preparar noticia" had extracted it:
+    "Crear noticia" rewrites it with the editorial AI and credits the source.
+    422 if the text is too short or the candidate is already processed.
+    """
+    candidato = _get_or_404(uow, candidate_id)
+    if candidato.es_terminal:
+        raise HTTPException(status_code=422, detail="La noticia ya fue procesada")
+    try:
+        actualizado = cargar_texto_manual(candidato, payload.texto, payload.titulo)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     uow.news_candidates.save(actualizado)
     uow.commit()
     return actualizado

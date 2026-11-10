@@ -29,7 +29,11 @@ from app.api.dependencies import (
 )
 from app.api.main import app
 from core.entities.extracted_content import ExtractedContent
-from core.entities.news_candidate import EstadoNewsCandidate, NewsCandidate
+from core.entities.news_candidate import (
+    EstadoNewsCandidate,
+    EstadoResolucionFuente,
+    NewsCandidate,
+)
 from core.ports.ai_provider import AIProviderError
 from core.ports.cms_publisher import (
     CategoriaCMS,
@@ -471,3 +475,80 @@ def test_list_hides_old_unreviewed_candidates_but_never_reviewed_ones(
 
     assert por_defecto == {"Procesado viejo", "Nuevo hoy"}
     assert todo == {"Nuevo viejo", "Procesado viejo", "Nuevo hoy"}
+
+
+_TEXTO_LARGO = "El cantante ofreció un concierto en su ciudad natal y habló de su nuevo álbum. " * 5
+
+
+def test_texto_manual_fills_the_extracted_content_and_keeps_the_resolved_source(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    candidato = _candidato(
+        url_fuente_original="https://medio.example/nota",
+        estado_resolucion=EstadoResolucionFuente.RESUELTA,
+    )
+    _seed(_test_engine, candidato)
+
+    response = client.post(
+        f"/discovery/{candidato.id}/texto-manual",
+        json={"texto": _TEXTO_LARGO, "titulo": " Mi título "},
+    )
+
+    assert response.status_code == 200
+    contenido = response.json()["extracted_content"]
+    assert contenido["title"] == "Mi título"
+    assert contenido["body"] == _TEXTO_LARGO.strip()
+    assert contenido["source_url"] == "https://medio.example/nota"
+    assert response.json()["estado"] == "nuevo"
+
+
+def test_texto_manual_falls_back_to_the_discovery_url_and_title(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    candidato = _candidato()
+    _seed(_test_engine, candidato)
+
+    contenido = client.post(
+        f"/discovery/{candidato.id}/texto-manual", json={"texto": _TEXTO_LARGO}
+    ).json()["extracted_content"]
+
+    assert contenido["title"] == candidato.title
+    assert contenido["source_url"] == candidato.url
+
+
+def test_texto_manual_rejects_short_text_and_processed_candidates(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    nuevo = _candidato()
+    procesado = _candidato(estado=EstadoNewsCandidate.PROCESADO, hash="hash-2")
+    _seed(_test_engine, nuevo)
+    _seed(_test_engine, procesado)
+
+    assert (
+        client.post(f"/discovery/{nuevo.id}/texto-manual", json={"texto": "muy corto"}).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            f"/discovery/{procesado.id}/texto-manual", json={"texto": _TEXTO_LARGO}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post("/discovery/no-existe/texto-manual", json={"texto": _TEXTO_LARGO}).status_code
+        == 404
+    )
+
+
+def test_a_candidate_with_pasted_text_can_become_a_draft(
+    client: TestClient, _test_engine: Engine
+) -> None:
+    _con_cms_falso()
+    candidato = _candidato()
+    _seed(_test_engine, candidato)
+    client.post(f"/discovery/{candidato.id}/texto-manual", json={"texto": _TEXTO_LARGO})
+
+    response = client.post(f"/discovery/{candidato.id}/crear-noticia")
+
+    assert response.status_code == 200
+    assert response.json()["estado"] == "procesado"

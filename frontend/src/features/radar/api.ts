@@ -85,6 +85,12 @@ export const radarApi = {
   // papelera) y devuelve todos los candidatos procesados.
   sincronizarWordpress: () => api.post<NewsCandidate[]>('/discovery/sincronizar-wordpress'),
   preparar: (id: string) => api.post<NewsCandidate>(`/discovery/${id}/preparar`),
+  // Para medios que bloquean la extracción automática: el texto lo pega el editor.
+  textoManual: (id: string, texto: string, titulo: string) =>
+    api.post<NewsCandidate>(`/discovery/${id}/texto-manual`, {
+      texto,
+      titulo: titulo.trim() || null,
+    }),
 }
 
 // Sprint Fuentes — fuentes del Radar y escaneo.

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from core.entities.extracted_content import ExtractedContent
 from core.entities.news_candidate import EstadoResolucionFuente, NewsCandidate
 from core.ports.content_extractor import ContentExtractor, ContentExtractorError
 from core.ports.source_resolver import SourceResolver
@@ -112,3 +113,38 @@ def preparar_noticia(
     if not resuelto.lista_para_extraccion:
         return resuelto
     return preparar_contenido(resuelto, extractor)
+
+
+MIN_CARACTERES_TEXTO_MANUAL = 200
+
+
+def cargar_texto_manual(
+    candidato: NewsCandidate, texto: str, titulo: str | None = None
+) -> NewsCandidate:
+    """Return `candidato` with `extracted_content` filled from text the editor pasted.
+
+    For outlets that block automatic reading (HTTP 429/403, JavaScript-only
+    pages): the editor opens the note, copies its text and pastes it here.
+    From then on the flow is the usual one (editorial AI rewrite -> WordPress
+    draft), and the draft still credits the original outlet.
+
+    `source_url` is the resolved real URL when there is one (the credit link
+    must not point at a Google News redirect), else the discovery URL.
+
+    Raises `ValueError` if the candidate is already terminal or the text is
+    too short to be an article.
+    """
+    if candidato.es_terminal:
+        raise ValueError(f"el candidato ya está en un estado terminal ({candidato.estado.value!r})")
+    cuerpo = texto.strip()
+    if len(cuerpo) < MIN_CARACTERES_TEXTO_MANUAL:
+        raise ValueError(f"El texto es muy corto (mínimo {MIN_CARACTERES_TEXTO_MANUAL} caracteres)")
+    return replace(
+        candidato,
+        extracted_content=ExtractedContent(
+            title=(titulo or "").strip() or candidato.title,
+            body=cuerpo,
+            source_url=candidato.url_fuente_original or candidato.url,
+            site_name=candidato.source,
+        ),
+    )
