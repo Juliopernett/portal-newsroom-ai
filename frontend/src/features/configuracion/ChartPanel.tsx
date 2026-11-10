@@ -12,6 +12,8 @@ import { chartApi, type FilaChart } from './chartApi'
 const KEY = ['chart-vallenato']
 const KEY_CANALES = ['chart-vallenato', 'canales']
 const num = (n: number) => n.toLocaleString('es-CO')
+const normalizar = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 function Tendencia({ fila }: { fila: FilaChart }) {
   if (fila.tendencia === 'sube') return <ArrowUp className="size-4 text-success" aria-label="Sube" />
@@ -32,6 +34,7 @@ export function ChartPanel() {
   const [canalArtista, setCanalArtista] = useState('')
   const [videoRef, setVideoRef] = useState('')
   const [videoArtista, setVideoArtista] = useState('')
+  const [busqueda, setBusqueda] = useState('')
 
   const refrescar = () => qc.invalidateQueries({ queryKey: KEY })
 
@@ -79,6 +82,10 @@ export function ChartPanel() {
 
   const data = chart.data
   const ocupado = decidir.isPending
+  const q = normalizar(busqueda.trim())
+  const videosFiltrados = (data?.videos ?? []).filter(
+    (v) => !q || normalizar(`${v.titulo} ${v.artista ?? ''}`).includes(q),
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -144,9 +151,24 @@ export function ChartPanel() {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">Videos seguidos ({data?.videos.length ?? 0})</h3>
+        <h3 className="text-sm font-semibold">
+          Videos seguidos ({q ? `${videosFiltrados.length} de ` : ''}
+          {data?.videos.length ?? 0})
+        </h3>
+        <Input
+          type="search"
+          placeholder="Buscar por título o artista…"
+          aria-label="Buscar video por título o artista"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
         <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto">
-          {data?.videos.map((v) => (
+          {videosFiltrados.length === 0 && (
+            <li className="text-sm text-muted-foreground">
+              {q ? 'Ningún video coincide con esa búsqueda.' : 'Aún no hay videos.'}
+            </li>
+          )}
+          {videosFiltrados.map((v) => (
             <li key={v.video_id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2 text-sm">
               <div className="min-w-0 flex-1">
                 <a className="block truncate hover:underline" href={v.url} target="_blank" rel="noopener">

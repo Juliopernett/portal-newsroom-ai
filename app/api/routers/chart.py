@@ -51,6 +51,9 @@ router_publico = APIRouter(prefix="/chart-vallenato", tags=["chart"])
 
 _ORIGENES_PUBLICOS = ("https://portalvallenato.com", "https://www.portalvallenato.com")
 _HISTORIAL_DIAS = 30
+# Max videos listed for the editor's exclude/pin screen. The chart itself always
+# ranks every tracked video; this only bounds the size of that response.
+_MAX_VIDEOS_LISTADOS = 3000
 
 
 def _hoy() -> date:
@@ -93,7 +96,7 @@ def obtener_chart(
     videos, filas, ultimo, snaps = _calcular(uow)
     hoy = _hoy()
     seguidos = []
-    for v in videos[:300]:
+    for v in videos[:_MAX_VIDEOS_LISTADOS]:
         r = _vistas_ganadas(snaps.get(v.video_id, []), hoy, DIAS_VENTANA)
         seguidos.append(
             VideoSeguidoOut(
