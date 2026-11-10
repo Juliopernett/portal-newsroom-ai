@@ -161,3 +161,8 @@ def test_clips_titled_only_with_a_date_or_emojis_are_not_songs() -> None:
         assert titulo(sin_nombre).es_short is True, sin_nombre
     for cancion in ("La Playita", "20 de julio", "31 de octubre", "De noviembre a diciembre", "Adelanto de mi canción"):
         assert titulo(cancion).es_short is False, cancion
+
+
+def test_length_limit_is_90_seconds_inclusive() -> None:
+    assert _video("a", duracion_segundos=90).es_short is True
+    assert _video("b", duracion_segundos=91).es_short is False

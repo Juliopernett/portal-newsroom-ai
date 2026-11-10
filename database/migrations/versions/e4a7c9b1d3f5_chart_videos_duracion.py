@@ -4,7 +4,7 @@ Revision ID: e4a7c9b1d3f5
 Revises: d3f6b8a0c2e4
 Create Date: 2026-11-10 22:00:00.000000
 
-Duración de cada video, para dejar los Shorts (60 s o menos) fuera del
+Duración de cada video, para dejar los Shorts (90 s o menos) fuera del
 chart. YouTube no los marca en su API; la duración sale de la misma consulta
 que trae las vistas. Nula hasta la siguiente medición.
 """

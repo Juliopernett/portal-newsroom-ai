@@ -16,7 +16,7 @@ MAX_POSICION_FIJADA = 20
 # YouTube does not flag Shorts in its API. A video this short, or one titled
 # with the #shorts hashtag, is treated as a Short and kept out of the chart
 # (a song is never under a minute; Shorts were the noise the owner reported).
-MAX_SEGUNDOS_SHORT = 60
+MAX_SEGUNDOS_SHORT = 90
 _HASHTAG_SHORT = re.compile(r"#shorts?(?![a-z])", re.IGNORECASE)
 # Clips uploaded without a real title: only a full date ("6 de noviembre de 2026"),
 # or only emojis/digits/punctuation. A song always has a name made of letters.
@@ -71,7 +71,7 @@ class VideoChart:
     def es_short(self) -> bool:
         """Whether this is a Short or a clip rather than a song.
 
-        True for: tagged #shorts, 60 s or less, or a title that is only a date
+        True for: tagged #shorts, 90 s or less, or a title that is only a date
         or only emojis. (The name stays `es_short` for the API; it covers clips.)
         """
         if _HASHTAG_SHORT.search(self.titulo) or _TITULO_SIN_NOMBRE.match(self.titulo):
