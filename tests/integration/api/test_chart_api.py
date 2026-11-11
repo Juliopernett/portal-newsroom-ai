@@ -116,7 +116,7 @@ def test_public_chart_needs_no_login_and_is_cacheable(
     assert r.status_code == 200
     assert r.headers["access-control-allow-origin"] == "https://www.portalvallenato.com"
     assert "max-age" in r.headers["cache-control"]
-    assert set(r.json()) == {"actualizado", "filas"}
+    assert set(r.json()) == {"actualizado", "semana_fin", "publicada_en", "filas"}
 
 
 def test_admin_routes_require_login(unauthenticated_client: TestClient) -> None:
@@ -256,3 +256,39 @@ def test_edition_routes_404_and_require_login(
     assert client.get("/chart-vallenato/ediciones/2026-11-13").status_code == 404
     assert client.post("/chart-vallenato/ediciones/2026-11-13/regenerar").status_code == 404
     assert client.post("/chart-vallenato/ediciones/2026-11-13/publicar").status_code == 404
+
+
+def test_public_chart_only_shows_the_published_edition(
+    client: TestClient, unauthenticated_client: TestClient
+) -> None:
+    _sembrar_cortes()
+    client.post("/chart-vallenato/ediciones/2026-11-13/regenerar")  # a draft exists
+
+    antes = unauthenticated_client.get("/chart-vallenato/publico.json").json()
+    assert antes["filas"] == [] and antes["semana_fin"] is None
+    assert "primera edición" in unauthenticated_client.get("/chart-vallenato/embed").text
+
+    client.post("/chart-vallenato/ediciones/2026-11-13/publicar")
+
+    despues = unauthenticated_client.get("/chart-vallenato/publico.json").json()
+    assert despues["semana_fin"] == "2026-11-13" and despues["actualizado"] == "2026-11-13"
+    assert [f["video_id"] for f in despues["filas"]] == ["b", "a"]
+    assert (
+        unauthenticated_client.get("/chart-vallenato/publico.json?n=1").json()["filas"][0][
+            "video_id"
+        ]
+        == "b"
+    )
+    embed = unauthenticated_client.get("/chart-vallenato/embed").text
+    assert "Tema b" in embed and "edición del 2026-11-13" in embed
+    assert "Datos públicos de YouTube" in embed
+    assert "politica-de-privacidad" in embed
+
+
+def test_public_chart_does_not_expose_the_live_ranking(
+    client: TestClient, unauthenticated_client: TestClient
+) -> None:
+    _canal(client)
+    client.post("/chart-vallenato/recolectar")
+
+    assert unauthenticated_client.get("/chart-vallenato/publico.json").json()["filas"] == []

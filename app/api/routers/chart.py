@@ -37,7 +37,7 @@ from app.api.schemas.chart import (
     VideoSeguidoOut,
 )
 from config.settings import Settings
-from core.entities.chart import CanalChart, EdicionChart, VideoChart
+from core.entities.chart import CanalChart, EdicionChart, FilaEdicion, VideoChart
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
 from core.services.chart_semanal_service import (
@@ -85,6 +85,15 @@ def _fila(p: PosicionChart) -> FilaChartOut:
         fijado=p.fijado,
         parcial=p.parcial,
     )
+
+
+def _fila_edicion(f: FilaEdicion) -> FilaChartOut:
+    return FilaChartOut(**asdict(f), parcial=False)
+
+
+def _ultima_publicada(uow: UnitOfWork) -> EdicionChart | None:
+    """The newest published weekly edition — the only thing the public ever sees."""
+    return uow.chart.ultima_publicada_antes(date.max)
 
 
 def _calcular(uow: UnitOfWork) -> tuple[list[VideoChart], list[PosicionChart], date | None, dict]:
@@ -316,20 +325,33 @@ def decidir_video(
 
 @router_publico.get("/publico.json", response_model=ChartPublicoOut)
 def chart_publico(
-    request: Request, response: Response, uow: UnitOfWork = Depends(get_unit_of_work)
+    request: Request,
+    response: Response,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    n: int = Query(default=10, ge=1, le=20, description="Cuántas posiciones devolver"),
 ) -> ChartPublicoOut:
-    """The current top 10 for the website's sidebar — unauthenticated, cacheable."""
-    _, filas, ultimo, _ = _calcular(uow)
+    """The last published weekly edition (top `n`) — unauthenticated, cacheable.
+
+    Empty until the editor publishes the first edition; the live ranking is
+    never exposed here.
+    """
+    edicion = _ultima_publicada(uow)
     origen = request.headers.get("origin", "")
     response.headers["Cache-Control"] = "public, max-age=900"
     response.headers["Access-Control-Allow-Origin"] = (
         origen if origen in _ORIGENES_PUBLICOS else _ORIGENES_PUBLICOS[0]
     )
     response.headers["Vary"] = "Origin"
-    return ChartPublicoOut(actualizado=ultimo, filas=[_fila(p) for p in filas])
+    return ChartPublicoOut(
+        actualizado=edicion.semana_fin if edicion else None,
+        semana_fin=edicion.semana_fin if edicion else None,
+        publicada_en=edicion.publicada_en if edicion else None,
+        filas=[_fila_edicion(f) for f in edicion.filas][:n] if edicion else [],
+    )
 
 
 _URL_PAGINA_CHART = "https://portalvallenato.com/chart-vallenato/"
+_URL_PRIVACIDAD = "https://portalvallenato.com/politica-de-privacidad/"
 _CSP_EMBED = (
     "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; frame-ancestors *"
 )
@@ -377,10 +399,8 @@ def _html_embed(filas: list[FilaChartOut], actualizado: date | None) -> str:
             )
         cuerpo = "<ol>" + "".join(items) + "</ol>"
     else:
-        cuerpo = (
-            '<div class="v">El ranking aparece cuando haya al menos tres días de mediciones.</div>'
-        )
-    fecha = f" · actualizado {actualizado.isoformat()}" if actualizado else ""
+        cuerpo = '<div class="v">La primera edición del chart se publica pronto.</div>'
+    fecha = f" · edición del {actualizado.isoformat()}" if actualizado else ""
     return (
         '<!doctype html><html lang="es"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -390,7 +410,9 @@ def _html_embed(filas: list[FilaChartOut], actualizado: date | None) -> str:
         f"{cuerpo}"
         f'<div class="f">Chart Vallenato · un producto de '
         f'<a href="{_URL_PAGINA_CHART}" target="_blank" rel="noopener">www.portalvallenato.com</a>'
-        f"{e(fecha)}</div></body></html>"
+        f"{e(fecha)}<br>Datos públicos de YouTube; las posiciones son un cálculo de "
+        f'Portal Vallenato. <a href="{_URL_PRIVACIDAD}" target="_blank" rel="noopener">'
+        "Política de privacidad</a></div></body></html>"
     )
 
 
@@ -401,13 +423,15 @@ def chart_embed(
 ) -> HTMLResponse:
     """The chart as a ready-made card other websites can put in an `<iframe>`.
 
-    Server-rendered (no script), always carries the credit "un producto de
-    www.portalvallenato.com" with a link back, and is the only route that
+    Shows the last published weekly edition. Server-rendered (no script),
+    always carries the credit "un producto de www.portalvallenato.com" with a
+    link back, the YouTube-data notice, and is the only route that
     allows being framed (see `app.api.main.add_security_headers`).
     """
-    _, filas, ultimo, _ = _calcular(uow)
+    edicion = _ultima_publicada(uow)
+    filas = [_fila_edicion(f) for f in edicion.filas][:n] if edicion else []
     return HTMLResponse(
-        _html_embed([_fila(p) for p in filas][:n], ultimo),
+        _html_embed(filas, edicion.semana_fin if edicion else None),
         headers={
             "Cache-Control": "public, max-age=900",
             "Content-Security-Policy": _CSP_EMBED,

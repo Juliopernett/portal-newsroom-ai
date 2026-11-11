@@ -49,7 +49,9 @@ class ChartOut(BaseModel):
 class ChartPublicoOut(BaseModel):
     """What the website's sidebar widget reads — no editor-only fields."""
 
-    actualizado: date | None
+    actualizado: date | None  # = semana_fin (kept for the widgets already on the site)
+    semana_fin: date | None  # Colombian Friday that closed the published edition
+    publicada_en: datetime | None
     filas: list[FilaChartOut]
 
 
