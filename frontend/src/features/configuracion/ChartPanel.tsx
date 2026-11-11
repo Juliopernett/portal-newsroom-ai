@@ -12,6 +12,7 @@ import { chartApi, type FilaChart, type FilaEdicion } from './chartApi'
 const KEY = ['chart-vallenato']
 const KEY_CANALES = ['chart-vallenato', 'canales']
 const KEY_EDICIONES = ['chart-vallenato', 'ediciones']
+const KEY_ESTADO = ['chart-vallenato', 'estado-semanal']
 const num = (n: number) => n.toLocaleString('es-CO')
 const normalizar = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -31,13 +32,17 @@ function Tendencia({ fila }: { fila: Pick<FilaChart | FilaEdicion, 'tendencia'> 
 function EdicionesSection() {
   const qc = useQueryClient()
   const lista = useQuery({ queryKey: KEY_EDICIONES, queryFn: chartApi.ediciones })
+  const estado = useQuery({ queryKey: KEY_ESTADO, queryFn: chartApi.estadoSemanal })
   const ultima = lista.data?.[0]
   const detalle = useQuery({
     queryKey: [...KEY_EDICIONES, ultima?.semana_fin],
     queryFn: () => chartApi.edicion(ultima!.semana_fin),
     enabled: !!ultima,
   })
-  const refrescar = () => qc.invalidateQueries({ queryKey: KEY_EDICIONES })
+  const refrescar = () => {
+    qc.invalidateQueries({ queryKey: KEY_EDICIONES })
+    qc.invalidateQueries({ queryKey: KEY_ESTADO })
+  }
   const regenerar = useMutation({
     mutationFn: (semana: string) => chartApi.regenerarEdicion(semana),
     onSuccess: () => {
@@ -59,6 +64,23 @@ function EdicionesSection() {
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-border p-3">
       <h3 className="text-sm font-semibold">Edición semanal (cierre del viernes)</h3>
+      {estado.data && (
+        <p
+          role={estado.data.nivel === 'error' ? 'alert' : 'status'}
+          className={
+            'rounded-md px-3 py-2 text-sm ' +
+            (estado.data.nivel === 'error'
+              ? 'bg-danger-bg text-danger'
+              : estado.data.nivel === 'atencion'
+                ? 'bg-warning-bg text-warning'
+                : estado.data.nivel === 'ok'
+                  ? 'bg-success-bg text-success'
+                  : 'bg-muted text-muted-foreground')
+          }
+        >
+          {estado.data.mensaje}
+        </p>
+      )}
       {lista.isLoading ? (
         <p className="text-sm text-muted-foreground">Cargando…</p>
       ) : !ultima ? (
@@ -194,8 +216,8 @@ export function ChartPanel() {
         <div>
           <h2 className="text-base font-semibold">Chart Vallenato</h2>
           <p className="text-sm text-muted-foreground">
-            Se calcula solo con las vistas ganadas en YouTube los últimos 7 días. Tú puedes excluir
-            o fijar canciones.
+            Cada viernes a medianoche (hora de Colombia) se cierra el conteo de la semana y queda un
+            borrador que tú revisas (excluir o fijar canciones) y publicas.
             {data?.actualizado ? ` Última medición: ${data.actualizado}.` : ''}
           </p>
         </div>

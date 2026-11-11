@@ -266,3 +266,60 @@ def cerrar_semana(
     res.edicion_filas = len(edicion.filas)
     res.sin_base = edicion.sin_base
     return res
+
+
+_GRACIA_CIERRE = timedelta(hours=2)  # time the Saturday cron gets before it is "late"
+
+
+@dataclass(frozen=True, slots=True)
+class EstadoSemanal:
+    """What the editor should know about this week's close, for a panel banner."""
+
+    semana_fin: date
+    nivel: str  # "ok" | "info" | "atencion" | "error"
+    mensaje: str
+
+
+def estado_semanal(uow: UnitOfWork, ahora: datetime | None = None) -> EstadoSemanal:
+    """Say whether the weekly close ran and what is waiting for the editor.
+
+    Pure reading of the database: a missed cron shows up here even if Railway's
+    own failure e-mail never arrives.
+    """
+    ahora = ahora or datetime.now(UTC)
+    semana = semana_fin_de(ahora)
+    corte = momento_corte(semana)
+    edicion = uow.chart.get_edicion(semana)
+    hay_cierre = bool(uow.chart.list_cortes(semana))
+    hay_base = bool(uow.chart.list_cortes(semana - timedelta(days=7)))
+    fecha = semana.isoformat()
+
+    if edicion is not None and edicion.estado == ESTADO_PUBLICADA:
+        return EstadoSemanal(semana, "ok", f"La edición del {fecha} está publicada.")
+    if edicion is not None:
+        return EstadoSemanal(
+            semana,
+            "atencion",
+            f"La edición del {fecha} está lista como borrador: revísala y publícala.",
+        )
+    if not hay_cierre:
+        if ahora >= corte + _GRACIA_CIERRE:
+            return EstadoSemanal(
+                semana,
+                "error",
+                f"El cierre semanal del {fecha} no se ha hecho. Revisa el servicio "
+                "chart-vallenato-cierre-semanal en Railway.",
+            )
+        return EstadoSemanal(semana, "info", "Esperando el cierre semanal.")
+    if not hay_base:
+        return EstadoSemanal(
+            semana,
+            "info",
+            f"El cierre del {fecha} quedó como línea base; "
+            "la primera edición sale en el cierre siguiente.",
+        )
+    return EstadoSemanal(
+        semana,
+        "error",
+        f"El cierre del {fecha} se hizo pero no generó edición. Revisa los registros del servicio.",
+    )

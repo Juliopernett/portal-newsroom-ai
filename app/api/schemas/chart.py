@@ -87,6 +87,12 @@ class RecoleccionOut(BaseModel):
     error_estadisticas: str | None
 
 
+class EstadoSemanalOut(BaseModel):
+    semana_fin: date
+    nivel: str
+    mensaje: str
+
+
 class FilaEdicionOut(BaseModel):
     posicion: int
     video_id: str

@@ -29,6 +29,7 @@ from app.api.schemas.chart import (
     ChartPublicoOut,
     EdicionOut,
     EdicionResumenOut,
+    EstadoSemanalOut,
     FilaChartOut,
     FilaEdicionOut,
     RecoleccionOut,
@@ -42,6 +43,7 @@ from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
 from core.services.chart_semanal_service import (
     EdicionPublicadaError,
+    estado_semanal,
     generar_edicion,
     publicar_edicion,
 )
@@ -167,6 +169,13 @@ def _edicion_out(e: EdicionChart) -> EdicionOut:
         publicada_en=e.publicada_en,
         filas_detalle=[FilaEdicionOut(**asdict(f)) for f in e.filas],
     )
+
+
+@router.get("/estado-semanal", response_model=EstadoSemanalOut)
+def obtener_estado_semanal(uow: UnitOfWork = Depends(get_unit_of_work)) -> EstadoSemanalOut:
+    """Did this week's close run, and is an edition waiting for review?"""
+    e = estado_semanal(uow)
+    return EstadoSemanalOut(semana_fin=e.semana_fin, nivel=e.nivel, mensaje=e.mensaje)
 
 
 @router.get("/ediciones", response_model=list[EdicionResumenOut])

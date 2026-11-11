@@ -292,3 +292,13 @@ def test_public_chart_does_not_expose_the_live_ranking(
     client.post("/chart-vallenato/recolectar")
 
     assert unauthenticated_client.get("/chart-vallenato/publico.json").json()["filas"] == []
+
+
+def test_weekly_status_endpoint_needs_login_and_answers(
+    client: TestClient, unauthenticated_client: TestClient
+) -> None:
+    r = client.get("/chart-vallenato/estado-semanal")
+
+    assert r.status_code == 200
+    assert set(r.json()) == {"semana_fin", "nivel", "mensaje"}
+    assert r.json()["nivel"] in {"ok", "info", "atencion", "error"}

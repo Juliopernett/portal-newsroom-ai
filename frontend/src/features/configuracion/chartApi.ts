@@ -78,6 +78,12 @@ export interface Edicion extends EdicionResumen {
   filas_detalle: FilaEdicion[]
 }
 
+export interface EstadoSemanal {
+  semana_fin: string
+  nivel: 'ok' | 'info' | 'atencion' | 'error'
+  mensaje: string
+}
+
 const BASE = '/chart-vallenato'
 
 export const chartApi = {
@@ -89,6 +95,7 @@ export const chartApi = {
   quitarCanal: (canalId: string) => api.delete<void>(`${BASE}/canales/${canalId}`),
   agregarVideo: (referencia: string, artista: string | null) =>
     api.post<VideoSeguido>(`${BASE}/videos`, { referencia, artista }),
+  estadoSemanal: () => api.get<EstadoSemanal>(`${BASE}/estado-semanal`),
   ediciones: () => api.get<EdicionResumen[]>(`${BASE}/ediciones`),
   edicion: (semana: string) => api.get<Edicion>(`${BASE}/ediciones/${semana}`),
   regenerarEdicion: (semana: string) => api.post<Edicion>(`${BASE}/ediciones/${semana}/regenerar`),

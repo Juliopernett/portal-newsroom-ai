@@ -283,3 +283,27 @@ def test_retention_can_be_raised_after_approval_and_is_idempotent(
     assert purgar_datos_antiguos(uow, hoy, 30).snapshots == 0
     with pytest.raises(ValueError):
         purgar_datos_antiguos(uow, hoy, 0)
+
+
+def test_weekly_status_tells_what_the_editor_must_do(uow: SqlAlchemyUnitOfWork) -> None:
+    from core.services.chart_semanal_service import estado_semanal
+
+    sabado_temprano = datetime(2026, 11, 14, 5, 30, tzinfo=UTC)  # 30 min after the cut
+    sabado_tarde = datetime(2026, 11, 14, 9, 0, tzinfo=UTC)
+    _video(uow, "a")
+
+    assert estado_semanal(uow, sabado_temprano).nivel == "info"  # cron still has time
+    assert estado_semanal(uow, sabado_tarde).nivel == "error"  # close never ran
+
+    _corte(uow, F1, a=100)
+    assert estado_semanal(uow, sabado_tarde).nivel == "info"  # baseline only
+
+    _corte(uow, F0, a=10)
+    assert estado_semanal(uow, sabado_tarde).nivel == "error"  # closed, no edition
+
+    generar_edicion(uow, F1)
+    estado = estado_semanal(uow, sabado_tarde)
+    assert estado.nivel == "atencion" and "borrador" in estado.mensaje
+
+    publicar_edicion(uow, F1)
+    assert estado_semanal(uow, sabado_tarde).nivel == "ok"
