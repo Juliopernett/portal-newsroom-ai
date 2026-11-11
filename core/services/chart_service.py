@@ -98,19 +98,14 @@ def _ranking_base(
     return filas
 
 
-def calcular_chart(
-    videos: list[VideoChart],
-    snapshots: dict[str, list[SnapshotVistas]],
-    hoy: date,
-    *,
-    top: int = TOP_POR_DEFECTO,
-    dias: int = DIAS_VENTANA,
-) -> list[PosicionChart]:
-    """Return the chart for `hoy`: pinned videos in place, the rest by views gained."""
-    actual = _ranking_base(videos, snapshots, hoy, dias)
-    anterior = _ranking_base(videos, snapshots, hoy - timedelta(days=dias), dias)
-    pos_anterior = {f[0].video_id: i + 1 for i, f in enumerate(anterior)}
+def aplicar_fijados(
+    actual: list[tuple[VideoChart, int, int, bool]], videos: list[VideoChart], top: int
+) -> list[tuple[VideoChart, int, int, bool, bool]]:
+    """Place pinned videos at their position and fill the rest by views gained.
 
+    `actual` is already sorted best-first and only has rankable videos. Returns
+    `(video, gained, total, parcial, fijado)` tuples, at most `top`.
+    """
     datos = {f[0].video_id: f for f in actual}
     por_posicion = {
         v.fijado_posicion: v for v in videos if not v.excluido and v.fijado_posicion is not None
@@ -135,6 +130,23 @@ def calcular_chart(
                 break
             ordenados.append((siguiente[0], siguiente[1], siguiente[2], siguiente[3], False))
         posicion += 1
+    return ordenados
+
+
+def calcular_chart(
+    videos: list[VideoChart],
+    snapshots: dict[str, list[SnapshotVistas]],
+    hoy: date,
+    *,
+    top: int = TOP_POR_DEFECTO,
+    dias: int = DIAS_VENTANA,
+) -> list[PosicionChart]:
+    """Return the chart for `hoy`: pinned videos in place, the rest by views gained."""
+    actual = _ranking_base(videos, snapshots, hoy, dias)
+    anterior = _ranking_base(videos, snapshots, hoy - timedelta(days=dias), dias)
+    pos_anterior = {f[0].video_id: i + 1 for i, f in enumerate(anterior)}
+
+    ordenados = aplicar_fijados(actual, videos, top)
 
     resultado: list[PosicionChart] = []
     hay_historial = bool(anterior)

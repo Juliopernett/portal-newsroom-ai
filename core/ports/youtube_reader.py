@@ -47,6 +47,10 @@ class YouTubeReader(Protocol):
         """Return the channel's uploads published on/after `desde`, newest first."""
         ...
 
+    def catalogo_canal(self, canal_id: str, *, maximo: int = 500) -> list[VideoYouTube]:
+        """Return up to `maximo` of the channel's uploads, newest first (paged)."""
+        ...
+
     def obtener_video(self, referencia: str) -> VideoYouTube:
         """Resolve a video URL or id (for videos added by hand)."""
         ...

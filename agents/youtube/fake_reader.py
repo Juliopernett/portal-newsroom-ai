@@ -52,6 +52,23 @@ class FakeYouTubeReader:
             for i in range(3)
         ]
 
+    def catalogo_canal(self, canal_id: str, *, maximo: int = 500) -> list[VideoYouTube]:
+        if canal_id == self._canal_con_error:
+            raise YouTubeError("canal de prueba con error")
+        base = datetime.combine(
+            self._hoy or datetime.now(UTC).date(), datetime.min.time(), tzinfo=UTC
+        )
+        return [
+            VideoYouTube(
+                video_id=f"demo{_n(canal_id + str(i), 10**7):07d}",
+                canal_id=canal_id,
+                titulo=f"[DEMO] Canción {i + 1} de {canal_id[-4:]}",
+                publicado_en=base - timedelta(days=10 * (i + 1)),
+                miniatura_url=None,
+            )
+            for i in range(5)
+        ][:maximo]
+
     def obtener_video(self, referencia: str) -> VideoYouTube:
         vid = referencia.strip()[-11:]
         return VideoYouTube(

@@ -154,3 +154,38 @@ def test_video_reference_formats() -> None:
             "abcdefghijk",
         ):
             assert r.obtener_video(ref).video_id == "abcdefghijk"
+
+
+def test_catalog_pages_through_the_whole_uploads_playlist() -> None:
+    def pagina(ids: list[str], siguiente: str | None) -> dict:
+        body: dict = {
+            "items": [
+                {
+                    "snippet": {
+                        "title": f"Tema {i}",
+                        "publishedAt": "2019-01-01T10:00:00Z",
+                        "resourceId": {"videoId": i},
+                    }
+                }
+                for i in ids
+            ]
+        }
+        if siguiente:
+            body["nextPageToken"] = siguiente
+        return body
+
+    respuestas = [_resp(pagina(["AAAAAAAAAAA"], "PAG2")), _resp(pagina(["BBBBBBBBBBB"], None))]
+    with patch("agents.youtube.client.requests.get", side_effect=respuestas) as get:
+        videos = _reader().catalogo_canal(CANAL)
+
+    assert [v.video_id for v in videos] == ["AAAAAAAAAAA", "BBBBBBBBBBB"]  # old uploads kept
+    assert get.call_args_list[1].kwargs["params"]["pageToken"] == "PAG2"
+
+
+def test_catalog_respects_the_maximum() -> None:
+    items = [
+        {"snippet": {"title": f"T{i}", "publishedAt": "2020-01-01T00:00:00Z", "resourceId": {"videoId": f"{i:011d}"}}}
+        for i in range(50)
+    ]
+    with patch("agents.youtube.client.requests.get", return_value=_resp({"items": items, "nextPageToken": "X"})):
+        assert len(_reader().catalogo_canal(CANAL, maximo=60)) == 60

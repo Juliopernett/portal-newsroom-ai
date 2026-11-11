@@ -137,6 +137,31 @@ class YouTubeDataApiReader:
             playlistId="UU" + canal_id[2:],
             maxResults=min(maximo, 50),
         )
+        return [v for v in self._videos_de(canal_id, datos) if v.publicado_en >= desde]
+
+    def catalogo_canal(self, canal_id: str, *, maximo: int = 500) -> list[VideoYouTube]:
+        """Page through the channel's whole uploads playlist (1 quota unit per 50)."""
+        if not _ID_CANAL.match(canal_id):
+            raise YouTubeError("ID de canal inválido.")
+        videos: list[VideoYouTube] = []
+        pagina: str | None = None
+        while len(videos) < maximo:
+            params: dict[str, str | int] = {
+                "part": "snippet,contentDetails",
+                "playlistId": "UU" + canal_id[2:],
+                "maxResults": 50,
+            }
+            if pagina:
+                params["pageToken"] = pagina
+            datos = self._get("playlistItems", **params)
+            videos.extend(self._videos_de(canal_id, datos))
+            pagina = datos.get("nextPageToken")
+            if not pagina:
+                break
+        return videos[:maximo]
+
+    @staticmethod
+    def _videos_de(canal_id: str, datos: dict[str, Any]) -> list[VideoYouTube]:
         videos: list[VideoYouTube] = []
         for item in datos.get("items", []):
             snippet = item.get("snippet", {})
@@ -145,8 +170,6 @@ class YouTubeDataApiReader:
             publicado = _fecha(
                 item.get("contentDetails", {}).get("videoPublishedAt") or snippet["publishedAt"]
             )
-            if publicado < desde:
-                continue
             videos.append(
                 VideoYouTube(
                     video_id=snippet["resourceId"]["videoId"],

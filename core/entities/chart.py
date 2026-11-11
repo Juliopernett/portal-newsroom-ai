@@ -94,3 +94,54 @@ class SnapshotVistas:
     def __post_init__(self) -> None:
         if self.vistas < 0:
             raise ValueError("vistas must not be negative")
+
+
+@dataclass(frozen=True, slots=True)
+class CorteVistas:
+    """Total views of a video at a weekly close (Friday midnight, Colombia time).
+
+    `semana_fin` is the Colombian calendar date of that Friday. Unlike the
+    daily snapshots, every close covers the whole followed catalog, so a week's
+    figure is always `this close - the previous close`.
+    """
+
+    video_id: str
+    semana_fin: date
+    vistas: int
+
+    def __post_init__(self) -> None:
+        if self.vistas < 0:
+            raise ValueError("vistas must not be negative")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FilaEdicion:
+    """One row of a weekly edition, frozen with the title/artist as they were."""
+
+    posicion: int
+    video_id: str
+    titulo: str
+    artista: str | None = None
+    miniatura_url: str | None = None
+    url: str
+    vistas_semana: int
+    vistas_totales: int
+    tendencia: str | None = None  # sube | baja | igual | nuevo | None
+    posicion_anterior: int | None = None
+    fijado: bool = False
+
+
+ESTADO_BORRADOR = "borrador"
+ESTADO_PUBLICADA = "publicada"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class EdicionChart:
+    """A weekly edition of the chart: draft until the editor publishes it."""
+
+    semana_fin: date
+    estado: str = ESTADO_BORRADOR
+    filas: tuple[FilaEdicion, ...] = ()
+    sin_base: int = 0  # videos measured this week with no previous close (not ranked)
+    generada_en: datetime | None = None
+    publicada_en: datetime | None = None

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -83,3 +83,30 @@ class RecoleccionOut(BaseModel):
     videos_seguidos: int
     snapshots: int
     error_estadisticas: str | None
+
+
+class FilaEdicionOut(BaseModel):
+    posicion: int
+    video_id: str
+    titulo: str
+    artista: str | None
+    miniatura_url: str | None
+    url: str
+    vistas_semana: int
+    vistas_totales: int
+    tendencia: str | None
+    posicion_anterior: int | None
+    fijado: bool
+
+
+class EdicionResumenOut(BaseModel):
+    semana_fin: date
+    estado: str
+    filas: int
+    sin_base: int
+    generada_en: datetime | None
+    publicada_en: datetime | None
+
+
+class EdicionOut(EdicionResumenOut):
+    filas_detalle: list[FilaEdicionOut]

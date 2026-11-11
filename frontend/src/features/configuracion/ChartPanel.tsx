@@ -7,21 +7,122 @@ import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SelectNative } from '@/components/ui/select-native'
-import { chartApi, type FilaChart } from './chartApi'
+import { chartApi, type FilaChart, type FilaEdicion } from './chartApi'
 
 const KEY = ['chart-vallenato']
 const KEY_CANALES = ['chart-vallenato', 'canales']
+const KEY_EDICIONES = ['chart-vallenato', 'ediciones']
 const num = (n: number) => n.toLocaleString('es-CO')
 const normalizar = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
-function Tendencia({ fila }: { fila: FilaChart }) {
+function Tendencia({ fila }: { fila: Pick<FilaChart | FilaEdicion, 'tendencia'> }) {
   if (fila.tendencia === 'sube') return <ArrowUp className="size-4 text-success" aria-label="Sube" />
   if (fila.tendencia === 'baja') return <ArrowDown className="size-4 text-danger" aria-label="Baja" />
   if (fila.tendencia === 'nuevo')
     return <span className="text-[10px] font-bold text-brand">NUEVO</span>
   if (fila.tendencia === 'igual') return <Minus className="size-4 text-muted-foreground" aria-label="Igual" />
   return <span className="text-xs text-muted-foreground">—</span>
+}
+
+
+// Edición semanal: se cierra el viernes a medianoche (hora de Colombia). Queda en
+// borrador para que el editor la revise (excluir / fijar abajo) y la publique.
+function EdicionesSection() {
+  const qc = useQueryClient()
+  const lista = useQuery({ queryKey: KEY_EDICIONES, queryFn: chartApi.ediciones })
+  const ultima = lista.data?.[0]
+  const detalle = useQuery({
+    queryKey: [...KEY_EDICIONES, ultima?.semana_fin],
+    queryFn: () => chartApi.edicion(ultima!.semana_fin),
+    enabled: !!ultima,
+  })
+  const refrescar = () => qc.invalidateQueries({ queryKey: KEY_EDICIONES })
+  const regenerar = useMutation({
+    mutationFn: (semana: string) => chartApi.regenerarEdicion(semana),
+    onSuccess: () => {
+      refrescar()
+      toast.success('Borrador recalculado.')
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+  const publicar = useMutation({
+    mutationFn: (semana: string) => chartApi.publicarEdicion(semana),
+    onSuccess: () => {
+      refrescar()
+      toast.success('Edición publicada.')
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+  const ed = detalle.data
+
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border border-border p-3">
+      <h3 className="text-sm font-semibold">Edición semanal (cierre del viernes)</h3>
+      {lista.isLoading ? (
+        <p className="text-sm text-muted-foreground">Cargando…</p>
+      ) : !ultima ? (
+        <p className="text-sm text-muted-foreground">
+          Aún no hay ediciones. El primer cierre (viernes a medianoche) solo fija la línea base; la
+          primera edición sale al cierre siguiente.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm">
+              Semana cerrada el <strong>{ultima.semana_fin}</strong> ·{' '}
+              <span className={ultima.estado === 'publicada' ? 'text-success' : 'text-warning'}>
+                {ultima.estado === 'publicada' ? 'Publicada' : 'Borrador por revisar'}
+              </span>
+              {ultima.sin_base > 0 && (
+                <span className="text-muted-foreground">
+                  {' '}
+                  · {ultima.sin_base} videos sin base de comparación (no entran)
+                </span>
+              )}
+            </p>
+            {ultima.estado === 'borrador' && (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={regenerar.isPending}
+                  onClick={() => regenerar.mutate(ultima.semana_fin)}
+                >
+                  Recalcular borrador
+                </Button>
+                <Button size="sm" disabled={publicar.isPending} onClick={() => publicar.mutate(ultima.semana_fin)}>
+                  Publicar edición
+                </Button>
+              </div>
+            )}
+          </div>
+          <ol className="flex flex-col gap-1">
+            {ed?.filas_detalle.map((f) => (
+              <li key={f.video_id} className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm">
+                <span className="w-6 text-center text-base font-bold text-brand">{f.posicion}</span>
+                <Tendencia fila={f} />
+                <div className="min-w-0 flex-1">
+                  <a className="block truncate font-medium hover:underline" href={f.url} target="_blank" rel="noopener">
+                    {f.titulo}
+                  </a>
+                  <p className="text-xs text-muted-foreground">
+                    {f.artista ?? 'Sin artista'} · +{num(f.vistas_semana)} en la semana · {num(f.vistas_totales)} en total
+                  </p>
+                </div>
+                {f.fijado && <Pin className="size-4 text-brand" aria-label="Fijado" />}
+              </li>
+            ))}
+          </ol>
+          {lista.data && lista.data.length > 1 && (
+            <p className="text-xs text-muted-foreground">
+              Anteriores: {lista.data.slice(1, 6).map((e) => `${e.semana_fin} (${e.estado})`).join(' · ')}
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  )
 }
 
 // El chart se calcula solo con las vistas de YouTube; aquí el editor tiene el
@@ -111,8 +212,10 @@ export function ChartPanel() {
         </p>
       )}
 
+      <EdicionesSection />
+
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">Top 10 actual</h3>
+        <h3 className="text-sm font-semibold">Top 10 actual (en vivo, solo para ti)</h3>
         {chart.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
         ) : !data || data.filas.length === 0 ? (

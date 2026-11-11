@@ -10,7 +10,7 @@ public data (titles, positions, public view counts).
 from __future__ import annotations
 
 import html
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -27,16 +27,24 @@ from app.api.schemas.chart import (
     CanalOut,
     ChartOut,
     ChartPublicoOut,
+    EdicionOut,
+    EdicionResumenOut,
     FilaChartOut,
+    FilaEdicionOut,
     RecoleccionOut,
     VideoManualIn,
     VideoPatch,
     VideoSeguidoOut,
 )
 from config.settings import Settings
-from core.entities.chart import CanalChart, VideoChart
+from core.entities.chart import CanalChart, EdicionChart, VideoChart
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
+from core.services.chart_semanal_service import (
+    EdicionPublicadaError,
+    generar_edicion,
+    publicar_edicion,
+)
 from core.services.chart_service import (
     DIAS_VENTANA,
     TOP_POR_DEFECTO,
@@ -138,6 +146,65 @@ def recolectar_ahora(
         snapshots=res.snapshots,
         error_estadisticas=res.error_estadisticas,
     )
+
+
+def _edicion_out(e: EdicionChart) -> EdicionOut:
+    return EdicionOut(
+        semana_fin=e.semana_fin,
+        estado=e.estado,
+        filas=len(e.filas),
+        sin_base=e.sin_base,
+        generada_en=e.generada_en,
+        publicada_en=e.publicada_en,
+        filas_detalle=[FilaEdicionOut(**asdict(f)) for f in e.filas],
+    )
+
+
+@router.get("/ediciones", response_model=list[EdicionResumenOut])
+def listar_ediciones(uow: UnitOfWork = Depends(get_unit_of_work)) -> list[EdicionResumenOut]:
+    """Weekly editions, newest first. A draft waits here for the editor's review."""
+    return [
+        EdicionResumenOut(
+            semana_fin=e.semana_fin,
+            estado=e.estado,
+            filas=len(e.filas),
+            sin_base=e.sin_base,
+            generada_en=e.generada_en,
+            publicada_en=e.publicada_en,
+        )
+        for e in uow.chart.list_ediciones()
+    ]
+
+
+@router.get("/ediciones/{semana_fin}", response_model=EdicionOut)
+def obtener_edicion(semana_fin: date, uow: UnitOfWork = Depends(get_unit_of_work)) -> EdicionOut:
+    edicion = uow.chart.get_edicion(semana_fin)
+    if edicion is None:
+        raise HTTPException(status_code=404, detail="Edition not found")
+    return _edicion_out(edicion)
+
+
+@router.post("/ediciones/{semana_fin}/regenerar", response_model=EdicionOut)
+def regenerar_edicion(semana_fin: date, uow: UnitOfWork = Depends(get_unit_of_work)) -> EdicionOut:
+    """Rebuild a draft after the editor excluded or pinned videos (never a published one)."""
+    try:
+        edicion = generar_edicion(uow, semana_fin)
+    except EdicionPublicadaError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if edicion is None:
+        raise HTTPException(status_code=404, detail="No hay cierres suficientes para esa semana")
+    uow.commit()
+    return _edicion_out(edicion)
+
+
+@router.post("/ediciones/{semana_fin}/publicar", response_model=EdicionOut)
+def publicar(semana_fin: date, uow: UnitOfWork = Depends(get_unit_of_work)) -> EdicionOut:
+    try:
+        edicion = publicar_edicion(uow, semana_fin)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Edition not found") from exc
+    uow.commit()
+    return _edicion_out(edicion)
 
 
 @router.get("/canales", response_model=list[CanalOut])

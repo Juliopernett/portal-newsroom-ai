@@ -199,3 +199,60 @@ def test_embed_escapes_titles_and_urls() -> None:
     assert "<script>alert" not in salida
     assert "&lt;script&gt;" in salida and "A &amp; B" in salida
     assert 'onerror="alert' not in salida
+
+
+def _sembrar_cortes() -> None:
+    from datetime import date
+
+    from app.api.dependencies import get_unit_of_work
+    from app.api.main import app
+    from core.entities.chart import CorteVistas, VideoChart
+
+    gen = app.dependency_overrides[get_unit_of_work]()
+    uow = next(gen)
+    for vid in ("a", "b"):
+        uow.chart.save_video(
+            VideoChart(
+                video_id=vid,
+                canal_id="UCx",
+                titulo=f"Tema {vid}",
+                publicado_en=datetime(2026, 1, 1, tzinfo=UTC),
+            )
+        )
+        uow.chart.save_corte(CorteVistas(vid, date(2026, 11, 6), 0))
+        uow.chart.save_corte(CorteVistas(vid, date(2026, 11, 13), 100 if vid == "a" else 500))
+    uow.commit()
+    gen.close()
+
+
+def test_weekly_edition_lifecycle_draft_regenerate_publish(client: TestClient) -> None:
+    assert client.get("/chart-vallenato/ediciones").json() == []
+    _sembrar_cortes()
+
+    r = client.post("/chart-vallenato/ediciones/2026-11-13/regenerar")
+    assert r.status_code == 200, r.text
+    ed = r.json()
+    assert ed["estado"] == "borrador" and ed["filas"] == 2
+    assert [f["video_id"] for f in ed["filas_detalle"]] == ["b", "a"]
+
+    # The editor excludes b and rebuilds the draft.
+    client.patch("/chart-vallenato/videos/b", json={"excluido": True})
+    rebuilt = client.post("/chart-vallenato/ediciones/2026-11-13/regenerar").json()
+    assert [f["video_id"] for f in rebuilt["filas_detalle"]] == ["a"]
+
+    pub = client.post("/chart-vallenato/ediciones/2026-11-13/publicar")
+    assert pub.status_code == 200 and pub.json()["estado"] == "publicada"
+    assert pub.json()["publicada_en"] is not None
+    assert client.post("/chart-vallenato/ediciones/2026-11-13/regenerar").status_code == 409
+
+    lista = client.get("/chart-vallenato/ediciones").json()
+    assert [(e["semana_fin"], e["estado"]) for e in lista] == [("2026-11-13", "publicada")]
+    assert client.get("/chart-vallenato/ediciones/2026-11-13").json()["filas"] == 1
+
+
+def test_edition_routes_404_and_require_login(
+    client: TestClient, unauthenticated_client: TestClient
+) -> None:
+    assert client.get("/chart-vallenato/ediciones/2026-11-13").status_code == 404
+    assert client.post("/chart-vallenato/ediciones/2026-11-13/regenerar").status_code == 404
+    assert client.post("/chart-vallenato/ediciones/2026-11-13/publicar").status_code == 404

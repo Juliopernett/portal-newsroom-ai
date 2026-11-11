@@ -5,11 +5,25 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import UTC, date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session as SqlAlchemySession
 
-from core.entities.chart import CanalChart, SnapshotVistas, VideoChart
-from database.models.chart import ChartCanalModel, ChartSnapshotModel, ChartVideoModel
+from core.entities.chart import (
+    CanalChart,
+    CorteVistas,
+    EdicionChart,
+    FilaEdicion,
+    SnapshotVistas,
+    VideoChart,
+)
+from database.models.chart import (
+    ChartCanalModel,
+    ChartCorteModel,
+    ChartEdicionFilaModel,
+    ChartEdicionModel,
+    ChartSnapshotModel,
+    ChartVideoModel,
+)
 
 
 def _aware(value: datetime) -> datetime:
@@ -114,3 +128,108 @@ class SqlAlchemyChartRepository:
         for m in self._session.execute(stmt).scalars():
             resultado[m.video_id].append(SnapshotVistas(m.video_id, m.fecha, int(m.vistas)))
         return resultado
+
+    def save_corte(self, corte: CorteVistas) -> None:
+        self._session.merge(
+            ChartCorteModel(
+                video_id=corte.video_id, semana_fin=corte.semana_fin, vistas=corte.vistas
+            )
+        )
+
+    def list_cortes(self, semana_fin: date) -> dict[str, int]:
+        stmt = select(ChartCorteModel).where(ChartCorteModel.semana_fin == semana_fin)
+        return {m.video_id: int(m.vistas) for m in self._session.execute(stmt).scalars()}
+
+    def ultimo_corte_antes(self, semana_fin: date) -> date | None:
+        stmt = select(func.max(ChartCorteModel.semana_fin)).where(
+            ChartCorteModel.semana_fin < semana_fin
+        )
+        return self._session.execute(stmt).scalar()
+
+    def save_edicion(self, edicion: EdicionChart) -> None:
+        self._session.flush()
+        self._session.execute(
+            delete(ChartEdicionFilaModel).where(
+                ChartEdicionFilaModel.semana_fin == edicion.semana_fin
+            )
+        )
+        self._session.merge(
+            ChartEdicionModel(
+                semana_fin=edicion.semana_fin,
+                estado=edicion.estado,
+                sin_base=edicion.sin_base,
+                generada_en=edicion.generada_en,
+                publicada_en=edicion.publicada_en,
+            )
+        )
+        self._session.flush()
+        for f in edicion.filas:
+            self._session.add(
+                ChartEdicionFilaModel(
+                    semana_fin=edicion.semana_fin,
+                    posicion=f.posicion,
+                    video_id=f.video_id,
+                    titulo=f.titulo,
+                    artista=f.artista,
+                    miniatura_url=f.miniatura_url,
+                    url=f.url,
+                    vistas_semana=f.vistas_semana,
+                    vistas_totales=f.vistas_totales,
+                    tendencia=f.tendencia,
+                    posicion_anterior=f.posicion_anterior,
+                    fijado=f.fijado,
+                )
+            )
+        self._session.flush()
+
+    def _edicion(self, m: ChartEdicionModel) -> EdicionChart:
+        stmt = (
+            select(ChartEdicionFilaModel)
+            .where(ChartEdicionFilaModel.semana_fin == m.semana_fin)
+            .order_by(ChartEdicionFilaModel.posicion)
+        )
+        filas = tuple(
+            FilaEdicion(
+                posicion=f.posicion,
+                video_id=f.video_id,
+                titulo=f.titulo,
+                artista=f.artista,
+                miniatura_url=f.miniatura_url,
+                url=f.url,
+                vistas_semana=int(f.vistas_semana),
+                vistas_totales=int(f.vistas_totales),
+                tendencia=f.tendencia,
+                posicion_anterior=f.posicion_anterior,
+                fijado=f.fijado,
+            )
+            for f in self._session.execute(stmt).scalars()
+        )
+        return EdicionChart(
+            semana_fin=m.semana_fin,
+            estado=m.estado,
+            filas=filas,
+            sin_base=m.sin_base,
+            generada_en=_aware(m.generada_en) if m.generada_en else None,
+            publicada_en=_aware(m.publicada_en) if m.publicada_en else None,
+        )
+
+    def get_edicion(self, semana_fin: date) -> EdicionChart | None:
+        m = self._session.get(ChartEdicionModel, semana_fin)
+        return self._edicion(m) if m else None
+
+    def list_ediciones(self) -> list[EdicionChart]:
+        stmt = select(ChartEdicionModel).order_by(ChartEdicionModel.semana_fin.desc())
+        return [self._edicion(m) for m in self._session.execute(stmt).scalars()]
+
+    def ultima_publicada_antes(self, semana_fin: date) -> EdicionChart | None:
+        stmt = (
+            select(ChartEdicionModel)
+            .where(
+                ChartEdicionModel.semana_fin < semana_fin,
+                ChartEdicionModel.estado == "publicada",
+            )
+            .order_by(ChartEdicionModel.semana_fin.desc())
+            .limit(1)
+        )
+        m = self._session.execute(stmt).scalars().first()
+        return self._edicion(m) if m else None
