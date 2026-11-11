@@ -32,7 +32,7 @@ from core.entities.chart import (
 )
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
-from core.services.chart_service import aplicar_fijados
+from core.services.chart_service import aplicar_fijados, deduplicar_canciones
 
 EDICION_TOP = 20
 MAX_VIDEOS_POR_CANAL = 500
@@ -81,7 +81,7 @@ def _ranking_semanal(
             continue
         filas.append((v, ganadas, total, False))
     filas.sort(key=lambda f: (-f[1], -f[2], f[0].titulo.lower()))
-    return filas, sin_base
+    return deduplicar_canciones(filas), sin_base
 
 
 def _tendencia(

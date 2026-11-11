@@ -159,10 +159,78 @@ def test_clips_titled_only_with_a_date_or_emojis_are_not_songs() -> None:
 
     for sin_nombre in ("6 de noviembre de 2026", "🎶🪗", "❤️🙏🏻", "2026"):
         assert titulo(sin_nombre).es_short is True, sin_nombre
-    for cancion in ("La Playita", "20 de julio", "31 de octubre", "De noviembre a diciembre", "Adelanto de mi canción"):
+    for cancion in (
+        "La Playita",
+        "20 de julio",
+        "31 de octubre",
+        "De noviembre a diciembre",
+        "Adelanto de mi canción",
+    ):
         assert titulo(cancion).es_short is False, cancion
 
 
 def test_length_limit_is_90_seconds_inclusive() -> None:
     assert _video("a", duracion_segundos=90).es_short is True
     assert _video("b", duracion_segundos=91).es_short is False
+
+
+def _con(
+    vid: str, titulo: str, artista: str | None, canal: str = "UCx", **kw: object
+) -> VideoChart:
+    return VideoChart(
+        video_id=vid,
+        canal_id=canal,
+        titulo=titulo,
+        artista=artista,
+        publicado_en=datetime(2026, 10, 1, tzinfo=UTC),
+        **kw,  # type: ignore[arg-type]
+    )
+
+
+def test_the_same_song_uploaded_twice_takes_one_place_the_most_viewed_one() -> None:
+    videos = [
+        _con("oficial", "La Playita (Video Oficial)", "Silvestre", "UC1"),
+        _con("vevo", "LA PLAYITA [Official Video] #vallenato", "Silvestre", "UC2"),
+        _con("otra", "Otra Canción", "Silvestre", "UC1"),
+    ]
+    snaps = {
+        "oficial": _snaps("oficial", {7: 0, 0: 9_000}),
+        "vevo": _snaps("vevo", {7: 0, 0: 12_000}),
+        "otra": _snaps("otra", {7: 0, 0: 5_000}),
+    }
+
+    chart = calcular_chart(videos, snaps, HOY)
+
+    assert [p.video.video_id for p in chart] == ["vevo", "otra"]
+
+
+def test_decorations_are_ignored_when_matching_a_song() -> None:
+    a = _con("a", "La Playita (Video Oficial) #vallenato", "Silvestre")
+    b = _con("b", "La  Playita [Official Audio]", "silvestre")
+    c = _con("c", "La Playita (En Vivo)", "Silvestre")  # a different recording
+
+    from core.services.chart_service import clave_cancion
+
+    assert clave_cancion(a) == clave_cancion(b)
+    assert clave_cancion(a) != clave_cancion(c)
+
+
+def test_two_songs_with_the_same_title_from_unknown_artists_never_merge() -> None:
+    from core.services.chart_service import clave_cancion
+
+    assert clave_cancion(_con("a", "El Camino", None, "UC1")) != clave_cancion(
+        _con("b", "El Camino", None, "UC2")
+    )
+
+
+def test_a_pinned_duplicate_claims_the_song_over_a_more_viewed_copy() -> None:
+    videos = [
+        _con("fijo", "La Playita", "Silvestre", "UC1", fijado_posicion=1),
+        _con("mas_vistas", "La Playita (Video Oficial)", "Silvestre", "UC2"),
+    ]
+    snaps = {
+        "fijo": _snaps("fijo", {7: 0, 0: 10}),
+        "mas_vistas": _snaps("mas_vistas", {7: 0, 0: 90_000}),
+    }
+
+    assert [p.video.video_id for p in calcular_chart(videos, snaps, HOY)] == ["fijo"]

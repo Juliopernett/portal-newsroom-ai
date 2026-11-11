@@ -18,6 +18,8 @@ Rules (agreed with the owner, 2026-11-10):
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
@@ -51,6 +53,65 @@ class PosicionChart:
     posicion_anterior: int | None
     fijado: bool
     parcial: bool
+
+
+_RUIDO_TITULO = re.compile(
+    r"\([^)]*\)|\[[^\]]*\]|\{[^}]*\}|#\w+"
+    r"|\b(?:video|videoclip|oficial|official|audio|lyric|lyrics|letra|visualizer|vevo)\b",
+    re.IGNORECASE,
+)
+
+
+_VERSION = re.compile(r"\b(en vivo|live|remix|cover|acustic[oa]|karaoke|instrumental)\b")
+
+
+def _normalizar(texto: str) -> str:
+    sin_tildes = unicodedata.normalize("NFD", texto.lower())
+    sin_tildes = "".join(c for c in sin_tildes if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^a-z0-9ñ]+", " ", sin_tildes).strip()
+
+
+def clave_cancion(video: VideoChart) -> str:
+    """Same song, different upload (official channel vs VEVO, lyric video, audio…).
+
+    Built from the artist and the title without the usual decorations. A video
+    with no artist keys on its channel, so two unrelated songs that share a
+    title never merge. "En vivo" versions are kept apart on purpose.
+    """
+    completo = _normalizar(video.titulo)
+    # A live, remix or cover recording is a different version of the song.
+    versiones = sorted(set(_VERSION.findall(completo)))
+    titulo = _normalizar(_RUIDO_TITULO.sub(" ", video.titulo)) + "".join(f"|{x}" for x in versiones)
+    quien = _normalizar(video.artista) if video.artista else f"canal:{video.canal_id}"
+    return f"{quien}|{titulo}"
+
+
+def deduplicar_canciones(
+    filas: list[tuple[VideoChart, int, int, bool]],
+) -> list[tuple[VideoChart, int, int, bool]]:
+    """Keep one row per song: a pinned video first, otherwise the most viewed.
+
+    `filas` must already be sorted best-first. The editor can still exclude or
+    pin any video by hand; this only stops the same song taking two places.
+    """
+    vistas: set[str] = set()
+    elegidas: set[str] = set()
+    for v, *_ in filas:  # pinned videos claim their song first
+        if v.fijado_posicion is not None:
+            vistas.add(clave_cancion(v))
+            elegidas.add(v.video_id)
+    resultado: list[tuple[VideoChart, int, int, bool]] = []
+    for fila in filas:
+        v = fila[0]
+        if v.video_id in elegidas:
+            resultado.append(fila)
+            continue
+        clave = clave_cancion(v)
+        if clave in vistas:
+            continue
+        vistas.add(clave)
+        resultado.append(fila)
+    return resultado
 
 
 def _vistas_ganadas(
@@ -95,7 +156,7 @@ def _ranking_base(
             continue
         filas.append((v, r[0], r[1], r[2]))
     filas.sort(key=lambda f: (-f[1], -f[2], f[0].titulo.lower()))
-    return filas
+    return deduplicar_canciones(filas)
 
 
 def aplicar_fijados(
