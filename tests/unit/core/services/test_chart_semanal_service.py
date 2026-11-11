@@ -239,3 +239,47 @@ def test_close_reports_a_failing_channel_but_keeps_going(uow: SqlAlchemyUnitOfWo
     )
 
     assert res.canales_ok == 1 and len(res.canales_con_error) == 1 and res.hubo_errores
+
+
+def test_retention_purges_statistics_older_than_the_limit(uow: SqlAlchemyUnitOfWork) -> None:
+    from core.entities.chart import SnapshotVistas
+    from core.services.chart_service import purgar_datos_antiguos
+
+    hoy = date(2026, 12, 20)
+    _video(uow, "a")
+    # Old (45 days) and recent (5 days) data of every kind.
+    uow.chart.save_snapshot(SnapshotVistas("a", hoy - timedelta(days=45), 10))
+    uow.chart.save_snapshot(SnapshotVistas("a", hoy - timedelta(days=5), 20))
+    viejo, reciente = hoy - timedelta(days=45), hoy - timedelta(days=5)
+    for semana, total in ((viejo - timedelta(days=7), 1), (viejo, 2), (reciente, 3)):
+        _corte(uow, semana, a=total)
+    _corte(uow, reciente - timedelta(days=7), a=1)
+    generar_edicion(uow, viejo)
+    generar_edicion(uow, reciente)
+
+    res = purgar_datos_antiguos(uow, hoy, 30)
+
+    assert (res.snapshots, res.cortes, res.ediciones) == (1, 2, 1)
+    assert [s.fecha for s in uow.chart.list_snapshots(["a"], desde=date(2020, 1, 1))["a"]] == [
+        hoy - timedelta(days=5)
+    ]
+    assert uow.chart.get_edicion(viejo) is None
+    assert uow.chart.get_edicion(reciente) is not None
+    assert uow.chart.list_cortes(reciente) == {"a": 3}
+
+
+def test_retention_can_be_raised_after_approval_and_is_idempotent(
+    uow: SqlAlchemyUnitOfWork,
+) -> None:
+    from core.entities.chart import SnapshotVistas
+    from core.services.chart_service import purgar_datos_antiguos
+
+    hoy = date(2026, 12, 20)
+    _video(uow, "a")
+    uow.chart.save_snapshot(SnapshotVistas("a", hoy - timedelta(days=200), 5))
+
+    assert purgar_datos_antiguos(uow, hoy, 1095).snapshots == 0
+    assert purgar_datos_antiguos(uow, hoy, 30).snapshots == 1
+    assert purgar_datos_antiguos(uow, hoy, 30).snapshots == 0
+    with pytest.raises(ValueError):
+        purgar_datos_antiguos(uow, hoy, 0)

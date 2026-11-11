@@ -129,6 +129,21 @@ class SqlAlchemyChartRepository:
             resultado[m.video_id].append(SnapshotVistas(m.video_id, m.fecha, int(m.vistas)))
         return resultado
 
+    def purgar_anteriores_a(self, fecha: date) -> tuple[int, int, int]:
+        snaps = self._session.execute(
+            delete(ChartSnapshotModel).where(ChartSnapshotModel.fecha < fecha)
+        ).rowcount
+        cortes = self._session.execute(
+            delete(ChartCorteModel).where(ChartCorteModel.semana_fin < fecha)
+        ).rowcount
+        self._session.execute(
+            delete(ChartEdicionFilaModel).where(ChartEdicionFilaModel.semana_fin < fecha)
+        )
+        ediciones = self._session.execute(
+            delete(ChartEdicionModel).where(ChartEdicionModel.semana_fin < fecha)
+        ).rowcount
+        return int(snaps or 0), int(cortes or 0), int(ediciones or 0)
+
     def save_corte(self, corte: CorteVistas) -> None:
         self._session.merge(
             ChartCorteModel(

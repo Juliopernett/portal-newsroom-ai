@@ -15,18 +15,24 @@ Usage:
 from __future__ import annotations
 
 import sys
+from datetime import UTC, datetime
 
 from agents.youtube.client import YouTubeDataApiReader
 from config.settings import get_settings
 from core.services.chart_semanal_service import cerrar_semana
+from core.services.chart_service import purgar_datos_antiguos
 from database.engine import get_session_factory
 from database.unit_of_work import SqlAlchemyUnitOfWork
 
 
 def main() -> int:
-    reader = YouTubeDataApiReader(get_settings())
+    settings = get_settings()
+    reader = YouTubeDataApiReader(settings)
     with SqlAlchemyUnitOfWork(get_session_factory()) as uow:
         res = cerrar_semana(uow, reader)
+        limpieza = purgar_datos_antiguos(
+            uow, datetime.now(UTC).date(), settings.chart_retencion_dias
+        )
         uow.commit()
 
     edicion = f"borrador con {res.edicion_filas} filas" if res.edicion_generada else "no generada"
@@ -34,6 +40,10 @@ def main() -> int:
         f"Semana {res.semana_fin} | canales ok: {res.canales_ok} | "
         f"videos nuevos: {res.videos_nuevos} | medidos: {res.videos_medidos} | "
         f"edición: {edicion} | sin base: {res.sin_base}"
+    )
+    print(
+        f"Limpieza (>{settings.chart_retencion_dias} días): {limpieza.snapshots} snapshots, "
+        f"{limpieza.cortes} cierres, {limpieza.ediciones} ediciones"
     )
     if res.nota:
         print(res.nota)

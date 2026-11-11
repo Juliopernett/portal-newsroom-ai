@@ -59,3 +59,10 @@ class ChartRepository(Protocol):
         ...
 
     def ultima_publicada_antes(self, semana_fin: date) -> EdicionChart | None: ...
+
+    def purgar_anteriores_a(self, fecha: date) -> tuple[int, int, int]:
+        """Delete snapshots, weekly closes and editions older than `fecha`.
+
+        Returns how many `(snapshots, cortes, ediciones)` were removed.
+        """
+        ...

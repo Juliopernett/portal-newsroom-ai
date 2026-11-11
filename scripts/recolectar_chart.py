@@ -12,22 +12,32 @@ Usage:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from agents.youtube.client import YouTubeDataApiReader
 from config.settings import get_settings
-from core.services.chart_service import recolectar_chart
+from core.services.chart_service import purgar_datos_antiguos, recolectar_chart
 from database.engine import get_session_factory
 from database.unit_of_work import SqlAlchemyUnitOfWork
 
 
 def main() -> None:
-    reader = YouTubeDataApiReader(get_settings())
+    settings = get_settings()
+    reader = YouTubeDataApiReader(settings)
     with SqlAlchemyUnitOfWork(get_session_factory()) as uow:
         res = recolectar_chart(uow, reader)
+        limpieza = purgar_datos_antiguos(
+            uow, datetime.now(UTC).date(), settings.chart_retencion_dias
+        )
         uow.commit()
 
     print(
         f"Canales ok: {res.canales_ok} | videos nuevos: {res.videos_nuevos} | "
         f"videos seguidos: {res.videos_seguidos} | snapshots: {res.snapshots}"
+    )
+    print(
+        f"Limpieza (>{settings.chart_retencion_dias} días): {limpieza.snapshots} snapshots, "
+        f"{limpieza.cortes} cierres, {limpieza.ediciones} ediciones"
     )
     for error in res.canales_con_error:
         print(f"[canal con error] {error}")

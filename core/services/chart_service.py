@@ -254,3 +254,23 @@ def recolectar_chart(
 
 def _aware(valor: datetime) -> datetime:
     return valor if valor.tzinfo is not None else valor.replace(tzinfo=UTC)
+
+
+@dataclass(frozen=True, slots=True)
+class ResultadoLimpieza:
+    snapshots: int
+    cortes: int
+    ediciones: int
+
+
+def purgar_datos_antiguos(uow: UnitOfWork, hoy: date, dias: int) -> ResultadoLimpieza:
+    """Delete YouTube statistics older than `dias` days (data-retention policy).
+
+    YouTube lets a client without approval keep API statistics for 30 days at
+    most. Covers the daily snapshots, the weekly closes and the stored
+    editions (whose view counts are derived from them). Idempotent.
+    """
+    if dias < 1:
+        raise ValueError("dias must be at least 1")
+    snaps, cortes, ediciones = uow.chart.purgar_anteriores_a(hoy - timedelta(days=dias))
+    return ResultadoLimpieza(snapshots=snaps, cortes=cortes, ediciones=ediciones)
