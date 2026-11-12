@@ -26,7 +26,7 @@ reportlab>=4.2,<5
 pillow>=11,<14  # portadas (agents/images/pillow_portada_renderer.py)
 
 # --- Extracción de contenido (usadas a partir del agente Extractor) ---
-playwright>=1.44,<2
+playwright>=1.64.1,<2
 beautifulsoup4>=4.12,<5
 requests>=2.32,<3
 
