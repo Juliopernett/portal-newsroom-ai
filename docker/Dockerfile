@@ -30,6 +30,12 @@ WORKDIR /app
 COPY requirements.txt requirements.lock.txt ./
 RUN pip install --no-cache-dir -r requirements.lock.txt
 
+# `pg_dump` for the nightly backup (scripts/respaldar_base.py). Installed in the
+# shared image because every Railway service builds from this Dockerfile.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY . .
 COPY --from=frontend-build /frontend/dist ./frontend/dist
 

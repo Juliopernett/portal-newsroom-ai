@@ -62,6 +62,17 @@ class Settings(BaseSettings):
     # raise it (e.g. CHART_RETENCION_DIAS=1095) only after that approval.
     chart_retencion_dias: int = 30
 
+    # --- Respaldos de la base de datos (scripts/respaldar_base.py) ---
+    # Any S3-compatible bucket; Cloudflare R2 is the intended one (endpoint
+    # https://<account>.r2.cloudflarestorage.com). Set by the owner directly in
+    # Railway — never in the repo. All four must be set for backups to run.
+    respaldo_s3_endpoint: str | None = None
+    respaldo_s3_bucket: str | None = None
+    respaldo_s3_access_key_id: str | None = None
+    respaldo_s3_secret_access_key: str | None = None
+    respaldo_prefijo: str = "newsroom"
+    respaldo_conservar: int = 30  # how many of the most recent backups are kept
+
     # --- Media storage (MediaAsset — see docs/adr/ADR-007-media-assets.md) ---
     # `media_storage_dir` points at a Railway Volume in production; a
     # plain local directory otherwise (see `agents/storage/local_disk.py`).

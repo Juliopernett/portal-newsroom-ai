@@ -38,3 +38,6 @@ anthropic>=0.69,<1
 
 # --- Discovery / Radar (agents/radar, Sprint Discovery 1) ---
 feedparser>=6.0,<7
+
+# --- Respaldos de la base de datos hacia un bucket compatible con S3 (Cloudflare R2) ---
+boto3>=1.35,<2
