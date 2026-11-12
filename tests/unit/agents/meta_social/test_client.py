@@ -244,3 +244,66 @@ def test_a_second_timeout_is_raised() -> None:
         pytest.raises(requests.Timeout),
     ):
         reader._get("pagina/posts", fields="id", token="t")
+
+
+def _meta_demasiados_datos() -> MagicMock:
+    import requests
+
+    response = MagicMock()
+    response.status_code = 500
+    response.json.return_value = {
+        "error": {
+            "code": 1,
+            "message": "Please reduce the amount of data you're asking for, then retry your request",  # noqa: E501
+        }
+    }
+    response.raise_for_status.side_effect = requests.HTTPError("500", response=response)
+    return response
+
+
+def test_facebook_listing_steps_down_when_meta_asks_for_less_data() -> None:
+    reader = MetaGraphSocialMediaReader(_settings())
+    ok = _mock_response(
+        {
+            "data": [
+                {
+                    "id": "1_2",
+                    "message": "hola",
+                    "permalink_url": "https://facebook.com/1_2",
+                    "created_time": "2026-11-12T10:00:00+0000",
+                }
+            ]
+        }
+    )
+    llamadas = [
+        _mock_response({"access_token": "page-token"}),
+        _meta_demasiados_datos(),  # 25 posts + pictures: too much
+        ok,  # 12 posts, no pictures
+    ]
+
+    with patch("agents.meta_social.client.requests.get", side_effect=llamadas) as get:
+        posts = reader.posts_recientes(CanalPublicacion.FACEBOOK, limite=40)
+
+    assert [p.id for p in posts] == ["1_2"]
+    assert get.call_count == 3  # token + two listings: the "too much data" call is NOT retried
+    primero = get.call_args_list[1].kwargs["params"]
+    segundo = get.call_args_list[2].kwargs["params"]
+    assert primero["limit"] == 25 and "full_picture" in primero["fields"]
+    assert segundo["limit"] == 12 and "full_picture" not in segundo["fields"]
+
+
+def test_facebook_listing_gives_up_after_the_smallest_request() -> None:
+    import requests
+
+    reader = MetaGraphSocialMediaReader(_settings())
+    llamadas = [_mock_response({"access_token": "t"})] + [
+        _meta_demasiados_datos() for _ in range(3)
+    ]
+
+    with (
+        patch("agents.meta_social.client.requests.get", side_effect=llamadas) as get,
+        pytest.raises(requests.HTTPError),
+    ):
+        reader.posts_recientes(CanalPublicacion.FACEBOOK, limite=40)
+
+    assert get.call_count == 4  # token + 25 + 12 + 6, each tried once

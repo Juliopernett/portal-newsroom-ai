@@ -26,6 +26,13 @@ from core.entities.post_red_social import PostRedSocial
 _GRAPH_API_BASE = "https://graph.facebook.com/v21.0"
 _REQUEST_TIMEOUT_SECONDS = 25
 _INTENTOS = 2
+_PIDE_MENOS_DATOS = "reduce the amount of data"
+# The Page's /posts edge answers HTTP 500 "reduce the amount of data you're
+# asking for" when the page is big (40 posts + their pictures). Asking again
+# for the same thing never works, so the listing steps down instead.
+_MAX_POSTS_FACEBOOK = 25
+_CAMPOS_FACEBOOK = "id,message,permalink_url,created_time,full_picture"
+_CAMPOS_FACEBOOK_LIGEROS = "id,message,permalink_url,created_time"
 _log = logging.getLogger(__name__)
 
 
@@ -36,7 +43,14 @@ def _error_meta(response: requests.Response) -> str:
         return f"code={error.get('code')} {str(error.get('message', ''))[:200]}"
     except ValueError:
         return "(sin detalle)"
+
+
 _SIN_TEXTO = "(sin texto)"
+
+
+def _pide_menos_datos(response: requests.Response | None) -> bool:
+    """Whether Meta is saying "ask for less" (so repeating the same call is pointless)."""
+    return response is not None and _PIDE_MENOS_DATOS in _error_meta(response).lower()
 
 
 class MetaGraphConfigurationError(RuntimeError):
@@ -96,7 +110,7 @@ class MetaGraphSocialMediaReader:
                 codigo = fallo.status_code if fallo is not None else 0
                 detalle = _error_meta(fallo) if fallo is not None else "(sin detalle)"
                 _log.warning("Meta Graph %s respondió %s: %s", path, codigo, detalle)
-                if ultimo or not (codigo >= 500 or codigo == 429):
+                if ultimo or not (codigo >= 500 or codigo == 429) or _pide_menos_datos(fallo):
                     raise
             else:
                 result: dict[str, Any] = response.json()
@@ -191,12 +205,23 @@ class MetaGraphSocialMediaReader:
         return self._page_access_token
 
     def _posts_facebook(self, limite: int) -> list[PostRedSocial]:
-        data = self._get(
-            f"{self._page_id}/posts",
-            fields="id,message,permalink_url,created_time,full_picture",
-            token=self._facebook_page_token(),
-            limite=limite,
-        ).get("data", [])
+        token = self._facebook_page_token()
+        pasos = [
+            (min(limite, _MAX_POSTS_FACEBOOK), _CAMPOS_FACEBOOK),
+            (min(limite, 12), _CAMPOS_FACEBOOK_LIGEROS),
+            (min(limite, 6), _CAMPOS_FACEBOOK_LIGEROS),
+        ]
+        data: list[dict[str, Any]] = []
+        for i, (cuantos, campos) in enumerate(pasos):
+            try:
+                data = self._get(
+                    f"{self._page_id}/posts", fields=campos, token=token, limite=cuantos
+                ).get("data", [])
+                break
+            except requests.HTTPError as exc:
+                if i == len(pasos) - 1 or not _pide_menos_datos(exc.response):
+                    raise
+                _log.warning("Meta Graph /posts: pidiendo menos datos (%s posts)", pasos[i + 1][0])
         return [
             PostRedSocial(
                 id=item["id"],

@@ -42,6 +42,9 @@ function PostsRecientesPicker({
     queryKey: ['posts-recientes', canal, contexto],
     queryFn: () => solicitudesApi.postsRecientes(canal, contexto),
     enabled: open,
+    // Un fallo de Meta no se arregla repitiéndolo solo: se muestra el error al
+    // instante y la persona reintenta con el botón.
+    retry: false,
   })
 
   return (
@@ -52,7 +55,14 @@ function PostsRecientesPicker({
       {open && (
         <div className="absolute top-full left-0 z-10 mt-1 max-h-96 w-96 overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
           {query.isLoading && <p className="p-2 text-xs text-muted-foreground">Cargando…</p>}
-          {query.isError && <p className="p-2 text-xs text-danger">{errorMessage(query.error)}</p>}
+          {query.isError && (
+            <div className="flex flex-col gap-1 p-2 text-xs">
+              <p className="text-danger">{errorMessage(query.error)}</p>
+              <Button type="button" size="sm" variant="secondary" onClick={() => query.refetch()}>
+                Reintentar
+              </Button>
+            </div>
+          )}
           {query.data?.length === 0 && (
             <p className="p-2 text-xs text-muted-foreground">Sin posts recientes.</p>
           )}
