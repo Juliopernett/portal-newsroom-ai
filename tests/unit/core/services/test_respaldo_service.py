@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from boto3.exceptions import S3UploadFailedError
 from botocore.exceptions import ClientError
 
 from agents.storage.respaldo_s3 import AlmacenRespaldosS3, RespaldoNoConfigurado
@@ -166,3 +167,13 @@ def test_pg_dump_command_keeps_the_password_out_of_the_command_line(tmp_path: Pa
 def test_only_postgres_is_supported(tmp_path: Path) -> None:
     with pytest.raises(AlmacenRespaldoError):
         comando_pg_dump("sqlite:///x.db", tmp_path / "x.dump")
+
+
+def test_a_failed_upload_wrapper_from_boto3_is_also_a_clean_error(tmp_path: Path) -> None:
+    archivo = tmp_path / "a.dump"
+    archivo.write_bytes(b"1")
+    s3 = MagicMock()
+    s3.upload_file.side_effect = S3UploadFailedError("Failed to upload: SignatureDoesNotMatch")
+
+    with pytest.raises(AlmacenRespaldoError, match="S3UploadFailedError"):
+        AlmacenRespaldosS3(_settings(), cliente=s3).subir(archivo, "n/a.dump")

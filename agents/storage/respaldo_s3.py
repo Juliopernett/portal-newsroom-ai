@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import boto3
+from boto3.exceptions import Boto3Error
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -45,7 +46,7 @@ class AlmacenRespaldosS3:
         try:
             self._s3.upload_file(str(archivo), self._bucket, clave)
             cabecera = self._s3.head_object(Bucket=self._bucket, Key=clave)
-        except (BotoCoreError, ClientError) as exc:
+        except (BotoCoreError, ClientError, Boto3Error) as exc:
             raise AlmacenRespaldoError(
                 f"No se pudo subir el respaldo: {type(exc).__name__}"
             ) from None
@@ -59,7 +60,7 @@ class AlmacenRespaldosS3:
             )
             for pagina in paginas:
                 claves.extend(o["Key"] for o in pagina.get("Contents", []))
-        except (BotoCoreError, ClientError) as exc:
+        except (BotoCoreError, ClientError, Boto3Error) as exc:
             raise AlmacenRespaldoError(
                 f"No se pudo listar los respaldos: {type(exc).__name__}"
             ) from None
@@ -68,5 +69,5 @@ class AlmacenRespaldosS3:
     def borrar(self, clave: str) -> None:
         try:
             self._s3.delete_object(Bucket=self._bucket, Key=clave)
-        except (BotoCoreError, ClientError) as exc:
+        except (BotoCoreError, ClientError, Boto3Error) as exc:
             raise AlmacenRespaldoError(f"No se pudo borrar {clave}: {type(exc).__name__}") from None
