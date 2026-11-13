@@ -56,6 +56,7 @@ prueba): una copia que nunca se ha restaurado no es una garantía.
 
 ## Notas
 
+- `pg_dump` debe ser de la misma versión mayor que el Postgres de Railway o más nueva (hoy 18). Si Railway sube Postgres, cambia `PG_CLIENT_MAJOR` en `docker/Dockerfile`; el error típico es «server version mismatch».
 - La copia contiene datos sensibles (clientes, contratos, finanzas): el bucket debe
   ser privado y las claves solo viven en las variables de Railway.
 - El volumen de archivos multimedia (`portal-newsroom-ai-volume`) **no** entra en

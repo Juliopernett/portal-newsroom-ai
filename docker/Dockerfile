@@ -32,8 +32,23 @@ RUN pip install --no-cache-dir -r requirements.lock.txt
 
 # `pg_dump` for the nightly backup (scripts/respaldar_base.py). Installed in the
 # shared image because every Railway service builds from this Dockerfile.
+# pg_dump refuses to dump a server NEWER than itself, and Railway's Postgres is
+# 18 while Debian's own package is 17 — so the client comes from the official
+# PostgreSQL apt repository (PGDG). Keep this number equal to the server's major
+# version (check `SHOW server_version;`) and bump both together.
+ARG PG_CLIENT_MAJOR=18
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends postgresql-client \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+        https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends "postgresql-client-${PG_CLIENT_MAJOR}" \
+    && apt-get purge -y curl \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY . .
