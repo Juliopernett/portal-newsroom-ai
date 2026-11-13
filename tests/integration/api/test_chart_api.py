@@ -4,9 +4,30 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 
 from core.entities.chart import SnapshotVistas
+
+
+class _CatalogoFalso:
+    """Stands in for the website's artist grid; never touches the network."""
+
+    def __init__(self, datos: dict[str, str] | None = None) -> None:
+        self.datos = datos or {}
+
+    def obtener(self) -> dict[str, str]:
+        return self.datos
+
+
+@pytest.fixture(autouse=True)
+def _sin_red_de_artistas():
+    from agents.portal.catalogo_artistas import get_catalogo_artistas
+    from app.api.main import app
+
+    app.dependency_overrides[get_catalogo_artistas] = lambda: _CatalogoFalso()
+    yield
+    app.dependency_overrides.pop(get_catalogo_artistas, None)
 
 
 def _canal(client: TestClient, ref: str = "@silvestredangond", artista: str = "Silvestre") -> str:
@@ -302,3 +323,46 @@ def test_weekly_status_endpoint_needs_login_and_answers(
     assert r.status_code == 200
     assert set(r.json()) == {"semana_fin", "nivel", "mensaje"}
     assert r.json()["nivel"] in {"ok", "info", "atencion", "error"}
+
+
+def test_public_rows_link_to_the_artist_page_when_the_website_has_one(
+    client: TestClient, unauthenticated_client: TestClient
+) -> None:
+    from agents.portal.catalogo_artistas import get_catalogo_artistas
+    from app.api.dependencies import get_unit_of_work
+    from app.api.main import app
+    from core.entities.chart import CorteVistas, VideoChart
+
+    app.dependency_overrides[get_catalogo_artistas] = lambda: _CatalogoFalso(
+        {"la china laura hamburger": "https://portalvallenato.com/laura-hamburger-la-china/"}
+    )
+    gen = app.dependency_overrides[get_unit_of_work]()
+    uow = next(gen)
+    for vid, artista in (("a", "La China"), ("b", "Sin Pagina")):
+        uow.chart.save_video(
+            VideoChart(
+                video_id=vid,
+                canal_id="UCx",
+                titulo=f"Tema {vid}",
+                artista=artista,
+                publicado_en=datetime(2026, 1, 1, tzinfo=UTC),
+            )
+        )
+        from datetime import date
+
+        uow.chart.save_corte(CorteVistas(vid, date(2026, 11, 6), 0))
+        uow.chart.save_corte(CorteVistas(vid, date(2026, 11, 13), 100 if vid == "a" else 500))
+    uow.commit()
+    gen.close()
+    client.post("/chart-vallenato/ediciones/2026-11-13/regenerar")
+    client.post("/chart-vallenato/ediciones/2026-11-13/publicar")
+
+    filas = {
+        f["video_id"]: f
+        for f in unauthenticated_client.get("/chart-vallenato/publico.json").json()["filas"]
+    }
+    assert filas["a"]["artista_url"] == "https://portalvallenato.com/laura-hamburger-la-china/"
+    assert filas["b"]["artista_url"] is None
+    embed = unauthenticated_client.get("/chart-vallenato/embed").text
+    assert 'href="https://portalvallenato.com/laura-hamburger-la-china/"' in embed
+    assert "Sin Pagina" in embed

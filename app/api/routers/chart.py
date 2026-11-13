@@ -16,6 +16,7 @@ from datetime import UTC, date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse
 
+from agents.portal.catalogo_artistas import CatalogoArtistas, get_catalogo_artistas
 from app.api.dependencies import (
     get_current_user,
     get_settings_dep,
@@ -32,6 +33,7 @@ from app.api.schemas.chart import (
     EstadoSemanalOut,
     FilaChartOut,
     FilaEdicionOut,
+    FilaPublicaOut,
     RecoleccionOut,
     VideoManualIn,
     VideoPatch,
@@ -41,6 +43,7 @@ from config.settings import Settings
 from core.entities.chart import CanalChart, EdicionChart, FilaEdicion, VideoChart
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
+from core.services.chart_enlaces import pagina_del_artista
 from core.services.chart_semanal_service import (
     EdicionPublicadaError,
     estado_semanal,
@@ -91,6 +94,12 @@ def _fila(p: PosicionChart) -> FilaChartOut:
 
 def _fila_edicion(f: FilaEdicion) -> FilaChartOut:
     return FilaChartOut(**asdict(f), parcial=False)
+
+
+def _fila_publica(f: FilaEdicion, catalogo: dict[str, str]) -> FilaPublicaOut:
+    return FilaPublicaOut(
+        **_fila_edicion(f).model_dump(), artista_url=pagina_del_artista(f.artista, catalogo)
+    )
 
 
 def _ultima_publicada(uow: UnitOfWork) -> EdicionChart | None:
@@ -337,6 +346,7 @@ def chart_publico(
     request: Request,
     response: Response,
     uow: UnitOfWork = Depends(get_unit_of_work),
+    catalogo: CatalogoArtistas = Depends(get_catalogo_artistas),
     n: int = Query(default=10, ge=1, le=20, description="Cuántas posiciones devolver"),
 ) -> ChartPublicoOut:
     """The last published weekly edition (top `n`) — unauthenticated, cacheable.
@@ -351,11 +361,12 @@ def chart_publico(
         origen if origen in _ORIGENES_PUBLICOS else _ORIGENES_PUBLICOS[0]
     )
     response.headers["Vary"] = "Origin"
+    mapa = catalogo.obtener() if edicion else {}
     return ChartPublicoOut(
         actualizado=edicion.semana_fin if edicion else None,
         semana_fin=edicion.semana_fin if edicion else None,
         publicada_en=edicion.publicada_en if edicion else None,
-        filas=[_fila_edicion(f) for f in edicion.filas][:n] if edicion else [],
+        filas=[_fila_publica(f, mapa) for f in edicion.filas][:n] if edicion else [],
     )
 
 
@@ -375,12 +386,15 @@ _CSS_EMBED = (
     ".t{margin:0;padding:10px 12px;background:#3B5998;color:#fff;font-weight:700;text-transform:uppercase;"  # noqa: E501
     "letter-spacing:-.5px;font-size:16px}.t small{display:block;font-weight:400;text-transform:none;"  # noqa: E501
     "letter-spacing:0;font-size:12px;opacity:.85;margin-top:2px}"
-    "ol{list-style:none;margin:0;padding:0}li{border-top:1px solid #e3e8ef}"
-    "a{color:inherit;text-decoration:none}li a{display:flex;align-items:center;gap:8px;padding:8px 10px}"  # noqa: E501
-    "li a:hover{background:#f2f6fb}.n{flex:0 0 26px;text-align:center;font-weight:700;font-size:18px;color:#3B5998}"  # noqa: E501
+    "ol{list-style:none;margin:0;padding:0}"
+    "li{border-top:1px solid #e3e8ef;display:flex;align-items:center;gap:8px;padding:8px 10px}"
+    "a{color:inherit;text-decoration:none}li:hover{background:#f2f6fb}"
+    ".p{display:flex;align-items:center;gap:8px}"
+    ".n{flex:0 0 26px;text-align:center;font-weight:700;font-size:18px;color:#3B5998}"
     ".i{flex:0 0 56px;height:42px;object-fit:cover;background:#dde3ec}.x{flex:1;min-width:0}"
     ".s{display:block;font-weight:600;font-size:13px;line-height:1.25}"
     ".a{display:block;font-size:12px;color:#5c6b7a;margin-top:2px}"
+    ".l{color:#3B5998;font-weight:600}.l:hover{text-decoration:underline}"
     ".d{flex:0 0 30px;text-align:center;font-size:13px;font-weight:700}"
     ".v{padding:16px 12px;font-size:13px;color:#5c6b7a}"
     ".f{padding:8px 12px;font-size:11px;color:#5c6b7a;border-top:1px solid #e3e8ef;background:#f7f9fc}"  # noqa: E501
@@ -399,12 +413,23 @@ def _html_embed(filas: list[FilaChartOut], actualizado: date | None) -> str:
                 if f.miniatura_url
                 else ""
             )
-            artista = f'<span class="a">{e(f.artista)}</span>' if f.artista else ""
+            url_artista = getattr(f, "artista_url", None)
+            if f.artista and url_artista:
+                artista = (
+                    f'<a class="a l" href="{e(url_artista, quote=True)}" target="_top">'
+                    f"{e(f.artista)}</a>"
+                )
+            elif f.artista:
+                artista = f'<span class="a">{e(f.artista)}</span>'
+            else:
+                artista = ""
             dir_ = f'<span class="d" style="color:{flecha[1]}">{flecha[0]}</span>' if flecha else ""
+            # The video link and the artist link are siblings (never nested anchors).
             items.append(
-                f'<li><a href="{e(f.url, quote=True)}" target="_blank" rel="noopener nofollow">'
-                f'<span class="n">{f.posicion}</span>{miniatura}'
-                f'<span class="x"><span class="s">{e(f.titulo)}</span>{artista}</span>{dir_}</a></li>'  # noqa: E501
+                f'<li><a class="p" href="{e(f.url, quote=True)}" target="_blank" '
+                f'rel="noopener nofollow"><span class="n">{f.posicion}</span>{miniatura}</a>'
+                f'<span class="x"><a class="s" href="{e(f.url, quote=True)}" target="_blank" '
+                f'rel="noopener nofollow">{e(f.titulo)}</a>{artista}</span>{dir_}</li>'
             )
         cuerpo = "<ol>" + "".join(items) + "</ol>"
     else:
@@ -428,6 +453,7 @@ def _html_embed(filas: list[FilaChartOut], actualizado: date | None) -> str:
 @router_publico.get("/embed", response_class=HTMLResponse)
 def chart_embed(
     uow: UnitOfWork = Depends(get_unit_of_work),
+    catalogo: CatalogoArtistas = Depends(get_catalogo_artistas),
     n: int = Query(default=10, ge=3, le=10, description="Cuántas posiciones mostrar"),
 ) -> HTMLResponse:
     """The chart as a ready-made card other websites can put in an `<iframe>`.
@@ -438,7 +464,8 @@ def chart_embed(
     allows being framed (see `app.api.main.add_security_headers`).
     """
     edicion = _ultima_publicada(uow)
-    filas = [_fila_edicion(f) for f in edicion.filas][:n] if edicion else []
+    mapa = catalogo.obtener() if edicion else {}
+    filas = [_fila_publica(f, mapa) for f in edicion.filas][:n] if edicion else []
     return HTMLResponse(
         _html_embed(filas, edicion.semana_fin if edicion else None),
         headers={
