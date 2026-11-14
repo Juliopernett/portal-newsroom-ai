@@ -247,6 +247,7 @@ class ResultadoRecoleccion:
     videos_seguidos: int = 0
     snapshots: int = 0
     error_estadisticas: str | None = None
+    videos_retirados: int = 0
 
 
 def recolectar_chart(
@@ -300,9 +301,11 @@ def recolectar_chart(
     res.videos_seguidos = len(seguidos)
     por_id = {v.video_id: v for v in seguidos}
     ids = list(por_id)
+    devueltos: set[str] = set()
     try:
         for i in range(0, len(ids), _LOTE_ESTADISTICAS):
             for vid, d in reader.detalles(ids[i : i + _LOTE_ESTADISTICAS]).items():
+                devueltos.add(vid)
                 uow.chart.save_snapshot(SnapshotVistas(video_id=vid, fecha=hoy, vistas=d.vistas))
                 res.snapshots += 1
                 video = por_id[vid]
@@ -310,11 +313,47 @@ def recolectar_chart(
                     uow.chart.save_video(replace(video, duracion_segundos=d.duracion_segundos))
     except YouTubeError as exc:
         res.error_estadisticas = str(exc)
+        return res
+    res.videos_retirados = retirar_no_disponibles(uow, reader, ids, devueltos)
     return res
 
 
 def _aware(valor: datetime) -> datetime:
     return valor if valor.tzinfo is not None else valor.replace(tzinfo=UTC)
+
+
+# A run that would retire more than this share of what it measured (and more than
+# the absolute floor) is treated as a YouTube anomaly, not as real deletions.
+_MAX_RETIRO_PROPORCION = 0.2
+_MAX_RETIRO_MINIMO = 10
+
+
+def retirar_no_disponibles(
+    uow: UnitOfWork, reader: YouTubeReader, pedidos: list[str], devueltos: set[str]
+) -> int:
+    """Delete the tracked videos YouTube no longer serves (deleted, private, terminated).
+
+    YouTube's developer policies require removing stored API data (title,
+    thumbnail, counts) for content that is no longer available. Only ids that
+    were asked for and did not come back are checked, and only an explicit
+    "not served" answer deletes. A failing check deletes nothing, and so does
+    an implausibly large batch (more than 20 % and more than 10 videos), which
+    points at a YouTube hiccup rather than real removals. Returns how many.
+    """
+    faltan = [v for v in pedidos if v not in devueltos]
+    if not faltan:
+        return 0
+    try:
+        ausentes = reader.videos_no_disponibles(faltan)
+    except YouTubeError:
+        return 0
+    if len(ausentes) > _MAX_RETIRO_MINIMO and len(ausentes) > _MAX_RETIRO_PROPORCION * len(
+        pedidos
+    ):
+        return 0
+    for video_id in ausentes:
+        uow.chart.delete_video(video_id)
+    return len(ausentes)
 
 
 @dataclass(frozen=True, slots=True)

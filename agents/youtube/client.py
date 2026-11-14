@@ -195,6 +195,15 @@ class YouTubeDataApiReader:
             miniatura_url=_miniatura(snippet),
         )
 
+    def videos_no_disponibles(self, video_ids: list[str]) -> set[str]:
+        ausentes: set[str] = set()
+        for i in range(0, len(video_ids), 50):
+            lote = video_ids[i : i + 50]
+            datos = self._get("videos", part="id", id=",".join(lote))
+            servidos = {item["id"] for item in datos.get("items", [])}
+            ausentes.update(v for v in lote if v not in servidos)
+        return ausentes
+
     def detalles(self, video_ids: list[str]) -> dict[str, DetalleVideo]:
         if not video_ids:
             return {}

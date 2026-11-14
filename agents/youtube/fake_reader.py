@@ -78,6 +78,9 @@ class FakeYouTubeReader:
             publicado_en=datetime.now(UTC) - timedelta(days=5),
         )
 
+    def videos_no_disponibles(self, video_ids: list[str]) -> set[str]:
+        return set()
+
     def detalles(self, video_ids: list[str]) -> dict[str, DetalleVideo]:
         return {
             vid: DetalleVideo(

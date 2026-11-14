@@ -39,7 +39,8 @@ def main() -> int:
     print(
         f"Semana {res.semana_fin} | canales ok: {res.canales_ok} | "
         f"videos nuevos: {res.videos_nuevos} | medidos: {res.videos_medidos} | "
-        f"edición: {edicion} | sin base: {res.sin_base}"
+        f"edición: {edicion} | sin base: {res.sin_base} | "
+        f"retirados (ya no en YouTube): {res.videos_retirados}"
     )
     print(
         f"Limpieza (>{settings.chart_retencion_dias} días): {limpieza.snapshots} snapshots, "

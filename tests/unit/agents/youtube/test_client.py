@@ -189,3 +189,20 @@ def test_catalog_respects_the_maximum() -> None:
     ]
     with patch("agents.youtube.client.requests.get", return_value=_resp({"items": items, "nextPageToken": "X"})):
         assert len(_reader().catalogo_canal(CANAL, maximo=60)) == 60
+
+
+def test_unavailable_videos_are_the_ids_youtube_does_not_return() -> None:
+    cuerpo = {"items": [{"id": "vivo0000001"}]}
+    with patch("agents.youtube.client.requests.get", return_value=_resp(cuerpo)) as get:
+        ausentes = _reader().videos_no_disponibles(["vivo0000001", "ido00000002"])
+
+    assert ausentes == {"ido00000002"}
+    assert get.call_args.kwargs["params"]["part"] == "id"
+
+
+def test_unavailable_videos_are_checked_in_batches_of_fifty() -> None:
+    ids = [f"v{i:010d}" for i in range(120)]
+    with patch("agents.youtube.client.requests.get", return_value=_resp({"items": []})) as get:
+        ausentes = _reader().videos_no_disponibles(ids)
+
+    assert ausentes == set(ids) and get.call_count == 3

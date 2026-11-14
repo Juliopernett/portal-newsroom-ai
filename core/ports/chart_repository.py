@@ -26,6 +26,10 @@ class ChartRepository(Protocol):
 
     def list_videos(self) -> list[VideoChart]: ...
 
+    def delete_video(self, video_id: str) -> None:
+        """Delete a video with everything stored about it (snapshots, closes, edition rows)."""
+        ...
+
     def save_snapshot(self, snapshot: SnapshotVistas) -> None:
         """Create or replace the snapshot of that video on that day."""
         ...

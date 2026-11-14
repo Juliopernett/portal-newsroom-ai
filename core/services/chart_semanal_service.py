@@ -32,7 +32,11 @@ from core.entities.chart import (
 )
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
-from core.services.chart_service import aplicar_fijados, deduplicar_canciones
+from core.services.chart_service import (
+    aplicar_fijados,
+    deduplicar_canciones,
+    retirar_no_disponibles,
+)
 
 EDICION_TOP = 20
 MAX_VIDEOS_POR_CANAL = 500
@@ -178,6 +182,7 @@ class ResultadoCierre:
     edicion_filas: int = 0
     sin_base: int = 0
     nota: str | None = None
+    videos_retirados: int = 0
 
     @property
     def hubo_errores(self) -> bool:
@@ -238,9 +243,11 @@ def cerrar_semana(
     activos = {c.canal_id for c in canales}
     por_id = {v.video_id: v for v in uow.chart.list_videos() if v.manual or v.canal_id in activos}
     ids = list(por_id)
+    devueltos: set[str] = set()
     try:
         for i in range(0, len(ids), _LOTE_ESTADISTICAS):
             for vid, d in reader.detalles(ids[i : i + _LOTE_ESTADISTICAS]).items():
+                devueltos.add(vid)
                 uow.chart.save_corte(
                     CorteVistas(video_id=vid, semana_fin=semana_fin, vistas=d.vistas)
                 )
@@ -251,6 +258,7 @@ def cerrar_semana(
     except YouTubeError as exc:
         res.error_estadisticas = str(exc)
         return res
+    res.videos_retirados = retirar_no_disponibles(uow, reader, ids, devueltos)
 
     try:
         edicion = generar_edicion(uow, semana_fin, ahora)

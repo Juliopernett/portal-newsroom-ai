@@ -106,6 +106,17 @@ class SqlAlchemyChartRepository:
         stmt = select(ChartVideoModel).order_by(ChartVideoModel.publicado_en.desc())
         return [_video(m) for m in self._session.execute(stmt).scalars()]
 
+    def delete_video(self, video_id: str) -> None:
+        # Explicit deletes: SQLite (tests) does not enforce ON DELETE CASCADE.
+        self._session.execute(
+            delete(ChartSnapshotModel).where(ChartSnapshotModel.video_id == video_id)
+        )
+        self._session.execute(delete(ChartCorteModel).where(ChartCorteModel.video_id == video_id))
+        self._session.execute(
+            delete(ChartEdicionFilaModel).where(ChartEdicionFilaModel.video_id == video_id)
+        )
+        self._session.execute(delete(ChartVideoModel).where(ChartVideoModel.video_id == video_id))
+
     def save_snapshot(self, snapshot: SnapshotVistas) -> None:
         self._session.merge(
             ChartSnapshotModel(

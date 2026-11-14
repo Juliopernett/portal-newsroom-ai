@@ -307,3 +307,91 @@ def test_weekly_status_tells_what_the_editor_must_do(uow: SqlAlchemyUnitOfWork) 
 
     publicar_edicion(uow, F1)
     assert estado_semanal(uow, sabado_tarde).nivel == "ok"
+
+
+class _LectorQueSeFue(_Lector):
+    """Serves stats for everything except `ausentes`; YouTube says those are gone."""
+
+    def __init__(self, ausentes: set[str], **kw: object) -> None:
+        super().__init__(100, **kw)
+        self._ausentes = ausentes
+        self.chequeos: list[list[str]] = []
+
+    def detalles(self, video_ids: list[str]) -> dict[str, DetalleVideo]:
+        return {
+            v: DetalleVideo(vistas=100, duracion_segundos=200)
+            for v in video_ids
+            if v not in self._ausentes
+        }
+
+    def videos_no_disponibles(self, video_ids: list[str]) -> set[str]:
+        self.chequeos.append(video_ids)
+        return {v for v in video_ids if v in self._ausentes}
+
+
+def test_videos_youtube_no_longer_serves_are_deleted_with_everything_about_them(
+    uow: SqlAlchemyUnitOfWork,
+) -> None:
+    from core.entities.chart import SnapshotVistas
+    from core.services.chart_service import retirar_no_disponibles
+
+    for vid in ("a", "b"):
+        _video(uow, vid)
+        uow.chart.save_snapshot(SnapshotVistas(vid, date(2026, 11, 10), 5))
+        uow.chart.save_corte(CorteVistas(vid, F1, 5))
+    lector = _LectorQueSeFue({"b"})
+
+    n = retirar_no_disponibles(uow, lector, ["a", "b"], {"a"})
+
+    assert n == 1
+    assert uow.chart.get_video("b") is None and uow.chart.get_video("a") is not None
+    assert uow.chart.list_cortes(F1) == {"a": 5}
+    assert lector.chequeos == [["b"]]  # only the missing id is asked about
+
+
+def test_nothing_is_checked_when_every_video_came_back(uow: SqlAlchemyUnitOfWork) -> None:
+    from core.services.chart_service import retirar_no_disponibles
+
+    _video(uow, "a")
+    lector = _LectorQueSeFue(set())
+
+    assert retirar_no_disponibles(uow, lector, ["a"], {"a"}) == 0
+    assert lector.chequeos == []
+
+
+def test_a_failing_check_deletes_nothing(uow: SqlAlchemyUnitOfWork) -> None:
+    from core.services.chart_service import retirar_no_disponibles
+
+    _video(uow, "a")
+
+    class Roto(_LectorQueSeFue):
+        def videos_no_disponibles(self, video_ids: list[str]) -> set[str]:
+            raise YouTubeError("cuota")
+
+    assert retirar_no_disponibles(uow, Roto({"a"}), ["a"], set()) == 0
+    assert uow.chart.get_video("a") is not None
+
+
+def test_a_suspiciously_large_batch_deletes_nothing(uow: SqlAlchemyUnitOfWork) -> None:
+    from core.services.chart_service import retirar_no_disponibles
+
+    ids = [f"v{i:02d}" for i in range(30)]
+    for vid in ids:
+        _video(uow, vid)
+    lector = _LectorQueSeFue(set(ids[:15]))  # half of everything "gone" = a YouTube anomaly
+
+    assert retirar_no_disponibles(uow, lector, ids, set(ids[15:])) == 0
+    assert len(uow.chart.list_videos()) == 30
+
+
+def test_the_weekly_close_retires_vanished_videos_before_building_the_edition(
+    uow: SqlAlchemyUnitOfWork,
+) -> None:
+    uow.chart.save_canal(CanalChart(canal_id=CANAL, nombre="Canal"))
+    uow.chart.save_video(
+        VideoChart(video_id="ido", canal_id=CANAL, titulo="Borrado", publicado_en=VIEJO)
+    )
+
+    res = cerrar_semana(uow, _LectorQueSeFue({"ido"}), datetime(2026, 11, 14, 5, 5, tzinfo=UTC))
+
+    assert res.videos_retirados == 1 and uow.chart.get_video("ido") is None

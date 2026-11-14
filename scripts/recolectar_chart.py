@@ -33,7 +33,8 @@ def main() -> None:
 
     print(
         f"Canales ok: {res.canales_ok} | videos nuevos: {res.videos_nuevos} | "
-        f"videos seguidos: {res.videos_seguidos} | snapshots: {res.snapshots}"
+        f"videos seguidos: {res.videos_seguidos} | snapshots: {res.snapshots} | "
+        f"retirados (ya no en YouTube): {res.videos_retirados}"
     )
     print(
         f"Limpieza (>{settings.chart_retencion_dias} días): {limpieza.snapshots} snapshots, "

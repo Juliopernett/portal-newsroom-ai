@@ -58,3 +58,10 @@ class YouTubeReader(Protocol):
     def detalles(self, video_ids: list[str]) -> dict[str, DetalleVideo]:
         """Return the current views and duration per video (missing ids omitted)."""
         ...
+
+    def videos_no_disponibles(self, video_ids: list[str]) -> set[str]:
+        """Return the ids YouTube does not serve at all (deleted, private, terminated).
+
+        A video that only hides its view count is still served, so it is not here.
+        """
+        ...
