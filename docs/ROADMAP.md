@@ -5,6 +5,35 @@ usable por sí sola y se corresponde, en general, con un "Prompt" de
 construcción del proyecto. Las fechas no se fijan de antemano: cada fase
 comienza cuando la anterior está estable.
 
+## Estado real a noviembre de 2026
+
+Las fases de abajo conservan su redacción original, pero el producto avanzó más
+allá de lo que muestran sus casillas. Lo que está **en producción** hoy
+(Railway + WordPress de Portal Vallenato):
+
+- **Panel y gestión comercial:** clientes, pautas, planes, ingresos, gastos,
+  solicitudes de publicación (WhatsApp/manual) con destinos Facebook/Instagram,
+  informes compartibles por enlace.
+- **Redacción con IA y WordPress:** reescritura editorial con varios
+  proveedores, SEO de Yoast y publicación/sincronización con WordPress.
+- **Radar:** escaneo horario de fuentes (cron) y pegado manual de texto.
+- **Chart Vallenato semanal:** corte el viernes 24:00 hora de Colombia (sábado
+  05:00 UTC), borrador que el editor revisa y publica, una fila por canción,
+  tendencia contra la edición anterior, widget, `publico.json` con enlace al
+  artista y embed para otros sitios. Cumple las políticas de YouTube: retención
+  configurable (`CHART_RETENCION_DIAS`) y borrado de videos que YouTube ya no
+  sirve. Solicitud de auditoría/cuota enviada a Google (2026-11-11), en revisión.
+- **Respaldos:** `pg_dump` nocturno de Postgres a Cloudflare R2 (30 copias),
+  restauración de prueba verificada. Ver [RESPALDOS.md](RESPALDOS.md).
+- **Sitio portalvallenato.com** (WordPress, fuera de este repositorio): páginas
+  de artista enlazadas con las notas, política de privacidad y términos, y
+  medición sin cookies con Cloudflare Web Analytics.
+
+Pendiente: agente de WhatsApp real, Instagram como fuente de Radar, envío de
+correos (recordatorios de renovación y correo semanal al asesor, hoy la app no
+envía correo), páginas por canción y sección de videos automática para el
+sitio, y el token de Meta (la verificación por SMS no llegaba).
+
 ## Fase 0 — Foundation ✅ (Prompt 001, este)
 
 Base profesional del proyecto: estructura modular, arquitectura hexagonal,
