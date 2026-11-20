@@ -155,27 +155,40 @@ function EdicionesSection() {
 
 // El chart se calcula solo con las vistas de YouTube; aquí el editor tiene el
 // veto: excluir una canción (p. ej. no es la oficial) o fijarla en una posición.
-// Tarjetas para redes: vista previa (Top 10 en vivo con marca de agua, o la última
-// edición) y descarga solo de ediciones reales, para no publicar una vista previa.
+// Tarjetas para redes. Nada se dibuja hasta pulsar "Ver vista previa" (cada imagen
+// descarga fotos y se renderiza en el servidor: tarda unos segundos). La descarga es
+// solo de ediciones reales —cualquiera de la lista, no solo la última— y la vista previa
+// "en vivo" lleva marca de agua y no se descarga, para no publicarla por error.
 function ImagenesRedesSection() {
   const lista = useQuery({ queryKey: KEY_EDICIONES, queryFn: chartApi.ediciones })
-  const ultima = lista.data?.[0]
-  const [origen, setOrigen] = useState<'vivo' | 'edicion'>('vivo')
+  const ediciones = lista.data ?? []
+  const [origen, setOrigen] = useState<'vivo' | 'edicion'>('edicion')
+  const [semana, setSemana] = useState<string | null>(null)
   const [formato, setFormato] = useState<FormatoChart>('feed')
   const [version, setVersion] = useState(0)
-  const deEdicion = origen === 'edicion' && !!ultima
+  const [pedida, setPedida] = useState<string | null>(null)
+
+  const elegida = ediciones.find((e) => e.semana_fin === semana) ?? ediciones[0]
+  const deEdicion = origen === 'edicion' && !!elegida
+  const firma = (v: number) => [deEdicion ? elegida!.semana_fin : 'vivo', formato, v].join('|')
+  const mostrar = pedida === firma(version)
   const laminas: [LaminaChart, string][] = [
     ['portada', 'Portada'],
     ['lista', 'Top 10'],
   ]
   const url = (lamina: LaminaChart) =>
     deEdicion
-      ? `${chartApi.urlImagen(ultima!.semana_fin, lamina, formato)}&v=${version}`
+      ? `${chartApi.urlImagen(elegida!.semana_fin, lamina, formato)}&v=${version}`
       : chartApi.urlImagenEnVivo(lamina, formato, version)
   const opcion = (activa: boolean) =>
     `rounded-md border px-2.5 py-1 text-xs font-medium ${
       activa ? 'border-brand bg-brand/10' : 'border-border bg-background hover:bg-accent'
     }`
+  const verPrevia = () => setPedida(firma(version))
+  const actualizar = () => {
+    setVersion(version + 1)
+    setPedida(firma(version + 1))
+  }
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
@@ -189,12 +202,26 @@ function ImagenesRedesSection() {
           </button>
           <button
             type="button"
-            className={opcion(deEdicion) + (ultima ? '' : ' opacity-50')}
-            disabled={!ultima}
+            className={opcion(deEdicion) + (elegida ? '' : ' opacity-50')}
+            disabled={!elegida}
             onClick={() => setOrigen('edicion')}
           >
-            {ultima ? `Edición ${ultima.semana_fin}` : 'Edición (aún no hay)'}
+            {elegida ? 'Edición semanal' : 'Edición (aún no hay)'}
           </button>
+          {deEdicion && ediciones.length > 1 && (
+            <SelectNative
+              aria-label="Semana de la edición"
+              className="!h-8 w-52 text-xs"
+              value={elegida!.semana_fin}
+              onChange={(e) => setSemana(e.target.value)}
+            >
+              {ediciones.map((e) => (
+                <option key={e.semana_fin} value={e.semana_fin}>
+                  {e.semana_fin} · {e.estado === 'publicada' ? 'publicada' : 'borrador'}
+                </option>
+              ))}
+            </SelectNative>
+          )}
           <span className="mx-1 h-4 w-px bg-border" aria-hidden />
           <button type="button" className={opcion(formato === 'feed')} onClick={() => setFormato('feed')}>
             Feed 4:5
@@ -206,41 +233,69 @@ function ImagenesRedesSection() {
           >
             Historia 9:16
           </button>
-          <Button size="sm" variant="secondary" onClick={() => setVersion((v) => v + 1)}>
-            <RefreshCw className="size-3.5" /> Actualizar
-          </Button>
         </div>
       </div>
-      <div className="grid max-w-xl grid-cols-2 gap-3">
-        {laminas.map(([lamina, etiqueta]) => (
-          <figure key={`${lamina}-${formato}-${origen}-${version}`} className="flex flex-col gap-1">
-            <img
-              src={url(lamina)}
-              alt={`${etiqueta} (${deEdicion ? 'edición' : 'vista previa en vivo'})`}
-              loading="lazy"
-              className={`w-full rounded-md border border-border bg-muted object-cover ${
-                formato === 'feed' ? 'aspect-[4/5]' : 'aspect-[9/16]'
-              }`}
-            />
-            <figcaption className="flex items-center justify-between text-xs text-muted-foreground">
+
+      {deEdicion && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted px-3 py-2">
+          <span className="text-xs font-medium">
+            Descargar edición {elegida!.semana_fin}
+            {elegida!.estado === 'borrador' ? ' (borrador)' : ''}:
+          </span>
+          {(
+            [
+              ['portada', 'feed', 'Portada 4:5'],
+              ['lista', 'feed', 'Top 10 4:5'],
+              ['portada', 'historia', 'Portada 9:16'],
+              ['lista', 'historia', 'Top 10 9:16'],
+            ] as [LaminaChart, FormatoChart, string][]
+          ).map(([lamina, fmt, etiqueta]) => (
+            <a
+              key={`${lamina}-${fmt}`}
+              href={chartApi.urlImagen(elegida!.semana_fin, lamina, fmt)}
+              download
+              className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-accent"
+            >
               {etiqueta}
-              {deEdicion && (
-                <a
-                  href={chartApi.urlImagen(ultima!.semana_fin, lamina, formato)}
-                  download
-                  className="font-medium text-brand hover:underline"
-                >
-                  Descargar
-                </a>
-              )}
-            </figcaption>
-          </figure>
-        ))}
-      </div>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {mostrar ? (
+        <>
+          <div className="grid max-w-xl grid-cols-2 gap-3">
+            {laminas.map(([lamina, etiqueta]) => (
+              <figure key={`${lamina}-${firma(version)}`} className="flex flex-col gap-1">
+                <img
+                  src={url(lamina)}
+                  alt={`${etiqueta} (${deEdicion ? 'edición' : 'vista previa en vivo'})`}
+                  className={`w-full rounded-md border border-border bg-muted object-cover ${
+                    formato === 'feed' ? 'aspect-[4/5]' : 'aspect-[9/16]'
+                  }`}
+                />
+                <figcaption className="text-xs text-muted-foreground">{etiqueta}</figcaption>
+              </figure>
+            ))}
+          </div>
+          <div>
+            <Button size="sm" variant="secondary" onClick={actualizar}>
+              <RefreshCw className="size-3.5" /> Actualizar vista previa
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div>
+          <Button size="sm" variant="secondary" onClick={verPrevia}>
+            <ImageDown className="size-3.5" /> Ver vista previa
+          </Button>
+        </div>
+      )}
+
       <p className="text-xs text-muted-foreground">
         {deEdicion
-          ? 'Con fotos de artista; también funciona con el borrador de la edición.'
-          : 'Vista previa con el Top 10 de hoy, solo para ti: lleva marca de agua y no se descarga. La imagen para publicar se descarga de la edición semanal, cuando se cierre la semana.'}
+          ? 'La imagen se arma con la edición elegida y las fotos de artista (si no hay foto, la miniatura de su video). Las ediciones anteriores siguen en la lista mientras se conserven los datos de YouTube.'
+          : 'Vista previa con el Top 10 de hoy, solo para ti: lleva marca de agua y no se descarga. Se actualiza solo cuando pulsas el botón. La imagen para publicar se descarga de la edición semanal, cuando se cierre la semana.'}
       </p>
     </section>
   )
