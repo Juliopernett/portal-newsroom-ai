@@ -201,8 +201,9 @@ _CLAVE_TEXTO_REDES = (
     "caracteres en total sin contar los hashtags. Fiel a los hechos del texto original: "
     "nunca inventes, no exageres ni conviertas algo probable en confirmado, y no uses "
     "clickbait engañoso (el gancho debe cumplirse en la nota). Máximo 3 emojis. Termina "
-    "con una línea de 3 a 5 hashtags relevantes (artistas, evento o ciudad del texto). "
-    "No incluyas #NoticiasVallenatas ni #portalvallenato: se agregan aparte.\n"
+    "con una línea de exactamente 3 hashtags relevantes (artistas, evento o ciudad del "
+    "texto), nunca más de 3: Instagram solo permite 5 hashtags por publicación y otros 2 "
+    "se agregan aparte. No incluyas #NoticiasVallenatas ni #portalvallenato.\n"
 )
 
 

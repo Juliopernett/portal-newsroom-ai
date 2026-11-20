@@ -6,6 +6,18 @@ import { formatFechaHoraNegocio } from '@/lib/format'
 import type { NewsCandidate } from './api'
 
 const HASHTAGS_FIJOS = '#NoticiasVallenatas #portalvallenato'
+// Instagram solo deja publicar 5 hashtags en total: los fijos van siempre y la IA
+// ocupa lo que quede (sus notas antiguas pueden traer hasta 5, así que se recorta).
+const MAX_HASHTAGS_INSTAGRAM = 5
+
+function limitarHashtags(texto: string, max: number): string {
+  let n = 0
+  return texto
+    .replace(/#[\p{L}\p{N}_]+/gu, (h) => (++n > max ? '' : h))
+    .replace(/[ \t]+$/gm, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trimEnd()
+}
 
 const WP_BADGE: Record<string, { label: string; className: string }> = {
   borrador: { label: 'Borrador en WordPress', className: 'bg-warning-bg text-warning' },
@@ -20,7 +32,8 @@ function textoFacebook(c: NewsCandidate): string {
 }
 
 function textoInstagram(c: NewsCandidate): string {
-  return `${c.texto_redes}\n\n👉 Lee la nota completa en portalvallenato.com — link en la bio.\n\n${HASHTAGS_FIJOS}`
+  const libres = MAX_HASHTAGS_INSTAGRAM - HASHTAGS_FIJOS.split(' ').length
+  return `${limitarHashtags(c.texto_redes ?? '', libres)}\n\n👉 Lee la nota completa en portalvallenato.com — link en la bio.\n\n${HASHTAGS_FIJOS}`
 }
 
 async function copiar(texto: string, red: string) {
