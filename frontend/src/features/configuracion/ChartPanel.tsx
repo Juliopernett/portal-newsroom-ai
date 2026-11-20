@@ -1,13 +1,19 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Minus, Pin, RefreshCw, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ImageDown, Minus, Pin, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SelectNative } from '@/components/ui/select-native'
-import { chartApi, type FilaChart, type FilaEdicion } from './chartApi'
+import {
+  chartApi,
+  type FilaChart,
+  type FilaEdicion,
+  type FormatoChart,
+  type LaminaChart,
+} from './chartApi'
 
 const KEY = ['chart-vallenato']
 const KEY_CANALES = ['chart-vallenato', 'canales']
@@ -118,6 +124,31 @@ function EdicionesSection() {
                 </Button>
               </div>
             )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted px-3 py-2">
+            <span className="flex items-center gap-1 text-sm font-medium">
+              <ImageDown className="size-4" aria-hidden /> Imágenes para redes
+            </span>
+            {(
+              [
+                ['portada', 'feed', 'Portada 4:5'],
+                ['lista', 'feed', 'Top 10 4:5'],
+                ['portada', 'historia', 'Portada historia 9:16'],
+                ['lista', 'historia', 'Top 10 historia 9:16'],
+              ] as [LaminaChart, FormatoChart, string][]
+            ).map(([lamina, formato, etiqueta]) => (
+              <a
+                key={`${lamina}-${formato}`}
+                href={chartApi.urlImagen(ultima.semana_fin, lamina, formato)}
+                download
+                className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-accent"
+              >
+                {etiqueta}
+              </a>
+            ))}
+            <span className="text-xs text-muted-foreground">
+              Con fotos de artista; sirven también con el borrador.
+            </span>
           </div>
           <ol className="flex flex-col gap-1">
             {ed?.filas_detalle.map((f) => (

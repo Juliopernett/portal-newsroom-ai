@@ -12,10 +12,13 @@ from __future__ import annotations
 import html
 from dataclasses import asdict, replace
 from datetime import UTC, date, datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse
 
+from agents.images.descarga_imagenes import descargar_imagenes
+from agents.images.pillow_chart_renderer import FilaImagen, PillowChartRenderer
 from agents.portal.catalogo_artistas import CatalogoArtistas, get_catalogo_artistas
 from app.api.dependencies import (
     get_current_user,
@@ -209,6 +212,59 @@ def obtener_edicion(semana_fin: date, uow: UnitOfWork = Depends(get_unit_of_work
     if edicion is None:
         raise HTTPException(status_code=404, detail="Edition not found")
     return _edicion_out(edicion)
+
+
+@router.get("/ediciones/{semana_fin}/imagen")
+def imagen_edicion(
+    semana_fin: date,
+    lamina: Literal["portada", "lista"] = Query(description="portada (el #1) o lista (Top 10)"),
+    formato: Literal["feed", "historia"] = Query(default="feed", description="4:5 o 9:16"),
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    catalogo: CatalogoArtistas = Depends(get_catalogo_artistas),
+) -> Response:
+    """PNG card of the edition for social media (cover or Top 10; feed 4:5 or story 9:16).
+
+    Works for drafts too, so the editor can see the card before publishing.
+    Artist photos come from their pages on the website; a missing one shows initials.
+    """
+    edicion = uow.chart.get_edicion(semana_fin)
+    if edicion is None or not edicion.filas:
+        raise HTTPException(status_code=404, detail="Edition not found")
+    fotos = catalogo.obtener_fotos()
+    filas = list(edicion.filas[:10])
+    foto_de = {f.video_id: pagina_del_artista(f.artista, fotos) for f in filas}
+    urls = [u for u in foto_de.values() if u]
+    if lamina == "portada" and filas[0].miniatura_url:
+        urls.append(filas[0].miniatura_url)
+    imagenes = descargar_imagenes(urls)
+    png = PillowChartRenderer().renderizar(
+        edicion.semana_fin,
+        [
+            FilaImagen(
+                posicion=f.posicion,
+                titulo=f.titulo,
+                artista=f.artista,
+                vistas_semana=f.vistas_semana,
+                tendencia=f.tendencia,
+                foto_artista=imagenes.get(foto_de[f.video_id] or ""),
+                miniatura=imagenes.get(f.miniatura_url or "")
+                if f.posicion == filas[0].posicion
+                else None,
+            )
+            for f in filas
+        ],
+        lamina=lamina,
+        formato=formato,
+    )
+    nombre = f"chart-vallenato-{edicion.semana_fin.isoformat()}-{lamina}-{formato}.png"
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.post("/ediciones/{semana_fin}/regenerar", response_model=EdicionOut)

@@ -25,9 +25,19 @@ _TARJETA = re.compile(
     r'<li\s+data-n="([^"]+)"[^>]*>\s*<a\s+href="(https://portalvallenato\.com/[^"]+)"'
 )
 
+_TARJETA_FOTO = re.compile(
+    r'<li\s+data-n="([^"]+)"[^>]*>\s*<a\s+href="https://portalvallenato\.com/[^"]+"[^>]*>\s*'
+    r'<img\b[^>]*?\ssrc="(https://portalvallenato\.com/[^"]+)"'
+)
+
 
 def parsear_catalogo(contenido: str) -> dict[str, str]:
     return {html.unescape(n).strip(): u for n, u in _TARJETA.findall(contenido)}
+
+
+def parsear_fotos(contenido: str) -> dict[str, str]:
+    """Normalized artist name -> URL of the photo shown on its card in `/artistas/`."""
+    return {html.unescape(n).strip(): html.unescape(u) for n, u in _TARJETA_FOTO.findall(contenido)}
 
 
 class CatalogoArtistas:
@@ -40,6 +50,7 @@ class CatalogoArtistas:
         self._ahora = ahora
         self._lock = threading.Lock()
         self._datos: dict[str, str] = {}
+        self._fotos: dict[str, str] = {}
         self._vence = 0.0
 
     @staticmethod
@@ -49,20 +60,33 @@ class CatalogoArtistas:
         return r.text
 
     def obtener(self) -> dict[str, str]:
+        """Normalized artist name -> page URL."""
         with self._lock:
-            if self._ahora() < self._vence:
-                return self._datos
-            try:
-                nuevos = parsear_catalogo(self._descargar())
-            except (requests.RequestException, ValueError):
-                self._vence = self._ahora() + _TTL_ERROR_SEGUNDOS
-                return self._datos
-            if nuevos:
-                self._datos = nuevos
-                self._vence = self._ahora() + _TTL_SEGUNDOS
-            else:
-                self._vence = self._ahora() + _TTL_ERROR_SEGUNDOS
+            self._refrescar()
             return self._datos
+
+    def obtener_fotos(self) -> dict[str, str]:
+        """Normalized artist name -> photo URL (same keys as `obtener`, when the card has one)."""
+        with self._lock:
+            self._refrescar()
+            return self._fotos
+
+    def _refrescar(self) -> None:
+        if self._ahora() < self._vence:
+            return
+        try:
+            contenido = self._descargar()
+            nuevos = parsear_catalogo(contenido)
+            fotos = parsear_fotos(contenido)
+        except (requests.RequestException, ValueError):
+            self._vence = self._ahora() + _TTL_ERROR_SEGUNDOS
+            return
+        if nuevos:
+            self._datos = nuevos
+            self._fotos = fotos
+            self._vence = self._ahora() + _TTL_SEGUNDOS
+        else:
+            self._vence = self._ahora() + _TTL_ERROR_SEGUNDOS
 
 
 _catalogo = CatalogoArtistas()

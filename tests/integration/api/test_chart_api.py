@@ -19,6 +19,9 @@ class _CatalogoFalso:
     def obtener(self) -> dict[str, str]:
         return self.datos
 
+    def obtener_fotos(self) -> dict[str, str]:
+        return {}
+
 
 @pytest.fixture(autouse=True)
 def _sin_red_de_artistas():
@@ -366,3 +369,43 @@ def test_public_rows_link_to_the_artist_page_when_the_website_has_one(
     embed = unauthenticated_client.get("/chart-vallenato/embed").text
     assert 'href="https://portalvallenato.com/laura-hamburger-la-china/"' in embed
     assert "Sin Pagina" in embed
+
+
+def test_social_card_downloads_as_png_for_a_draft_edition(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import io
+
+    from PIL import Image
+
+    monkeypatch.setattr("app.api.routers.chart.descargar_imagenes", lambda urls: {})
+    _sembrar_cortes()
+    client.post("/chart-vallenato/ediciones/2026-11-13/regenerar")
+
+    r = client.get(
+        "/chart-vallenato/ediciones/2026-11-13/imagen",
+        params={"lamina": "lista", "formato": "historia"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "image/png"
+    assert "chart-vallenato-2026-11-13-lista-historia.png" in r.headers["content-disposition"]
+    assert Image.open(io.BytesIO(r.content)).size == (1080, 1920)
+    portada = client.get(
+        "/chart-vallenato/ediciones/2026-11-13/imagen", params={"lamina": "portada"}
+    )
+    assert portada.status_code == 200
+    assert Image.open(io.BytesIO(portada.content)).size == (1080, 1350)
+
+
+def test_social_card_validates_its_parameters(client: TestClient) -> None:
+    base = "/chart-vallenato/ediciones/2026-11-13/imagen"
+    assert client.get(base, params={"lamina": "portada"}).status_code == 404
+    assert client.get(base, params={"lamina": "otra"}).status_code == 422
+    assert client.get(base).status_code == 422
+
+
+def test_social_card_requires_login(unauthenticated_client: TestClient) -> None:
+    r = unauthenticated_client.get(
+        "/chart-vallenato/ediciones/2026-11-13/imagen", params={"lamina": "portada"}
+    )
+    assert r.status_code == 401

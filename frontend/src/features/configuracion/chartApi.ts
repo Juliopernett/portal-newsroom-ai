@@ -86,6 +86,9 @@ export interface EstadoSemanal {
 
 const BASE = '/chart-vallenato'
 
+export type LaminaChart = 'portada' | 'lista'
+export type FormatoChart = 'feed' | 'historia'
+
 export const chartApi = {
   obtener: () => api.get<ChartAdmin>(BASE),
   recolectar: () => api.post<Recoleccion>(`${BASE}/recolectar`),
@@ -98,6 +101,9 @@ export const chartApi = {
   estadoSemanal: () => api.get<EstadoSemanal>(`${BASE}/estado-semanal`),
   ediciones: () => api.get<EdicionResumen[]>(`${BASE}/ediciones`),
   edicion: (semana: string) => api.get<Edicion>(`${BASE}/ediciones/${semana}`),
+  // Imagen PNG para redes (la sesión viaja por cookie, así que un enlace de descarga basta).
+  urlImagen: (semana: string, lamina: LaminaChart, formato: FormatoChart) =>
+    `${BASE}/ediciones/${semana}/imagen?lamina=${lamina}&formato=${formato}`,
   regenerarEdicion: (semana: string) => api.post<Edicion>(`${BASE}/ediciones/${semana}/regenerar`),
   publicarEdicion: (semana: string) => api.post<Edicion>(`${BASE}/ediciones/${semana}/publicar`),
   decidir: (
