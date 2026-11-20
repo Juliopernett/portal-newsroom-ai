@@ -165,11 +165,25 @@ def _fondo(ancho: int, alto: int) -> Image.Image:
     return lienzo
 
 
-def _circulo_foto(foto: Image.Image | None, nombre: str, d: int, borde: int = 0) -> Image.Image:
-    """Round picture of the artist (initials on brand blue when there is no picture)."""
+def _imagen_circulo(f: FilaImagen) -> tuple[Image.Image | None, float]:
+    """The artist's photo; when the website has none, the centre of the video's thumbnail.
+
+    Returns the picture and the vertical focus for the crop (faces sit high in portraits,
+    a thumbnail is best cropped from its middle).
+    """
+    foto = _abrir(f.foto_artista)
+    if foto is not None:
+        return foto, 0.3
+    return _abrir(f.miniatura), 0.5
+
+
+def _circulo_foto(
+    foto: Image.Image | None, nombre: str, d: int, borde: int = 0, enfoque_y: float = 0.3
+) -> Image.Image:
+    """Round picture (initials on brand blue when there is no picture at all)."""
     s = 4
     if foto is not None:
-        recorte = ImageOps.fit(foto, (d * s, d * s), Image.LANCZOS, centering=(0.5, 0.3))
+        recorte = ImageOps.fit(foto, (d * s, d * s), Image.LANCZOS, centering=(0.5, enfoque_y))
         recorte = recorte.convert("RGBA")
     else:
         recorte = Image.new("RGBA", (d * s, d * s), (*_AZUL, 255))
@@ -331,8 +345,9 @@ class PillowChartRenderer:
         draw.rectangle((x_img - 8, y - 8, x_img + 104, y + 132), fill=_NEGRO)
         _texto(draw, x_img + 48, y + 112, "1", _fuente("Anton-Regular.ttf", 128), _BLANCO, "c")
         d = 230
+        foto, enfoque = _imagen_circulo(top)
         circulo = _circulo_foto(
-            _abrir(top.foto_artista), top.artista or "Portal Vallenato", d, borde=8
+            foto, top.artista or "Portal Vallenato", d, borde=8, enfoque_y=enfoque
         )
         sombra = Image.new("RGBA", lienzo.size, (0, 0, 0, 0))
         cx, cy = min(round(x_img + tw - d / 2 - 30), _ANCHO - d - 24), round(y + th - d / 2 + 24)
@@ -416,8 +431,9 @@ class PillowChartRenderer:
         )  # fmt: skip
         d = round(h - 18)
         x += bw + 16
+        foto, enfoque = _imagen_circulo(f)
         lienzo.alpha_composite(
-            _circulo_foto(_abrir(f.foto_artista), f.artista or "Portal Vallenato", d, borde=3),
+            _circulo_foto(foto, f.artista or "Portal Vallenato", d, borde=3, enfoque_y=enfoque),
             (round(x), round(centro - d / 2)),
         )
         x += d + 20

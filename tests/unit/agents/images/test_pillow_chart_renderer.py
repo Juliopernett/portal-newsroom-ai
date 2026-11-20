@@ -113,3 +113,15 @@ def test_watermark_changes_the_card_so_a_preview_is_never_the_real_one() -> None
     )
     assert sin != con
     assert Image.open(io.BytesIO(con)).size == (1080, 1350)
+
+
+def test_a_missing_artist_photo_falls_back_to_the_video_thumbnail_not_initials() -> None:
+    def fila(miniatura: bytes | None) -> list[FilaImagen]:
+        return [FilaImagen(1, "Tema", "Artista Nuevo", 1000, None, None, miniatura)]
+
+    renderer = PillowChartRenderer()
+    con_miniatura = renderer.renderizar(
+        date(2026, 11, 20), fila(_foto((20, 90, 160))), lamina="lista"
+    )
+    solo_iniciales = renderer.renderizar(date(2026, 11, 20), fila(None), lamina="lista")
+    assert con_miniatura != solo_iniciales
