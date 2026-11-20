@@ -125,3 +125,15 @@ def test_a_missing_artist_photo_falls_back_to_the_video_thumbnail_not_initials()
     )
     solo_iniciales = renderer.renderizar(date(2026, 11, 20), fila(None), lamina="lista")
     assert con_miniatura != solo_iniciales
+
+
+def test_every_row_shows_its_video_thumbnail_not_only_the_first() -> None:
+    def filas(miniatura_en_la_5: bytes | None) -> list[FilaImagen]:
+        base = _filas(con_fotos=False)
+        base[4] = FilaImagen(5, "Tema", "Artista 5", 1000, None, None, miniatura_en_la_5)
+        return base
+
+    renderer = PillowChartRenderer()
+    con = renderer.renderizar(date(2026, 11, 20), filas(_foto((20, 90, 160))), lamina="lista")
+    sin = renderer.renderizar(date(2026, 11, 20), filas(None), lamina="lista")
+    assert con != sin

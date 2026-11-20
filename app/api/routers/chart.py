@@ -227,9 +227,7 @@ def _png_tarjeta(
     filas = filas[:10]
     foto_de = {f.video_id: pagina_del_artista(f.artista, fotos) for f in filas}
     urls = [u for u in foto_de.values() if u]
-    for f in filas:  # the video's thumbnail: the #1 cover image, or stand-in for a missing photo
-        if f.miniatura_url and (not foto_de[f.video_id] or f.posicion == filas[0].posicion):
-            urls.append(f.miniatura_url)
+    urls += [f.miniatura_url for f in filas if f.miniatura_url]  # every row shows its video
     imagenes = descargar_imagenes(urls)
     return PillowChartRenderer().renderizar(
         semana_fin,

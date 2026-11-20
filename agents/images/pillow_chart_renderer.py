@@ -177,6 +177,35 @@ def _imagen_circulo(f: FilaImagen) -> tuple[Image.Image | None, float]:
     return _abrir(f.miniatura), 0.5
 
 
+def _bloque_video(f: FilaImagen, w: int, h: int) -> Image.Image:
+    """The video's thumbnail as a rounded 16:9 block (artist photo, then initials, if missing)."""
+    s = 4
+    imagen = _abrir(f.miniatura) or _abrir(f.foto_artista)
+    if imagen is not None:
+        base = ImageOps.fit(imagen, (w * s, h * s), Image.LANCZOS, centering=(0.5, 0.4)).convert(
+            "RGBA"
+        )
+    else:
+        base = Image.new("RGBA", (w * s, h * s), (*_AZUL, 255))
+        iniciales = "".join(p[0] for p in _limpiar(f.artista or "").split()[:2]) or "PV"
+        ImageDraw.Draw(base).text(
+            (w * s / 2, h * s / 2),
+            iniciales,
+            font=_fuente("Anton-Regular.ttf", h * s * 0.5),
+            fill=_BLANCO,
+            anchor="mm",
+        )
+    mascara = Image.new("L", (w * s, h * s), 0)
+    ImageDraw.Draw(mascara).rounded_rectangle((0, 0, w * s - 1, h * s - 1), 10 * s, fill=255)
+    base.putalpha(mascara)
+    anillo = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0))
+    ImageDraw.Draw(anillo).rounded_rectangle(
+        (0, 0, w * s - 1, h * s - 1), 10 * s, outline=(*_BLANCO, 255), width=3 * s
+    )
+    base.alpha_composite(anillo)
+    return base.resize((w, h), Image.LANCZOS)
+
+
 def _circulo_foto(
     foto: Image.Image | None, nombre: str, d: int, borde: int = 0, enfoque_y: float = 0.3
 ) -> Image.Image:
@@ -429,14 +458,17 @@ class PillowChartRenderer:
             draw, x + bw / 2, centro + h * 0.2, str(f.posicion),
             _fuente("Anton-Regular.ttf", h * 0.58), _BLANCO, "c",
         )  # fmt: skip
-        d = round(h - 18)
+        th = round(h - 18)
+        tw = round(th * 16 / 9)
         x += bw + 16
-        foto, enfoque = _imagen_circulo(f)
-        lienzo.alpha_composite(
-            _circulo_foto(foto, f.artista or "Portal Vallenato", d, borde=3, enfoque_y=enfoque),
-            (round(x), round(centro - d / 2)),
-        )
-        x += d + 20
+        lienzo.alpha_composite(_bloque_video(f, tw, th), (round(x), round(centro - th / 2)))
+        if f.posicion <= 3:  # the top 3 also get the artist's photo, small, on the corner
+            ds = round(h * 0.52)
+            lienzo.alpha_composite(
+                _circulo_foto(_abrir(f.foto_artista), f.artista or "Portal Vallenato", ds, borde=3),
+                (round(x + tw - ds * 0.6), round(centro + th / 2 - ds * 0.9)),
+            )
+        x += tw + 26
         x_der = x0 + w - 36
         ancho_txt = x_der - 190 - x
         nombre = _limpiar(f.artista or "")
