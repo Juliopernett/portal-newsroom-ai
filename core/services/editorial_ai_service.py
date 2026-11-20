@@ -235,7 +235,11 @@ def _construir_prompt(
         '- "contenido": string, el cuerpo de la noticia ya reescrito (apunta a ~300 '
         "palabras sin inventar nada, ver regla de extensión arriba)\n"
         '- "categoria": string (una de las categorías existentes de arriba) o null\n'
-        '- "etiquetas": array de strings (2 a 6, casi nunca vacío)\n'
+        '- "etiquetas": array de strings (2 a 6, casi nunca vacío). Si la nota trata de uno '
+        "o más artistas o agrupaciones, ponlos primero, uno por etiqueta, con su nombre "
+        "completo y bien escrito (con tildes), tal como se le conoce (por ejemplo "
+        '"Silvestre Dangond", no "Silvestre" ni "Homenaje a Silvestre Dangond"); con esas '
+        "etiquetas la nota aparece sola en la página del artista en el sitio\n"
         '- "slug": string, en minúsculas y con guiones\n'
         '- "meta_titulo": string, título SEO (máx. 60 caracteres)\n'
         '- "meta_descripcion": string, meta descripción SEO (120 a 156 caracteres)\n'
