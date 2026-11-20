@@ -103,3 +103,13 @@ def test_only_the_website_and_youtube_thumbnails_are_downloadable() -> None:
     assert not _permitida("https://portalvallenato.com.evil.example/a.jpg")
     assert not _permitida("https://169.254.169.254/latest/meta-data")
     assert descargar_imagenes(["https://evil.example.com/a.jpg", ""]) == {}
+
+
+def test_watermark_changes_the_card_so_a_preview_is_never_the_real_one() -> None:
+    renderer = PillowChartRenderer()
+    sin = renderer.renderizar(date(2026, 11, 20), _filas(), lamina="lista")
+    con = renderer.renderizar(
+        date(2026, 11, 20), _filas(), lamina="lista", marca_agua="VISTA PREVIA EN VIVO"
+    )
+    assert sin != con
+    assert Image.open(io.BytesIO(con)).size == (1080, 1350)

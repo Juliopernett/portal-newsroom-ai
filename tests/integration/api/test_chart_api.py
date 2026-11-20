@@ -409,3 +409,40 @@ def test_social_card_requires_login(unauthenticated_client: TestClient) -> None:
         "/chart-vallenato/ediciones/2026-11-13/imagen", params={"lamina": "portada"}
     )
     assert r.status_code == 401
+
+
+def test_live_preview_card_is_inline_and_404_without_a_ranking(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import io
+
+    from PIL import Image
+
+    monkeypatch.setattr("app.api.routers.chart.descargar_imagenes", lambda urls: {})
+    url = "/chart-vallenato/en-vivo/imagen"
+    assert client.get(url, params={"lamina": "lista"}).status_code == 404
+
+    from app.api.dependencies import get_unit_of_work
+    from app.api.main import app
+
+    _canal(client, artista="")
+    client.post("/chart-vallenato/recolectar")
+    ids = [v["video_id"] for v in client.get("/chart-vallenato").json()["videos"]]
+    hoy = datetime.now(UTC).date()
+    gen = app.dependency_overrides[get_unit_of_work]()
+    uow = next(gen)
+    for n, vid in enumerate(ids):
+        uow.chart.save_snapshot(SnapshotVistas(vid, hoy - timedelta(days=7), 1_000))
+        uow.chart.save_snapshot(SnapshotVistas(vid, hoy, 1_000 + 10_000 * (n + 1)))
+    uow.commit()
+
+    r = client.get(url, params={"lamina": "portada", "formato": "historia"})
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "image/png"
+    assert "content-disposition" not in r.headers  # shown, never offered as a download
+    assert Image.open(io.BytesIO(r.content)).size == (1080, 1920)
+
+
+def test_live_preview_card_requires_login(unauthenticated_client: TestClient) -> None:
+    r = unauthenticated_client.get("/chart-vallenato/en-vivo/imagen", params={"lamina": "lista"})
+    assert r.status_code == 401

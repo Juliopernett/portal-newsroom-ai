@@ -214,6 +214,7 @@ class PillowChartRenderer:
         *,
         lamina: Lamina,
         formato: Formato = "feed",
+        marca_agua: str | None = None,
     ) -> bytes:
         if not filas:
             raise ChartImagenError("La edición no tiene filas")
@@ -228,10 +229,27 @@ class PillowChartRenderer:
             self._portada(lienzo, draw, semana_fin, filas, y0, y1, formato)
         else:
             self._lista(lienzo, draw, semana_fin, filas[:10], y0, y1)
+        if marca_agua:
+            self._marca_agua(lienzo, marca_agua)
         self._pie(lienzo, draw, alto - 1350 - inf)
         salida = io.BytesIO()
         lienzo.convert("RGB").save(salida, "PNG", optimize=True)
         return salida.getvalue()
+
+    @staticmethod
+    def _marca_agua(lienzo: Image.Image, texto: str) -> None:
+        """Big diagonal banner so a preview can never be mistaken for the real card."""
+        fuente = _fuente("Anton-Regular.ttf", 120)
+        caja = fuente.getbbox(texto)
+        ancho, alto = caja[2] - caja[0] + 80, caja[3] - caja[1] + 60
+        capa = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
+        d = ImageDraw.Draw(capa)
+        d.rectangle((0, 0, ancho, alto), fill=(0, 0, 0, 110))
+        d.text((ancho / 2, alto / 2), texto, font=fuente, fill=(255, 255, 255, 150), anchor="mm")
+        capa = capa.rotate(24, expand=True, resample=Image.BICUBIC)
+        lienzo.alpha_composite(
+            capa, (round((lienzo.width - capa.width) / 2), round((lienzo.height - capa.height) / 2))
+        )
 
     # --- marco de la plantilla ------------------------------------------------
 

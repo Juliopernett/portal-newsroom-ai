@@ -125,31 +125,6 @@ function EdicionesSection() {
               </div>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted px-3 py-2">
-            <span className="flex items-center gap-1 text-sm font-medium">
-              <ImageDown className="size-4" aria-hidden /> Imágenes para redes
-            </span>
-            {(
-              [
-                ['portada', 'feed', 'Portada 4:5'],
-                ['lista', 'feed', 'Top 10 4:5'],
-                ['portada', 'historia', 'Portada historia 9:16'],
-                ['lista', 'historia', 'Top 10 historia 9:16'],
-              ] as [LaminaChart, FormatoChart, string][]
-            ).map(([lamina, formato, etiqueta]) => (
-              <a
-                key={`${lamina}-${formato}`}
-                href={chartApi.urlImagen(ultima.semana_fin, lamina, formato)}
-                download
-                className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-accent"
-              >
-                {etiqueta}
-              </a>
-            ))}
-            <span className="text-xs text-muted-foreground">
-              Con fotos de artista; sirven también con el borrador.
-            </span>
-          </div>
           <ol className="flex flex-col gap-1">
             {ed?.filas_detalle.map((f) => (
               <li key={f.video_id} className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm">
@@ -180,6 +155,97 @@ function EdicionesSection() {
 
 // El chart se calcula solo con las vistas de YouTube; aquí el editor tiene el
 // veto: excluir una canción (p. ej. no es la oficial) o fijarla en una posición.
+// Tarjetas para redes: vista previa (Top 10 en vivo con marca de agua, o la última
+// edición) y descarga solo de ediciones reales, para no publicar una vista previa.
+function ImagenesRedesSection() {
+  const lista = useQuery({ queryKey: KEY_EDICIONES, queryFn: chartApi.ediciones })
+  const ultima = lista.data?.[0]
+  const [origen, setOrigen] = useState<'vivo' | 'edicion'>('vivo')
+  const [formato, setFormato] = useState<FormatoChart>('feed')
+  const [version, setVersion] = useState(0)
+  const deEdicion = origen === 'edicion' && !!ultima
+  const laminas: [LaminaChart, string][] = [
+    ['portada', 'Portada'],
+    ['lista', 'Top 10'],
+  ]
+  const url = (lamina: LaminaChart) =>
+    deEdicion
+      ? `${chartApi.urlImagen(ultima!.semana_fin, lamina, formato)}&v=${version}`
+      : chartApi.urlImagenEnVivo(lamina, formato, version)
+  const opcion = (activa: boolean) =>
+    `rounded-md border px-2.5 py-1 text-xs font-medium ${
+      activa ? 'border-brand bg-brand/10' : 'border-border bg-background hover:bg-accent'
+    }`
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-1 text-sm font-semibold">
+          <ImageDown className="size-4" aria-hidden /> Imágenes para redes
+        </h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className={opcion(!deEdicion)} onClick={() => setOrigen('vivo')}>
+            Top 10 en vivo
+          </button>
+          <button
+            type="button"
+            className={opcion(deEdicion) + (ultima ? '' : ' opacity-50')}
+            disabled={!ultima}
+            onClick={() => setOrigen('edicion')}
+          >
+            {ultima ? `Edición ${ultima.semana_fin}` : 'Edición (aún no hay)'}
+          </button>
+          <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+          <button type="button" className={opcion(formato === 'feed')} onClick={() => setFormato('feed')}>
+            Feed 4:5
+          </button>
+          <button
+            type="button"
+            className={opcion(formato === 'historia')}
+            onClick={() => setFormato('historia')}
+          >
+            Historia 9:16
+          </button>
+          <Button size="sm" variant="secondary" onClick={() => setVersion((v) => v + 1)}>
+            <RefreshCw className="size-3.5" /> Actualizar
+          </Button>
+        </div>
+      </div>
+      <div className="grid max-w-xl grid-cols-2 gap-3">
+        {laminas.map(([lamina, etiqueta]) => (
+          <figure key={`${lamina}-${formato}-${origen}-${version}`} className="flex flex-col gap-1">
+            <img
+              src={url(lamina)}
+              alt={`${etiqueta} (${deEdicion ? 'edición' : 'vista previa en vivo'})`}
+              loading="lazy"
+              className={`w-full rounded-md border border-border bg-muted object-cover ${
+                formato === 'feed' ? 'aspect-[4/5]' : 'aspect-[9/16]'
+              }`}
+            />
+            <figcaption className="flex items-center justify-between text-xs text-muted-foreground">
+              {etiqueta}
+              {deEdicion && (
+                <a
+                  href={chartApi.urlImagen(ultima!.semana_fin, lamina, formato)}
+                  download
+                  className="font-medium text-brand hover:underline"
+                >
+                  Descargar
+                </a>
+              )}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {deEdicion
+          ? 'Con fotos de artista; también funciona con el borrador de la edición.'
+          : 'Vista previa con el Top 10 de hoy, solo para ti: lleva marca de agua y no se descarga. La imagen para publicar se descarga de la edición semanal, cuando se cierre la semana.'}
+      </p>
+    </section>
+  )
+}
+
 export function ChartPanel() {
   const qc = useQueryClient()
   const chart = useQuery({ queryKey: KEY, queryFn: chartApi.obtener })
@@ -266,6 +332,8 @@ export function ChartPanel() {
       )}
 
       <EdicionesSection />
+
+      <ImagenesRedesSection />
 
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold">Top 10 actual (en vivo, solo para ti)</h3>

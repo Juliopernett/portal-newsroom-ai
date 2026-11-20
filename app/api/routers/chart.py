@@ -214,31 +214,24 @@ def obtener_edicion(semana_fin: date, uow: UnitOfWork = Depends(get_unit_of_work
     return _edicion_out(edicion)
 
 
-@router.get("/ediciones/{semana_fin}/imagen")
-def imagen_edicion(
+def _png_tarjeta(
+    filas: list[FilaEdicion] | list[FilaChartOut],
     semana_fin: date,
-    lamina: Literal["portada", "lista"] = Query(description="portada (el #1) o lista (Top 10)"),
-    formato: Literal["feed", "historia"] = Query(default="feed", description="4:5 o 9:16"),
-    uow: UnitOfWork = Depends(get_unit_of_work),
-    catalogo: CatalogoArtistas = Depends(get_catalogo_artistas),
-) -> Response:
-    """PNG card of the edition for social media (cover or Top 10; feed 4:5 or story 9:16).
-
-    Works for drafts too, so the editor can see the card before publishing.
-    Artist photos come from their pages on the website; a missing one shows initials.
-    """
-    edicion = uow.chart.get_edicion(semana_fin)
-    if edicion is None or not edicion.filas:
-        raise HTTPException(status_code=404, detail="Edition not found")
+    lamina: Literal["portada", "lista"],
+    formato: Literal["feed", "historia"],
+    catalogo: CatalogoArtistas,
+    marca_agua: str | None = None,
+) -> bytes:
+    """Draw a social card from ranking rows (edition or live), downloading only what it needs."""
     fotos = catalogo.obtener_fotos()
-    filas = list(edicion.filas[:10])
+    filas = filas[:10]
     foto_de = {f.video_id: pagina_del_artista(f.artista, fotos) for f in filas}
     urls = [u for u in foto_de.values() if u]
     if lamina == "portada" and filas[0].miniatura_url:
         urls.append(filas[0].miniatura_url)
     imagenes = descargar_imagenes(urls)
-    png = PillowChartRenderer().renderizar(
-        edicion.semana_fin,
+    return PillowChartRenderer().renderizar(
+        semana_fin,
         [
             FilaImagen(
                 posicion=f.posicion,
@@ -255,7 +248,54 @@ def imagen_edicion(
         ],
         lamina=lamina,
         formato=formato,
+        marca_agua=marca_agua,
     )
+
+
+@router.get("/en-vivo/imagen")
+def imagen_en_vivo(
+    lamina: Literal["portada", "lista"] = Query(description="portada (el #1) o lista (Top 10)"),
+    formato: Literal["feed", "historia"] = Query(default="feed", description="4:5 o 9:16"),
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    catalogo: CatalogoArtistas = Depends(get_catalogo_artistas),
+) -> Response:
+    """Preview of the card from today's live Top 10 — for the editor's eyes only.
+
+    Carries a "VISTA PREVIA EN VIVO" banner and is served inline (never as a
+    download), so it cannot be posted by mistake: the real card comes from a
+    weekly edition (`/ediciones/{semana}/imagen`).
+    """
+    _, posiciones, _, _ = _calcular(uow)
+    if not posiciones:
+        raise HTTPException(status_code=404, detail="Aún no hay ranking en vivo")
+    png = _png_tarjeta(
+        [_fila(p) for p in posiciones],
+        _hoy(),
+        lamina,
+        formato,
+        catalogo,
+        marca_agua="VISTA PREVIA EN VIVO",
+    )
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/ediciones/{semana_fin}/imagen")
+def imagen_edicion(
+    semana_fin: date,
+    lamina: Literal["portada", "lista"] = Query(description="portada (el #1) o lista (Top 10)"),
+    formato: Literal["feed", "historia"] = Query(default="feed", description="4:5 o 9:16"),
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    catalogo: CatalogoArtistas = Depends(get_catalogo_artistas),
+) -> Response:
+    """PNG card of the edition for social media (cover or Top 10; feed 4:5 or story 9:16).
+
+    Works for drafts too, so the editor can see the card before publishing.
+    Artist photos come from their pages on the website; a missing one shows initials.
+    """
+    edicion = uow.chart.get_edicion(semana_fin)
+    if edicion is None or not edicion.filas:
+        raise HTTPException(status_code=404, detail="Edition not found")
+    png = _png_tarjeta(list(edicion.filas), edicion.semana_fin, lamina, formato, catalogo)
     nombre = f"chart-vallenato-{edicion.semana_fin.isoformat()}-{lamina}-{formato}.png"
     return Response(
         content=png,

@@ -104,6 +104,9 @@ export const chartApi = {
   // Imagen PNG para redes (la sesión viaja por cookie, así que un enlace de descarga basta).
   urlImagen: (semana: string, lamina: LaminaChart, formato: FormatoChart) =>
     `${BASE}/ediciones/${semana}/imagen?lamina=${lamina}&formato=${formato}`,
+  // Vista previa del Top 10 en vivo (marca de agua, solo se ve; nunca se descarga).
+  urlImagenEnVivo: (lamina: LaminaChart, formato: FormatoChart, version = 0) =>
+    `${BASE}/en-vivo/imagen?lamina=${lamina}&formato=${formato}&v=${version}`,
   regenerarEdicion: (semana: string) => api.post<Edicion>(`${BASE}/ediciones/${semana}/regenerar`),
   publicarEdicion: (semana: string) => api.post<Edicion>(`${BASE}/ediciones/${semana}/publicar`),
   decidir: (
