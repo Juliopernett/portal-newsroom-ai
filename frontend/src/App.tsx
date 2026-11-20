@@ -20,6 +20,7 @@ const PortadasPage = lazy(() => import('@/features/portadas/PortadasPage').then(
 const RadarPage = lazy(() => import('@/features/radar/RadarPage').then((m) => ({ default: m.RadarPage })))
 const AlertasPage = lazy(() => import('@/features/alertas/AlertasPage').then((m) => ({ default: m.AlertasPage })))
 const DashboardPage = lazy(() => import('@/features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const ChartPage = lazy(() => import('@/features/chart/ChartPage').then((m) => ({ default: m.ChartPage })))
 const ConfiguracionPage = lazy(() => import('@/features/configuracion/ConfiguracionPage').then((m) => ({ default: m.ConfiguracionPage })))
 
 const queryClient = new QueryClient({
@@ -61,6 +62,7 @@ export default function App() {
                 <Route path="contratos" element={<ContratosPage />} />
                 <Route path="gastos" element={<GastosPage />} />
                 <Route path="reportes" element={<ReportesPage />} />
+                <Route path="chart" element={<ChartPage />} />
                 <Route path="configuracion" element={<ConfiguracionPage />} />
               </Route>
             </Route>

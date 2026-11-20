@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   ImagePlus,
+  ListMusic,
   Radar,
   Settings,
   X,
@@ -50,6 +51,10 @@ const NAV_GROUPS = [
       { to: '/radar', label: 'Radar Editorial', icon: Radar, end: false },
       { to: '/portadas', label: 'Portadas', icon: ImagePlus, end: false },
     ],
+  },
+  {
+    label: 'Chart',
+    items: [{ to: '/chart', label: 'Chart Vallenato', icon: ListMusic, end: false }],
   },
   {
     label: 'Finanzas',

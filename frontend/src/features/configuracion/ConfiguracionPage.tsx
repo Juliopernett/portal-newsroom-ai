@@ -21,13 +21,12 @@ import { IdentidadForm } from '@/features/identidad/IdentidadForm'
 import { aiConfiguracionApi, type AIConfiguracionInput, type ProveedorIA } from '@/features/ia/api'
 import { planesPautaApi, type PlanPauta, type PlanPautaInput } from './api'
 import { PlanPautaForm } from './PlanPautaForm'
-import { ChartPanel } from './ChartPanel'
 
 const PLANES_KEY = ['planes-pauta']
 const IDENTIDAD_KEY = ['identidad-comercial']
 const AI_CONFIGURACION_KEY = ['ai-configuracion']
 
-type ConfiguracionTab = 'planes' | 'identidad' | 'ia' | 'chart' | 'cuenta'
+type ConfiguracionTab = 'planes' | 'identidad' | 'ia' | 'cuenta'
 
 function PlanesPautaPanel() {
   const queryClient = useQueryClient()
@@ -419,7 +418,6 @@ export function ConfiguracionPage() {
             { id: 'planes', label: 'Planes de Pauta' },
             { id: 'identidad', label: 'Identidad comercial' },
             { id: 'ia', label: 'IA' },
-            { id: 'chart', label: 'Chart' },
             { id: 'cuenta', label: 'Cuenta' },
           ] as const
         ).map((t) => (
@@ -440,7 +438,7 @@ export function ConfiguracionPage() {
         ))}
       </div>
 
-      {tab === 'planes' ? <PlanesPautaPanel /> : tab === 'identidad' ? <IdentidadPanel /> : tab === 'cuenta' ? <CuentaPanel /> : tab === 'chart' ? <ChartPanel /> : <IAPanel />}
+      {tab === 'planes' ? <PlanesPautaPanel /> : tab === 'identidad' ? <IdentidadPanel /> : tab === 'cuenta' ? <CuentaPanel /> : <IAPanel />}
     </div>
   )
 }
