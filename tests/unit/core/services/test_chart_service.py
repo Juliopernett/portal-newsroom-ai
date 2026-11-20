@@ -234,3 +234,53 @@ def test_a_pinned_duplicate_claims_the_song_over_a_more_viewed_copy() -> None:
     }
 
     assert [p.video.video_id for p in calcular_chart(videos, snaps, HOY)] == ["fijo"]
+
+
+def _con_artista(vid: str, artista: str | None, **kw: object) -> VideoChart:
+    return _video(vid, artista=artista, **kw)
+
+
+def test_an_artist_gets_at_most_two_places_and_the_next_song_moves_up() -> None:
+    videos = [
+        _con_artista("p1", "Peter Manjarres"),
+        _con_artista("p2", "Peter Manjarres"),
+        _con_artista("p3", "Peter Manjarres"),
+        _con_artista("o", "Otro Artista"),
+    ]
+    snaps = {
+        "p1": _snaps("p1", {7: 0, 0: 9_000}),
+        "p2": _snaps("p2", {7: 0, 0: 8_000}),
+        "p3": _snaps("p3", {7: 0, 0: 7_000}),
+        "o": _snaps("o", {7: 0, 0: 1_000}),
+    }
+    chart = calcular_chart(videos, snaps, HOY)
+    assert [p.video.video_id for p in chart] == ["p1", "p2", "o"]
+
+
+def test_the_artist_limit_ignores_accents_and_case_and_never_limits_unknown_artists() -> None:
+    videos = [
+        _con_artista("a", "Peter Manjarrés"),
+        _con_artista("b", "peter manjarres"),
+        _con_artista("c", "PETER MANJARRES"),
+        _con_artista("x", None),
+        _con_artista("y", None),
+        _con_artista("z", None),
+    ]
+    snaps = {
+        v.video_id: _snaps(v.video_id, {7: 0, 0: 9_000 - i * 100}) for i, v in enumerate(videos)
+    }
+    ids = [p.video.video_id for p in calcular_chart(videos, snaps, HOY)]
+    assert ids == ["a", "b", "x", "y", "z"]
+
+
+def test_a_pinned_video_is_never_dropped_by_the_artist_limit() -> None:
+    videos = [
+        _con_artista("p1", "Peter Manjarres"),
+        _con_artista("p2", "Peter Manjarres"),
+        _con_artista("p3", "Peter Manjarres", fijado_posicion=1),
+    ]
+    snaps = {
+        v.video_id: _snaps(v.video_id, {7: 0, 0: 9_000 - i * 100}) for i, v in enumerate(videos)
+    }
+    ids = [p.video.video_id for p in calcular_chart(videos, snaps, HOY)]
+    assert ids[0] == "p3" and len(ids) == 3 - 1  # the pin uses a place: only one free song fits

@@ -113,7 +113,7 @@ def test_chart_ranks_after_enough_daily_history(client: TestClient) -> None:
     from app.api.dependencies import get_unit_of_work
     from app.api.main import app
 
-    _canal(client)
+    _canal(client, artista="")  # no artist: the two-per-artist limit has its own tests
     client.post("/chart-vallenato/recolectar")
     ids = [v["video_id"] for v in client.get("/chart-vallenato").json()["videos"]]
     hoy = datetime.now(UTC).date()

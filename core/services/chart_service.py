@@ -27,6 +27,7 @@ from enum import StrEnum
 from core.entities.chart import SnapshotVistas, VideoChart
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
+from core.services.chart_enlaces import normalizar_nombre
 
 DIAS_VENTANA = 7
 MIN_DIAS_HISTORIAL = 3
@@ -114,6 +115,37 @@ def deduplicar_canciones(
     return resultado
 
 
+MAX_CANCIONES_POR_ARTISTA = 2
+
+
+def limitar_por_artista(
+    filas: list[tuple[VideoChart, int, int, bool]], maximo: int = MAX_CANCIONES_POR_ARTISTA
+) -> list[tuple[VideoChart, int, int, bool]]:
+    """Keep at most `maximo` songs per artist so one name cannot take the whole chart.
+
+    `filas` must already be sorted best-first (and de-duplicated by song). Pinned
+    videos are the editor's explicit choice: they are never dropped, but they do
+    use up their artist's places. Videos with no artist are never limited.
+    """
+    cupo: dict[str, int] = {}
+    for v, *_ in filas:  # pinned videos claim their artist's places first
+        if v.fijado_posicion is not None and v.artista:
+            clave = normalizar_nombre(v.artista)
+            cupo[clave] = cupo.get(clave, 0) + 1
+    resultado: list[tuple[VideoChart, int, int, bool]] = []
+    for fila in filas:
+        v = fila[0]
+        if v.fijado_posicion is not None or not v.artista:
+            resultado.append(fila)
+            continue
+        clave = normalizar_nombre(v.artista)
+        if cupo.get(clave, 0) >= maximo:
+            continue
+        cupo[clave] = cupo.get(clave, 0) + 1
+        resultado.append(fila)
+    return resultado
+
+
 def _vistas_ganadas(
     snaps: list[SnapshotVistas], hoy: date, dias: int
 ) -> tuple[int, int, bool] | None:
@@ -156,7 +188,7 @@ def _ranking_base(
             continue
         filas.append((v, r[0], r[1], r[2]))
     filas.sort(key=lambda f: (-f[1], -f[2], f[0].titulo.lower()))
-    return deduplicar_canciones(filas)
+    return limitar_por_artista(deduplicar_canciones(filas))
 
 
 def aplicar_fijados(

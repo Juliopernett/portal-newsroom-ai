@@ -35,6 +35,7 @@ from core.ports.youtube_reader import YouTubeError, YouTubeReader
 from core.services.chart_service import (
     aplicar_fijados,
     deduplicar_canciones,
+    limitar_por_artista,
     retirar_no_disponibles,
 )
 
@@ -85,7 +86,7 @@ def _ranking_semanal(
             continue
         filas.append((v, ganadas, total, False))
     filas.sort(key=lambda f: (-f[1], -f[2], f[0].titulo.lower()))
-    return deduplicar_canciones(filas), sin_base
+    return limitar_por_artista(deduplicar_canciones(filas)), sin_base
 
 
 def _tendencia(
