@@ -531,11 +531,11 @@ def _html_embed(filas: list[FilaChartOut], actualizado: date | None) -> str:
     return (
         '<!doctype html><html lang="es"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<title>Chart Vallenato</title>"
+        "<title>Radar Vallenato</title>"
         f"<style>{_CSS_EMBED}</style></head><body>"
-        '<h1 class="t">Chart Vallenato<small>Lo más escuchado de la semana en YouTube</small></h1>'
+        '<h1 class="t">Radar Vallenato<small>Lo más escuchado de la semana en YouTube</small></h1>'
         f"{cuerpo}"
-        f'<div class="f">Chart Vallenato · un producto de '
+        f'<div class="f">Radar Vallenato · un producto de '
         f'<a href="{_URL_PAGINA_CHART}" target="_blank" rel="noopener">www.portalvallenato.com</a>'
         f"{e(fecha)}<br>Datos públicos de YouTube; las posiciones son un cálculo de "
         f'Portal Vallenato. <a href="{_URL_PRIVACIDAD}" target="_blank" rel="noopener">'

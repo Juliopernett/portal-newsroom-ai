@@ -366,7 +366,7 @@ export function ChartPanel() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Chart Vallenato</h2>
+          <h2 className="text-base font-semibold">Cierre semanal</h2>
           <p className="text-sm text-muted-foreground">
             Cada viernes a medianoche (hora de Colombia) se cierra el conteo de la semana y queda un
             borrador que tú revisas (excluir o fijar canciones) y publicas.

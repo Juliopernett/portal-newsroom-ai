@@ -54,7 +54,7 @@ const NAV_GROUPS = [
   },
   {
     label: 'Chart',
-    items: [{ to: '/chart', label: 'Chart Vallenato', icon: ListMusic, end: false }],
+    items: [{ to: '/chart', label: 'Radar Vallenato (Chart)', icon: ListMusic, end: false }],
   },
   {
     label: 'Finanzas',

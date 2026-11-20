@@ -298,7 +298,7 @@ class PillowChartRenderer:
 
     def _cabecera(self, lienzo: Image.Image, draw: ImageDraw.ImageDraw, dy: int) -> None:
         fuente = _fuente("Montserrat-Italic.ttf", 33, 700)
-        etiqueta = "CHART VALLENATO"
+        etiqueta = "RADAR VALLENATO"
         ancho = _ancho(etiqueta, fuente, 0.17)
         draw.rectangle((0, 7.4 + dy, 14 + ancho + 26, 81.8 + dy), fill=_NEGRO)
         _dibujar(draw, 14, 56.5 + dy, etiqueta, fuente, _BLANCO, 0.17)
