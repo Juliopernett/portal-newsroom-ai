@@ -27,6 +27,7 @@ from app.api.routers import (
     chart,
     clients,
     dashboard,
+    deudores,
     discovery,
     fuentes_radar,
     gastos,
@@ -62,6 +63,7 @@ app.include_router(chart.router)
 app.include_router(chart.router_publico)
 app.include_router(clients.router)
 app.include_router(dashboard.router)
+app.include_router(deudores.router)
 app.include_router(discovery.router)
 app.include_router(fuentes_radar.router)
 app.include_router(gastos.router)

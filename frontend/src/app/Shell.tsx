@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Users,
   FileText,
+  HandCoins,
   Wallet,
   Download,
   LogOut,
@@ -43,6 +44,7 @@ const NAV_GROUPS = [
       { to: '/clientes', label: 'Clientes', icon: Users, end: false },
       { to: '/contratos', label: 'Contratos', icon: FileText, end: false },
       { to: '/solicitudes', label: 'Solicitudes', icon: ClipboardList, end: false },
+      { to: '/deudores', label: 'Deudores', icon: HandCoins, end: false },
     ],
   },
   {
