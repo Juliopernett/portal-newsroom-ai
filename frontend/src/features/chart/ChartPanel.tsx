@@ -473,7 +473,7 @@ export function ChartPanel() {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
-        <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto">
+        <ul className="flex flex-col gap-1 sm:max-h-96 sm:overflow-y-auto">
           {videosFiltrados.length === 0 && (
             <li className="text-sm text-muted-foreground">
               {q ? 'Ningún video coincide con esa búsqueda.' : 'Aún no hay videos.'}
