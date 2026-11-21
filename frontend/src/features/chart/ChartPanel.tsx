@@ -30,7 +30,10 @@ async function descargar(semana: string, lamina: LaminaChart, formato: FormatoCh
     const blob = await chartApi.descargarImagen(semana, lamina, formato)
     const nombre = `chart-vallenato-${semana}-${lamina}-${formato}.png`
     const archivo = new File([blob], nombre, { type: 'image/png' })
-    if (navigator.canShare?.({ files: [archivo] })) {
+    // Compartir solo en teléfonos/tabletas: en escritorio `canShare` también da verdadero
+    // (diálogo de Windows) y el editor espera que el archivo se descargue.
+    const esTactil = window.matchMedia('(pointer: coarse)').matches
+    if (esTactil && navigator.canShare?.({ files: [archivo] })) {
       try {
         await navigator.share({ files: [archivo] })
         return
@@ -38,6 +41,7 @@ async function descargar(semana: string, lamina: LaminaChart, formato: FormatoCh
         if (e instanceof DOMException && e.name === 'AbortError') return
       }
     }
+    // Descarga directa del Blob (la sesión ya viajó en la petición).
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
