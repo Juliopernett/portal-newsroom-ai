@@ -47,6 +47,7 @@ from core.entities.chart import CanalChart, EdicionChart, FilaEdicion, VideoChar
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
 from core.services.chart_enlaces import pagina_del_artista
+from core.services.chart_texto_redes import texto_redes
 from core.services.chart_semanal_service import (
     EdicionPublicadaError,
     estado_semanal,
@@ -312,6 +313,15 @@ def imagen_edicion(
             "Cache-Control": "no-store",
         },
     )
+
+
+@router.get("/ediciones/{semana_fin}/texto")
+def texto_edicion(semana_fin: date, uow: UnitOfWork = Depends(get_unit_of_work)) -> dict[str, str]:
+    """Ready-to-paste caption for the edition's social posts (editable by the editor)."""
+    edicion = uow.chart.get_edicion(semana_fin)
+    if edicion is None or not edicion.filas:
+        raise HTTPException(status_code=404, detail="Edition not found")
+    return {"texto": texto_redes(list(edicion.filas), edicion.semana_fin)}
 
 
 @router.post("/ediciones/{semana_fin}/regenerar", response_model=EdicionOut)

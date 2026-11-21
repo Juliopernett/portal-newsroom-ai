@@ -120,6 +120,7 @@ export const chartApi = {
   // Vista previa del Top 10 en vivo (marca de agua, solo se ve; nunca se descarga).
   urlImagenEnVivo: (lamina: LaminaChart, formato: FormatoChart, version = 0) =>
     `${BASE}/en-vivo/imagen?lamina=${lamina}&formato=${formato}&v=${version}`,
+  textoRedes: (semana: string) => api.get<{ texto: string }>(`${BASE}/ediciones/${semana}/texto`),
   regenerarEdicion: (semana: string) => api.post<Edicion>(`${BASE}/ediciones/${semana}/regenerar`),
   publicarEdicion: (semana: string) => api.post<Edicion>(`${BASE}/ediciones/${semana}/publicar`),
   decidir: (

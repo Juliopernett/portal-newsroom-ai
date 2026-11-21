@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ImageDown, Minus, Pin, RefreshCw, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Copy, ImageDown, Minus, Pin, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { errorMessage } from '@/api/client'
@@ -49,6 +49,46 @@ async function descargar(semana: string, lamina: LaminaChart, formato: FormatoCh
   } catch (e) {
     toast.error(errorMessage(e))
   }
+}
+
+// Texto para acompañar las tarjetas en redes: se arma con el Top de la edición elegida y
+// el editor puede ajustarlo antes de copiarlo.
+function TextoRedes({ semana }: { semana: string }) {
+  const q = useQuery({ queryKey: [...KEY_EDICIONES, semana, 'texto'], queryFn: () => chartApi.textoRedes(semana) })
+  const [editado, setEditado] = useState<{ semana: string; texto: string } | null>(null)
+  const texto = editado?.semana === semana ? editado.texto : (q.data?.texto ?? '')
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(texto)
+      toast.success('Texto copiado.')
+    } catch {
+      toast.error('No se pudo copiar: selecciona el texto y cópialo a mano.')
+    }
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium">Texto para la publicación (edición {semana})</span>
+        <div className="flex gap-2">
+          {editado?.semana === semana && (
+            <Button size="sm" variant="ghost" onClick={() => setEditado(null)}>
+              Restablecer
+            </Button>
+          )}
+          <Button size="sm" variant="secondary" disabled={!texto} onClick={() => void copiar()}>
+            <Copy className="size-3.5" /> Copiar texto
+          </Button>
+        </div>
+      </div>
+      <textarea
+        aria-label="Texto para redes"
+        className="min-h-64 w-full rounded-md border border-border bg-background p-2 text-sm"
+        value={q.isLoading ? 'Armando el texto…' : texto}
+        readOnly={q.isLoading}
+        onChange={(e) => setEditado({ semana, texto: e.target.value })}
+      />
+    </div>
+  )
 }
 
 function Tendencia({ fila }: { fila: Pick<FilaChart | FilaEdicion, 'tendencia'> }) {
@@ -304,6 +344,8 @@ function ImagenesRedesSection() {
           ))}
         </div>
       )}
+
+      {deEdicion && <TextoRedes semana={elegida!.semana_fin} />}
 
       {mostrar ? (
         <>
