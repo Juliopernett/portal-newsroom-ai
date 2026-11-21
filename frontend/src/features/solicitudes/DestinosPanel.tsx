@@ -4,6 +4,17 @@ import { ListChecks } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { errorMessage } from '@/api/client'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SelectNative } from '@/components/ui/select-native'
@@ -198,6 +209,15 @@ function DestinoRow({
     onError: (err) => toast.error(errorMessage(err)),
   })
 
+  const retirarMutation = useMutation({
+    mutationFn: () => solicitudesApi.retirarDestino(solicitudId, destino.id),
+    onSuccess: () => {
+      toast.success('Publicación retirada: el cupo de la pauta volvió.')
+      onChanged()
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
   const corregirEnlaceMutation = useMutation({
     mutationFn: () =>
       solicitudesApi.corregirEnlaceDestino(
@@ -220,6 +240,7 @@ function DestinoRow({
     confirmarMutation.isPending ||
     sincronizarMutation.isPending ||
     cancelarMutation.isPending ||
+    retirarMutation.isPending ||
     corregirEnlaceMutation.isPending
 
   let acciones: React.ReactNode = null
@@ -280,6 +301,30 @@ function DestinoRow({
         >
           Editar enlace
         </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="sm" variant="ghost" disabled={acting}>
+              Retirar publicación
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Retirar esta publicación?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Úsalo cuando la publicación salió mal y ya la bajaste de la red. Queda marcada
+                como retirada (se conserva el enlace y la fecha como historial) y el cupo de la
+                pauta vuelve. Esto no borra nada en Facebook, Instagram ni WordPress: bájala
+                primero allá.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Volver</AlertDialogCancel>
+              <AlertDialogAction onClick={() => retirarMutation.mutate()}>
+                Sí, retirar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     )
   } else if (destino.canal === 'wordpress') {

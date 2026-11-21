@@ -18,6 +18,7 @@ from core.services.publication_request_service import (
     cerrar_si_completa,
     edit_solicitud,
     link_pauta,
+    reabrir_si_incompleta,
 )
 
 
@@ -326,3 +327,30 @@ def test_cerrar_si_completa_is_idempotent_once_already_closed() -> None:
     )
 
     assert resultado.fecha_cierre == fecha_original
+
+
+def test_reabrir_si_incompleta_clears_fecha_cierre_when_nothing_is_published_anymore() -> None:
+    solicitud = _solicitud(fecha_cierre=datetime(2026, 8, 6, tzinfo=UTC))
+    destinos = [_destino(estado=EstadoDestino.CANCELADO)]
+
+    assert reabrir_si_incompleta(solicitud, destinos).fecha_cierre is None
+
+
+def test_reabrir_si_incompleta_keeps_a_request_that_is_still_complete() -> None:
+    cierre = datetime(2026, 8, 6, tzinfo=UTC)
+    solicitud = _solicitud(fecha_cierre=cierre)
+    destinos = [
+        _destino(estado=EstadoDestino.PUBLICADO, fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC))
+    ]
+
+    assert reabrir_si_incompleta(solicitud, destinos).fecha_cierre == cierre
+
+
+def test_reabrir_si_incompleta_never_changes_estado() -> None:
+    solicitud = _solicitud(
+        estado=PublicationRequestStatus.ACEPTADA, fecha_cierre=datetime(2026, 8, 6, tzinfo=UTC)
+    )
+
+    resultado = reabrir_si_incompleta(solicitud, [_destino(estado=EstadoDestino.CANCELADO)])
+
+    assert resultado.estado == PublicationRequestStatus.ACEPTADA

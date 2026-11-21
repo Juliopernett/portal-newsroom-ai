@@ -16,6 +16,7 @@ from core.services.destino_publicacion_service import (
     marcar_fallido,
     marcar_publicado,
     puede_eliminarse_sin_afectar_completitud,
+    retirar,
     sincronizar_estado_wordpress,
     tiene_destino_social,
 )
@@ -510,3 +511,26 @@ def test_sincronizar_estado_wordpress_no_muta_el_original() -> None:
     sincronizar_estado_wordpress(destino, cms)
 
     assert destino.estado == EstadoDestino.PENDIENTE
+
+
+def test_retirar_turns_a_published_destino_into_cancelado_keeping_its_history() -> None:
+    destino = _destino(
+        canal=CanalPublicacion.FACEBOOK,
+        estado=EstadoDestino.PUBLICADO,
+        fecha_publicacion=datetime(2026, 11, 20, 23, 44, tzinfo=UTC),
+        url_publicacion="https://www.facebook.com/reel/879046791957963/",
+        meta_post_id="137967556315253_1616244203881274",
+    )
+
+    retirado = retirar(destino)
+
+    assert retirado.estado == EstadoDestino.CANCELADO
+    assert retirado.url_publicacion == destino.url_publicacion
+    assert retirado.meta_post_id == destino.meta_post_id
+    assert retirado.fecha_publicacion == destino.fecha_publicacion
+    assert esta_completa([retirado]) is False  # no longer a real publication
+
+
+def test_retirar_rejects_a_destino_that_was_never_published() -> None:
+    with pytest.raises(ValueError, match="publicado"):
+        retirar(_destino())

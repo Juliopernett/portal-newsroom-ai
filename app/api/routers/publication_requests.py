@@ -115,6 +115,7 @@ from core.services.destino_publicacion_service import (
     corregir_enlace,
     marcar_publicado,
     puede_eliminarse_sin_afectar_completitud,
+    retirar,
     sincronizar_estado_wordpress,
 )
 from core.services.media_asset_service import (
@@ -128,6 +129,7 @@ from core.services.publication_request_service import (
     cerrar_si_completa,
     edit_solicitud,
     link_pauta,
+    reabrir_si_incompleta,
 )
 from core.services.reporte_service import ReporteSolicitud, construir_reporte
 from core.services.wordpress_publication_service import preparar_y_crear_borrador
@@ -558,6 +560,40 @@ def cancelar_destino(
     uow.publication_requests.save(cerrada)
     uow.commit()
     return cancelado
+
+
+@router.post(
+    "/{request_id}/destinos/{destino_id}/retirar",
+    response_model=DestinoPublicacionOut,
+)
+def retirar_destino(
+    request_id: str,
+    destino_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> DestinoPublicacion:
+    """Mark a published destino as taken down, and give the pauta's cupo back.
+
+    For a publication that was removed from the network by hand (it went out
+    wrong): the destino becomes `CANCELADO` keeping its link/id/date as
+    history, and the solicitud reopens (`fecha_cierre` cleared) so it no
+    longer counts as a consumed publication. It does NOT delete anything on
+    Facebook/Instagram/WordPress — that is done by hand first. Only a
+    `PUBLICADO` destino can be withdrawn (422 otherwise).
+    """
+    solicitud = uow.publication_requests.get_by_id(request_id)
+    if solicitud is None:
+        raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    destinos = uow.destinos_publicacion.list_by_publication_request_id(request_id)
+    destino = next((d for d in destinos if d.id == destino_id), None)
+    if destino is None:
+        raise HTTPException(status_code=404, detail="DestinoPublicacion not found")
+    retirado = retirar(destino)
+    destinos_actualizados = [retirado if d.id == destino_id else d for d in destinos]
+    reabierta = reabrir_si_incompleta(solicitud, destinos_actualizados)
+    uow.destinos_publicacion.save(retirado)
+    uow.publication_requests.save(reabierta)
+    uow.commit()
+    return retirado
 
 
 @router.delete("/{request_id}/destinos/{destino_id}", status_code=204)

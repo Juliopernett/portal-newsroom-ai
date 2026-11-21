@@ -177,6 +177,22 @@ def cancelar(destino: DestinoPublicacion) -> DestinoPublicacion:
     return replace(destino, estado=EstadoDestino.CANCELADO)
 
 
+def retirar(destino: DestinoPublicacion) -> DestinoPublicacion:
+    """Return a copy of a `PUBLICADO` destino marked as taken down (`CANCELADO`).
+
+    For a publication that went out by mistake or badly and was removed from
+    the network by hand: it stops counting as a real publication (so the
+    pauta's cupo comes back — see `esta_completa`) while the history stays:
+    `url_publicacion`, `meta_post_id` and `fecha_publicacion` are kept, so
+    there is still a record of what was published and where. Raises
+    `ValueError` for any destino that is not `PUBLICADO` (use `cancelar` for
+    one that never went out).
+    """
+    if destino.estado != EstadoDestino.PUBLICADO:
+        raise ValueError("solo se puede retirar un destino que ya está publicado")
+    return replace(destino, estado=EstadoDestino.CANCELADO)
+
+
 def puede_eliminarse_sin_afectar_completitud(
     destino: DestinoPublicacion, otros_destinos: Sequence[DestinoPublicacion]
 ) -> bool:

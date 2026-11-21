@@ -135,6 +135,21 @@ def edit_solicitud(
     )
 
 
+def reabrir_si_incompleta(
+    solicitud: PublicationRequest, destinos: Sequence[DestinoPublicacion]
+) -> PublicationRequest:
+    """Return `solicitud` with `fecha_cierre` cleared once it is no longer complete.
+
+    The counterpart of `cerrar_si_completa`, used only when a publication is
+    taken down (`retirar`): a request that closed because its destinos were
+    all published stops being closed when that publication is withdrawn, so
+    its pauta's cupo is free again. Never changes `estado`.
+    """
+    if solicitud.fecha_cierre is None or esta_completa(destinos):
+        return solicitud
+    return replace(solicitud, fecha_cierre=None)
+
+
 def cerrar_si_completa(
     solicitud: PublicationRequest,
     destinos: Sequence[DestinoPublicacion],

@@ -186,6 +186,10 @@ export const solicitudesApi = {
         ...(metaPostId ? { meta_post_id: metaPostId } : {}),
       },
     ),
+  // Publicación que salió mal y ya se bajó de la red a mano: pasa a «cancelado» (queda el
+  // historial) y el cupo de la pauta vuelve. No borra nada en Facebook/Instagram/WordPress.
+  retirarDestino: (id: string, destinoId: string) =>
+    api.post<DestinoPublicacion>(`/publication-requests/${id}/destinos/${destinoId}/retirar`),
   cancelarDestino: (id: string, destinoId: string) =>
     api.post<DestinoPublicacion>(`/publication-requests/${id}/destinos/${destinoId}/cancelar`),
   corregirEnlaceDestino: (
