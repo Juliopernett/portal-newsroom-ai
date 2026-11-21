@@ -220,10 +220,12 @@ function ImagenesRedesSection() {
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-1 text-sm font-semibold">
-          <ImageDown className="size-4" aria-hidden /> Imágenes para redes
-        </h3>
+      <h3 className="flex items-center gap-1 text-sm font-semibold">
+        <ImageDown className="size-4" aria-hidden /> Imágenes para redes
+      </h3>
+
+      <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-x-3">
+        <span className="text-xs font-medium text-muted-foreground">Origen</span>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className={opcion(!deEdicion)} onClick={() => setOrigen('vivo')}>
             Top 10 en vivo
@@ -250,7 +252,9 @@ function ImagenesRedesSection() {
               ))}
             </SelectNative>
           )}
-          <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+        </div>
+        <span className="text-xs font-medium text-muted-foreground">Formato</span>
+        <div className="flex flex-wrap items-center gap-2">
           <button type="button" className={opcion(formato === 'feed')} onClick={() => setFormato('feed')}>
             Feed 4:5
           </button>
@@ -521,6 +525,11 @@ export function ChartPanel() {
         </ul>
       </section>
 
+      <details className="group rounded-lg border border-border">
+        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">
+          Configuración: canales seguidos ({canales.data?.length ?? 0}) y videos sueltos
+        </summary>
+        <div className="flex flex-col gap-4 border-t border-border p-3">
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold">Canales de YouTube que se siguen</h3>
         <p className="text-xs text-muted-foreground">
@@ -555,7 +564,7 @@ export function ChartPanel() {
         </ul>
       </section>
 
-      <section className="flex flex-col gap-2">
+      <section className="flex flex-col gap-2 border-t border-border pt-4">
         <h3 className="text-sm font-semibold">Agregar un video suelto</h3>
         <p className="text-xs text-muted-foreground">
           Para canciones de artistas cuyo canal no sigues: pega el enlace del video.
@@ -574,6 +583,8 @@ export function ChartPanel() {
           </Button>
         </form>
       </section>
+        </div>
+      </details>
     </div>
   )
 }
