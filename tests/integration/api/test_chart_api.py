@@ -446,3 +446,25 @@ def test_live_preview_card_is_inline_and_404_without_a_ranking(
 def test_live_preview_card_requires_login(unauthenticated_client: TestClient) -> None:
     r = unauthenticated_client.get("/chart-vallenato/en-vivo/imagen", params={"lamina": "lista"})
     assert r.status_code == 401
+
+
+def test_cover_asks_for_the_hd_thumbnail_of_the_number_one_only(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pedidas: list[list[str]] = []
+
+    def falso(urls: list[str]) -> dict[str, bytes]:
+        pedidas.append(list(urls))
+        return {}
+
+    monkeypatch.setattr("app.api.routers.chart.descargar_imagenes", falso)
+    _sembrar_cortes()
+    client.post("/chart-vallenato/ediciones/2026-11-13/regenerar")
+    base = "/chart-vallenato/ediciones/2026-11-13/imagen"
+
+    assert client.get(base, params={"lamina": "portada"}).status_code == 200
+    assert client.get(base, params={"lamina": "lista"}).status_code == 200
+
+    hd = "https://i.ytimg.com/vi/b/maxresdefault.jpg"  # "b" is the most viewed in the seed
+    assert hd in pedidas[0]
+    assert not any("maxresdefault" in u for u in pedidas[1])

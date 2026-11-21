@@ -228,6 +228,15 @@ def _png_tarjeta(
     foto_de = {f.video_id: pagina_del_artista(f.artista, fotos) for f in filas}
     urls = [u for u in foto_de.values() if u]
     urls += [f.miniatura_url for f in filas if f.miniatura_url]  # every row shows its video
+    # The cover shows the #1 big: ask YouTube for the HD thumbnail (not every video has one;
+    # a missing one simply isn't downloaded and the stored thumbnail is used instead).
+    hd_primero = (
+        f"https://i.ytimg.com/vi/{filas[0].video_id}/maxresdefault.jpg"
+        if lamina == "portada"
+        else None
+    )
+    if hd_primero:
+        urls.append(hd_primero)
     imagenes = descargar_imagenes(urls)
     return PillowChartRenderer().renderizar(
         semana_fin,
@@ -239,7 +248,8 @@ def _png_tarjeta(
                 vistas_semana=f.vistas_semana,
                 tendencia=f.tendencia,
                 foto_artista=imagenes.get(foto_de[f.video_id] or ""),
-                miniatura=imagenes.get(f.miniatura_url or ""),
+                miniatura=(imagenes.get(hd_primero or "") if hd_primero and f is filas[0] else None)
+                or imagenes.get(f.miniatura_url or ""),
             )
             for f in filas
         ],
