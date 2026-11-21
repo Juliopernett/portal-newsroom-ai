@@ -47,7 +47,6 @@ from core.entities.chart import CanalChart, EdicionChart, FilaEdicion, VideoChar
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
 from core.services.chart_enlaces import pagina_del_artista
-from core.services.chart_texto_redes import texto_redes
 from core.services.chart_semanal_service import (
     EdicionPublicadaError,
     estado_semanal,
@@ -62,6 +61,7 @@ from core.services.chart_service import (
     calcular_chart,
     recolectar_chart,
 )
+from core.services.chart_texto_redes import texto_redes
 
 router = APIRouter(
     prefix="/chart-vallenato", tags=["chart"], dependencies=[Depends(get_current_user)]

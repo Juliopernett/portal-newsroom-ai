@@ -12,8 +12,19 @@ from core.entities.chart import FilaEdicion
 
 URL_RADAR = "https://portalvallenato.com/chart-vallenato/"
 _MESES = (
-    "enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre"
-).split()
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+)
 _FLECHA = {"sube": "🔼", "baja": "🔽", "igual": "▪️", "nuevo": "🆕"}
 _NUMEROS = ("1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟")
 
