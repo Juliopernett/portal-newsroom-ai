@@ -67,7 +67,8 @@ function EdicionesSection() {
   const qc = useQueryClient()
   const lista = useQuery({ queryKey: KEY_EDICIONES, queryFn: chartApi.ediciones })
   const estado = useQuery({ queryKey: KEY_ESTADO, queryFn: chartApi.estadoSemanal })
-  const ultima = lista.data?.[0]
+  const [semanaVista, setSemanaVista] = useState<string | null>(null)
+  const ultima = lista.data?.find((e) => e.semana_fin === semanaVista) ?? lista.data?.[0]
   const detalle = useQuery({
     queryKey: [...KEY_EDICIONES, ultima?.semana_fin],
     queryFn: () => chartApi.edicion(ultima!.semana_fin),
@@ -124,6 +125,21 @@ function EdicionesSection() {
         </p>
       ) : (
         <>
+          {lista.data && lista.data.length > 1 && (
+            <SelectNative
+              aria-label="Ver otra edición"
+              className="!h-8 w-60 text-xs"
+              value={ultima.semana_fin}
+              onChange={(e) => setSemanaVista(e.target.value)}
+            >
+              {lista.data.map((e, i) => (
+                <option key={e.semana_fin} value={e.semana_fin}>
+                  {e.semana_fin} · {e.estado === 'publicada' ? 'publicada' : 'borrador'}
+                  {i === 0 ? ' (la más reciente)' : ''}
+                </option>
+              ))}
+            </SelectNative>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm">
               Semana cerrada el <strong>{ultima.semana_fin}</strong> ·{' '}
@@ -170,11 +186,6 @@ function EdicionesSection() {
               </li>
             ))}
           </ol>
-          {lista.data && lista.data.length > 1 && (
-            <p className="text-xs text-muted-foreground">
-              Anteriores: {lista.data.slice(1, 6).map((e) => `${e.semana_fin} (${e.estado})`).join(' · ')}
-            </p>
-          )}
         </>
       )}
     </section>
