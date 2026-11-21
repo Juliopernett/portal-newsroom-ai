@@ -32,6 +32,71 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
   )
 }
 
+type TabId = 'prioridades' | 'cobrar' | 'abandono' | 'dormidos' | 'renovaciones' | 'salud' | 'oportunidades'
+
+interface TabDef {
+  id: TabId
+  label: string
+  count: number
+  tone: 'danger' | 'warning' | 'neutral'
+}
+
+// Una sola sección visible a la vez: cada pestaña lleva su contador (rojo/amarillo
+// cuando hay algo que atender) para ver de un vistazo dónde hay trabajo sin recorrer
+// una lista larguísima.
+function TabsAlertas({ tabs, value, onChange }: { tabs: TabDef[]; value: TabId; onChange: (id: TabId) => void }) {
+  const tono = (t: TabDef) =>
+    t.count === 0
+      ? 'bg-muted text-muted-foreground'
+      : t.tone === 'danger'
+        ? 'bg-danger-bg text-danger'
+        : t.tone === 'warning'
+          ? 'bg-warning-bg text-warning'
+          : 'bg-muted text-foreground'
+  return (
+    <div
+      role="tablist"
+      aria-label="Secciones de alertas"
+      className="sticky top-0 z-10 -mx-1 flex gap-2 overflow-x-auto bg-background px-1 py-2"
+    >
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          aria-selected={value === t.id}
+          onClick={() => onChange(t.id)}
+          className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+            value === t.id
+              ? 'border-brand bg-brand/10 text-foreground'
+              : 'border-border bg-card text-muted-foreground hover:bg-accent'
+          }`}
+        >
+          {t.label}
+          <span className={`rounded-full px-1.5 text-xs font-semibold ${tono(t)}`}>{t.count}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Muestra las primeras `limite` filas y deja ver el resto con un botón.
+function Recortable({ children, limite = 8 }: { children: React.ReactNode[]; limite?: number }) {
+  const [todo, setTodo] = useState(false)
+  const filas = Array.isArray(children) ? children.flat() : [children]
+  const visibles = todo ? filas : filas.slice(0, limite)
+  return (
+    <div className="flex flex-col gap-2">
+      {visibles}
+      {filas.length > limite && (
+        <Button variant="ghost" size="sm" className="self-start" onClick={() => setTodo(!todo)}>
+          {todo ? 'Ver menos' : `Ver las ${filas.length - limite} restantes`}
+        </Button>
+      )}
+    </div>
+  )
+}
+
 export function AlertasPage() {
   const centroQuery = useQuery({ queryKey: ['insights', 'centro-alertas'], queryFn: insightsApi.centroAlertas })
   const riesgoQuery = useQuery({ queryKey: ['insights', 'riesgo-abandono'], queryFn: insightsApi.riesgoAbandono })
@@ -42,6 +107,7 @@ export function AlertasPage() {
   const dashAlertasQuery = useQuery({ queryKey: ['dashboard', 'alertas'], queryFn: dashboardApi.alertas })
   const rankingQuery = useQuery({ queryKey: ['dashboard', 'ranking'], queryFn: dashboardApi.ranking })
   const [radarBucket, setRadarBucket] = useState(0)
+  const [tab, setTab] = useState<TabId>('prioridades')
   const { isDismissed, dismiss, dismissedCount, restoreAll } = useDismissedAlerts()
 
   const buckets = useMemo(() => computarRadarBuckets(rankingQuery.data ?? []), [rankingQuery.data])
@@ -99,8 +165,29 @@ export function AlertasPage() {
     rankingQuery.refetch()
   }
 
+  const totalCobrar = cobrarVisible.reduce((suma, c) => suma + Number(c.saldo_pendiente), 0)
+  const tabs: TabDef[] = [
+    {
+      id: 'prioridades',
+      label: 'Prioridades',
+      count: centroAgrupado.length,
+      tone: centroAgrupado.some(({ item }) => item.severidad === 'critica') ? 'danger' : 'warning',
+    },
+    { id: 'cobrar', label: 'Cuentas por cobrar', count: cobrarVisible.length, tone: 'warning' },
+    { id: 'abandono', label: 'Riesgo de abandono', count: riesgoVisible.length, tone: 'danger' },
+    { id: 'dormidos', label: 'Dormidos', count: dormidosVisible.length, tone: 'warning' },
+    {
+      id: 'renovaciones',
+      label: 'Renovaciones',
+      count: buckets.reduce((n, b) => n + b.items.length, 0),
+      tone: 'neutral',
+    },
+    { id: 'salud', label: 'Salud de clientes', count: (saludQuery.data ?? []).length, tone: 'neutral' },
+    { id: 'oportunidades', label: 'Oportunidades', count: patronesVisible.length, tone: 'neutral' },
+  ]
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold">Alertas</h1>
@@ -127,13 +214,16 @@ export function AlertasPage() {
         </div>
       )}
 
+      <TabsAlertas tabs={tabs} value={tab} onChange={setTab} />
+
+      {tab === 'prioridades' && (
       <Section title="Centro de Alertas">
         {centroQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
         ) : centroAgrupado.length === 0 ? (
           <EmptyState emoji="✅" mensaje="Sin pendientes urgentes — todo al día." />
         ) : (
-          <div className="flex flex-col gap-2">
+          <Recortable>
             {centroAgrupado.map(({ item, count }) => (
               <ActionItem
                 key={centroAlertaKey(item)}
@@ -148,10 +238,12 @@ export function AlertasPage() {
                 {item.mensaje}
               </ActionItem>
             ))}
-          </div>
+          </Recortable>
         )}
       </Section>
+      )}
 
+      {tab === 'renovaciones' && (
       <Section title="Radar de Renovaciones">
         {rankingQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
@@ -159,14 +251,16 @@ export function AlertasPage() {
           <RadarRenovaciones buckets={buckets} selected={radarBucket} onSelect={setRadarBucket} />
         )}
       </Section>
+      )}
 
+      {tab === 'abandono' && (
       <Section title="Riesgo de Abandono" subtitle="Tienen cupo pagado sin usar, pero llevan demasiado tiempo en silencio.">
         {riesgoQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
         ) : riesgoVisible.length === 0 ? (
           <EmptyState emoji="✅" mensaje="Ningún cliente vigente lleva demasiado tiempo en silencio." />
         ) : (
-          <div className="flex flex-col gap-2">
+          <Recortable>
             {riesgoVisible.map((item) => (
               <ActionItem
                 key={item.cliente.id}
@@ -187,17 +281,19 @@ export function AlertasPage() {
                 {item.publicaciones_restantes} publicaciones disponibles.
               </ActionItem>
             ))}
-          </div>
+          </Recortable>
         )}
       </Section>
+      )}
 
-      <Section title="Cuentas por Cobrar" subtitle="Pautas con saldo pendiente — pagaron una parte y falta el resto.">
+      {tab === 'cobrar' && (
+      <Section title="Cuentas por Cobrar" subtitle={`Total por cobrar: ${formatMoneda(totalCobrar)}. Pagaron una parte y falta el resto; el detalle agrupado por cliente está en Deudores.`}>
         {cobrarQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
         ) : cobrarVisible.length === 0 ? (
           <EmptyState emoji="✅" mensaje="Ningún cliente tiene saldo pendiente." />
         ) : (
-          <div className="flex flex-col gap-2">
+          <Recortable>
             {cobrarVisible.map((item) => (
               <ActionItem
                 key={item.pauta_id}
@@ -218,17 +314,19 @@ export function AlertasPage() {
                 {PAUTA_TIPO_LABELS[item.tipo]} ({formatFecha(item.fecha_fin)}).
               </ActionItem>
             ))}
-          </div>
+          </Recortable>
         )}
       </Section>
+      )}
 
+      {tab === 'dormidos' && (
       <Section title="Clientes Dormidos" subtitle="Sin ningún contrato vigente y sin actividad hace más de 60 días.">
         {dormidosQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
         ) : dormidosVisible.length === 0 ? (
           <EmptyState emoji="✅" mensaje="No hay clientes dormidos por ahora." />
         ) : (
-          <div className="flex flex-col gap-2">
+          <Recortable>
             {dormidosVisible.map((item) => (
               <ActionItem
                 key={item.cliente.id}
@@ -250,10 +348,12 @@ export function AlertasPage() {
                 {PAUTA_TIPO_LABELS[item.ultimo_contrato_tipo]}, venció {formatFecha(item.ultimo_contrato_fecha_fin)}.
               </ActionItem>
             ))}
-          </div>
+          </Recortable>
         )}
       </Section>
+      )}
 
+      {tab === 'salud' && (
       <Section title="Score de Salud del Cliente">
         {saludQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
@@ -273,7 +373,9 @@ export function AlertasPage() {
           </div>
         )}
       </Section>
+      )}
 
+      {tab === 'oportunidades' && (
       <Section title="Oportunidades Comerciales">
         <h3 className="text-sm font-medium text-muted-foreground">Categorías generales</h3>
         {dashAlertasQuery.isLoading ? (
@@ -297,7 +399,7 @@ export function AlertasPage() {
         ) : patronesVisible.length === 0 ? (
           <EmptyState emoji="✅" mensaje="No se detectaron patrones de compra por ahora." />
         ) : (
-          <div className="flex flex-col gap-2">
+          <Recortable>
             {patronesVisible.map((item) => (
               <ActionItem
                 key={`${item.cliente.id}-${item.tipo}`}
@@ -309,9 +411,10 @@ export function AlertasPage() {
                 {item.mensaje}
               </ActionItem>
             ))}
-          </div>
+          </Recortable>
         )}
       </Section>
+      )}
     </div>
   )
 }
