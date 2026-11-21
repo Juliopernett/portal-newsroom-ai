@@ -104,6 +104,19 @@ export const chartApi = {
   // Imagen PNG para redes (la sesión viaja por cookie, así que un enlace de descarga basta).
   urlImagen: (semana: string, lamina: LaminaChart, formato: FormatoChart) =>
     `${BASE}/ediciones/${semana}/imagen?lamina=${lamina}&formato=${formato}`,
+  // Baja la imagen desde la app (con la cookie) y devuelve el Blob PNG. Un enlace directo
+  // con `download` falla en el teléfono: el gestor de descargas no lleva la sesión y guarda
+  // la página HTML de login en vez de la imagen.
+  async descargarImagen(semana: string, lamina: LaminaChart, formato: FormatoChart): Promise<Blob> {
+    const res = await fetch(`${BASE}/ediciones/${semana}/imagen?lamina=${lamina}&formato=${formato}`, {
+      credentials: 'include',
+    })
+    const tipo = res.headers.get('content-type') ?? ''
+    if (!res.ok || !tipo.startsWith('image/')) {
+      throw new Error(res.ok ? 'La sesión venció: vuelve a entrar e inténtalo de nuevo' : `Error ${res.status}`)
+    }
+    return new Blob([await res.blob()], { type: 'image/png' })
+  },
   // Vista previa del Top 10 en vivo (marca de agua, solo se ve; nunca se descarga).
   urlImagenEnVivo: (lamina: LaminaChart, formato: FormatoChart, version = 0) =>
     `${BASE}/en-vivo/imagen?lamina=${lamina}&formato=${formato}&v=${version}`,

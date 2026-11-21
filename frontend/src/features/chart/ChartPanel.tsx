@@ -23,6 +23,34 @@ const num = (n: number) => n.toLocaleString('es-CO')
 const normalizar = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
+// Descarga una tarjeta: en el teléfono abre la hoja de compartir (guardar en galería,
+// WhatsApp, Instagram...); en el computador baja el PNG.
+async function descargar(semana: string, lamina: LaminaChart, formato: FormatoChart) {
+  try {
+    const blob = await chartApi.descargarImagen(semana, lamina, formato)
+    const nombre = `chart-vallenato-${semana}-${lamina}-${formato}.png`
+    const archivo = new File([blob], nombre, { type: 'image/png' })
+    if (navigator.canShare?.({ files: [archivo] })) {
+      try {
+        await navigator.share({ files: [archivo] })
+        return
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+      }
+    }
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = nombre
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+  } catch (e) {
+    toast.error(errorMessage(e))
+  }
+}
+
 function Tendencia({ fila }: { fila: Pick<FilaChart | FilaEdicion, 'tendencia'> }) {
   if (fila.tendencia === 'sube') return <ArrowUp className="size-4 text-success" aria-label="Sube" />
   if (fila.tendencia === 'baja') return <ArrowDown className="size-4 text-danger" aria-label="Baja" />
@@ -250,14 +278,14 @@ function ImagenesRedesSection() {
               ['lista', 'historia', 'Top 10 9:16'],
             ] as [LaminaChart, FormatoChart, string][]
           ).map(([lamina, fmt, etiqueta]) => (
-            <a
+            <button
               key={`${lamina}-${fmt}`}
-              href={chartApi.urlImagen(elegida!.semana_fin, lamina, fmt)}
-              download
+              type="button"
+              onClick={() => void descargar(elegida!.semana_fin, lamina, fmt)}
               className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-accent"
             >
               {etiqueta}
-            </a>
+            </button>
           ))}
         </div>
       )}
