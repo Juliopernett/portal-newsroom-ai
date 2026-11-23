@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SelectNative } from '@/components/ui/select-native'
+import { descargarArchivo } from '@/lib/descargar'
 
 interface ReportOption {
   value: string
@@ -108,10 +109,12 @@ export function ReportesPage() {
               onChange={(e) => setHasta(e.target.value)}
             />
           </div>
-          <Button variant="secondary" className="w-full sm:w-auto" asChild>
-            <a href={href} target="_blank" rel="noopener">
-              <Download /> Descargar CSV
-            </a>
+          <Button
+            variant="secondary"
+            className="w-full sm:w-auto"
+            onClick={() => void descargarArchivo(href, `${report.value}.csv`)}
+          >
+            <Download /> Descargar CSV
           </Button>
         </div>
 

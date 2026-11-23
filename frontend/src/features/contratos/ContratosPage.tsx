@@ -16,6 +16,7 @@ import {
 import { toast } from 'sonner'
 
 import { ApiError, errorMessage } from '@/api/client'
+import { descargarArchivo } from '@/lib/descargar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -346,10 +347,12 @@ export function ContratosPage() {
                         <Inbox /> Registrar
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" asChild>
-                      <a href={`/pautas/${pauta.id}/contrato.pdf`} target="_blank" rel="noopener">
-                        <FileText /> Contrato
-                      </a>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void descargarArchivo(`/pautas/${pauta.id}/contrato.pdf`, `contrato-${pauta.id}.pdf`)}
+                    >
+                      <FileText /> Contrato
                     </Button>
                     <Button
                       variant="ghost"
@@ -359,10 +362,12 @@ export function ContratosPage() {
                     >
                       <MessageCircle /> Enviar contrato
                     </Button>
-                    <Button variant="ghost" size="sm" asChild>
-                      <a href={`/pautas/${pauta.id}/informe.pdf`} target="_blank" rel="noopener">
-                        <FileDown /> Informe
-                      </a>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void descargarArchivo(`/pautas/${pauta.id}/informe.pdf`, `informe-${pauta.id}.pdf`)}
+                    >
+                      <FileDown /> Informe
                     </Button>
                     <Button
                       variant="ghost"

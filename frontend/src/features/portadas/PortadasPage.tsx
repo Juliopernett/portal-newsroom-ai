@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
+import { guardarBlob } from '@/lib/descargar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SelectNative } from '@/components/ui/select-native'
@@ -160,10 +161,13 @@ export function PortadasPage() {
                 alt="Vista previa de la portada"
                 className="w-full max-w-md rounded-lg border border-border"
               />
-              <Button asChild variant="outline">
-                <a href={vistaPrevia} download="portada.png">
-                  <Download /> Descargar PNG
-                </a>
+              <Button
+                variant="outline"
+                onClick={async () =>
+                  guardarBlob(await (await fetch(vistaPrevia)).blob(), 'portada.png')
+                }
+              >
+                <Download /> Descargar PNG
               </Button>
             </>
           ) : (

@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { errorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { guardarBlob } from '@/lib/descargar'
 import { SelectNative } from '@/components/ui/select-native'
 import {
   chartApi,
@@ -23,33 +24,11 @@ const num = (n: number) => n.toLocaleString('es-CO')
 const normalizar = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
-// Descarga una tarjeta: en el teléfono abre la hoja de compartir (guardar en galería,
-// WhatsApp, Instagram...); en el computador baja el PNG.
+// Descarga una tarjeta: en el teléfono abre la hoja de compartir; en escritorio baja el PNG.
 async function descargar(semana: string, lamina: LaminaChart, formato: FormatoChart) {
   try {
     const blob = await chartApi.descargarImagen(semana, lamina, formato)
-    const nombre = `chart-vallenato-${semana}-${lamina}-${formato}.png`
-    const archivo = new File([blob], nombre, { type: 'image/png' })
-    // Compartir solo en teléfonos/tabletas: en escritorio `canShare` también da verdadero
-    // (diálogo de Windows) y el editor espera que el archivo se descargue.
-    const esTactil = window.matchMedia('(pointer: coarse)').matches
-    if (esTactil && navigator.canShare?.({ files: [archivo] })) {
-      try {
-        await navigator.share({ files: [archivo] })
-        return
-      } catch (e) {
-        if (e instanceof DOMException && e.name === 'AbortError') return
-      }
-    }
-    // Descarga directa del Blob (la sesión ya viajó en la petición).
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = nombre
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 10000)
+    await guardarBlob(blob, `chart-vallenato-${semana}-${lamina}-${formato}.png`)
   } catch (e) {
     toast.error(errorMessage(e))
   }

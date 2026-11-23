@@ -31,6 +31,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { SelectNative } from '@/components/ui/select-native'
 import { errorMessage } from '@/api/client'
+import { descargarArchivo } from '@/lib/descargar'
 import { formatFechaHoraNegocio } from '@/lib/format'
 import { formatHoras, horasEnEspera } from '@/features/solicitudes/utils'
 import { radarApi, type NewsCandidate, type OpcionesPortada } from './api'
@@ -227,14 +228,14 @@ export function RadarCandidateCard({
         )}
 
         {candidato.tiene_portada_guardada ? (
-          <a
-            href={`/discovery/${candidato.id}/portada.jpg`}
-            download
+          <button
+            type="button"
+            onClick={() => void descargarArchivo(`/discovery/${candidato.id}/portada.jpg`, `portada-${candidato.id}.jpg`)}
             title="JPEG original, listo para subir a Instagram y Facebook"
             className="inline-flex items-center gap-1 text-xs font-medium text-brand underline"
           >
             <Download className="size-3.5" /> Descargar portada (JPG)
-          </a>
+          </button>
         ) : (
           candidato.portada_url && (
             <a
