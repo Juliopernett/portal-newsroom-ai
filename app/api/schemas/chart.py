@@ -87,6 +87,20 @@ class VideoPatch(BaseModel):
 class ApoyoPlataformaOut(BaseModel):
     valor: int
     url: str
+    manual: bool = False  # the editor picked this track by hand
+
+
+class DeezerPistaOut(BaseModel):
+    id: str
+    titulo: str
+    artista: str
+    rank: int
+    url: str
+
+
+class DeezerElegirIn(BaseModel):
+    track_id: str | None = None  # None = automatic match
+    ninguna: bool = False  # True = show no Deezer figure
 
 
 class RecoleccionOut(BaseModel):

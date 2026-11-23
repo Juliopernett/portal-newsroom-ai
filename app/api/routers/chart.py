@@ -19,10 +19,12 @@ from fastapi.responses import HTMLResponse
 
 from agents.images.descarga_imagenes import descargar_imagenes
 from agents.images.pillow_chart_renderer import FilaImagen, PillowChartRenderer
+from agents.musica.deezer import DeezerBuscador
 from agents.portal.catalogo_artistas import CatalogoArtistas, get_catalogo_artistas
 from app.api.dependencies import (
     get_buscadores_musica,
     get_current_user,
+    get_deezer,
     get_settings_dep,
     get_unit_of_work,
     get_youtube_reader,
@@ -33,6 +35,8 @@ from app.api.schemas.chart import (
     CanalOut,
     ChartOut,
     ChartPublicoOut,
+    DeezerElegirIn,
+    DeezerPistaOut,
     EdicionOut,
     EdicionResumenOut,
     EstadoSemanalOut,
@@ -45,7 +49,7 @@ from app.api.schemas.chart import (
     VideoSeguidoOut,
 )
 from config.settings import Settings
-from core.entities.chart import CanalChart, EdicionChart, FilaEdicion, VideoChart
+from core.entities.chart import DEEZER_NINGUNA, CanalChart, EdicionChart, FilaEdicion, VideoChart
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
 from core.services.chart_apoyo import buscar_apoyo
@@ -319,6 +323,7 @@ def imagen_edicion(
 
 
 _CACHE_APOYO: dict = {}
+_CACHE_DEEZER_ID: dict = {}
 
 
 @router.get("/apoyo")
@@ -326,6 +331,7 @@ def apoyo_otras_plataformas(
     semana: str = Query(description="Fecha de la edición (AAAA-MM-DD) o «vivo» (Top 10 de hoy)"),
     uow: UnitOfWork = Depends(get_unit_of_work),
     buscadores: list = Depends(get_buscadores_musica),
+    deezer: DeezerBuscador = Depends(get_deezer),
 ) -> dict[str, dict[str, ApoyoPlataformaOut]]:
     """Spotify popularity / Deezer rank per song of the Top 10 — supporting info only.
 
@@ -344,10 +350,54 @@ def apoyo_otras_plataformas(
             raise HTTPException(status_code=404, detail="Edition not found")
         canciones = [(f.video_id, f.artista, f.titulo) for f in edicion.filas[:10]]
     datos = buscar_apoyo(canciones, buscadores, _CACHE_APOYO, ahora=datetime.now(UTC).timestamp())
-    return {
+    salida = {
         vid: {pl: ApoyoPlataformaOut(valor=v, url=u) for pl, (v, u) in por.items()}
         for vid, por in datos.items()
     }
+    # The editor's own Deezer pick wins over the automatic match.
+    ahora = datetime.now(UTC).timestamp()
+    for vid, _artista, _titulo in canciones:
+        video = uow.chart.get_video(vid)
+        elegido = video.deezer_track_id if video else None
+        if not elegido:
+            continue
+        salida.get(vid, {}).pop("deezer", None)
+        if elegido == DEEZER_NINGUNA:
+            continue
+        hit = _CACHE_DEEZER_ID.get(elegido)
+        if hit is None or ahora - hit[0] > 6 * 3600:
+            hit = (ahora, deezer.por_id(elegido))
+            if hit[1] is not None:
+                _CACHE_DEEZER_ID[elegido] = hit
+        if hit[1] is not None:
+            salida.setdefault(vid, {})["deezer"] = ApoyoPlataformaOut(
+                valor=hit[1].valor, url=hit[1].url, manual=True
+            )
+    return salida
+
+
+@router.get("/deezer/buscar", response_model=list[DeezerPistaOut])
+def buscar_en_deezer(
+    q: str = Query(min_length=2, max_length=200),
+    deezer: DeezerBuscador = Depends(get_deezer),
+) -> list[DeezerPistaOut]:
+    """Search Deezer so the editor can pick the right version of a song."""
+    return [DeezerPistaOut(**p) for p in deezer.pistas(q)]
+
+
+@router.put("/videos/{video_id}/deezer", response_model=ApoyoPlataformaOut | None)
+def elegir_deezer(
+    video_id: str, datos: DeezerElegirIn, uow: UnitOfWork = Depends(get_unit_of_work)
+) -> None:
+    """Pick (or clear) the Deezer track shown for a video: a track, none, or automatic."""
+    video = uow.chart.get_video(video_id)
+    if video is None:
+        raise HTTPException(status_code=404, detail="Video not found")
+    if datos.track_id is not None and not datos.track_id.isdigit():
+        raise HTTPException(status_code=422, detail="Identificador de Deezer inválido")
+    elegido = DEEZER_NINGUNA if datos.ninguna else datos.track_id
+    uow.chart.save_video(replace(video, deezer_track_id=elegido))
+    uow.commit()
 
 
 @router.get("/ediciones/{semana_fin}/texto")

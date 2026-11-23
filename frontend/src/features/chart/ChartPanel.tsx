@@ -74,7 +74,7 @@ function TextoRedes({ semana }: { semana: string }) {
   )
 }
 
-type Apoyo = Record<string, Record<string, { valor: number; url: string }>>
+type Apoyo = Record<string, Record<string, { valor: number; url: string; manual?: boolean }>>
 
 // Spotify (popularidad 0-100) y Deezer (ranking) de una canción: información de apoyo,
 // el puesto del Radar solo depende de las vistas en YouTube.
@@ -88,23 +88,106 @@ function useApoyo(semana: string | undefined) {
   })
 }
 
-function ApoyoChips({ apoyo, videoId }: { apoyo: Apoyo | undefined; videoId: string }) {
+// Elegir a mano qué canción de Deezer corresponde a un video (p. ej. el emparejamiento
+// automático tomó la versión de estudio y el video es el "en vivo").
+function ElegirDeezer({ videoId, artista, titulo }: { videoId: string; artista: string | null; titulo: string }) {
+  const qc = useQueryClient()
+  const [abierto, setAbierto] = useState(false)
+  const [q, setQ] = useState(`${artista ?? ''} ${titulo.replace(/\(.*?\)|\[.*?\]/g, '')}`.trim())
+  const [consulta, setConsulta] = useState<string | null>(null)
+  const res = useQuery({
+    queryKey: ['chart-vallenato', 'deezer-buscar', consulta],
+    queryFn: () => chartApi.buscarDeezer(consulta!),
+    enabled: !!consulta,
+  })
+  const guardar = useMutation({
+    mutationFn: (cambio: { track_id?: string | null; ninguna?: boolean }) => chartApi.elegirDeezer(videoId, cambio),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['chart-vallenato', 'apoyo'] })
+      setAbierto(false)
+      toast.success('Deezer actualizado.')
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+  if (!abierto)
+    return (
+      <button type="button" className="text-[11px] text-brand underline" onClick={() => setAbierto(true)}>
+        Elegir en Deezer
+      </button>
+    )
+  return (
+    <div className="mt-1 flex flex-col gap-1 rounded-md border border-border bg-background p-2">
+      <form
+        className="flex gap-1"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (q.trim().length >= 2) setConsulta(q.trim())
+        }}
+      >
+        <Input className="!h-8 text-xs" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar en Deezer" />
+        <Button size="sm" type="submit" variant="secondary">
+          Buscar
+        </Button>
+      </form>
+      {res.isLoading && <p className="text-xs text-muted-foreground">Buscando…</p>}
+      {res.data?.length === 0 && <p className="text-xs text-muted-foreground">Sin resultados en Deezer.</p>}
+      <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto">
+        {res.data?.map((p) => (
+          <li key={p.id}>
+            <button
+              type="button"
+              disabled={guardar.isPending}
+              className="w-full rounded border border-border px-2 py-1 text-left text-xs hover:bg-accent"
+              onClick={() => guardar.mutate({ track_id: p.id })}
+            >
+              <span className="font-medium">{p.titulo}</span> · {p.artista} · {p.rank.toLocaleString('es-CO')}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="ghost" disabled={guardar.isPending} onClick={() => guardar.mutate({ ninguna: true })}>
+          No mostrar Deezer
+        </Button>
+        <Button size="sm" variant="ghost" disabled={guardar.isPending} onClick={() => guardar.mutate({ track_id: null })}>
+          Volver a automático
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setAbierto(false)}>
+          Cerrar
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function ApoyoChips({
+  apoyo,
+  videoId,
+  artista,
+  titulo,
+}: {
+  apoyo: Apoyo | undefined
+  videoId: string
+  artista: string | null
+  titulo: string
+}) {
   const d = apoyo?.[videoId]
-  if (!d) return null
   const chip = 'rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] hover:bg-accent'
   const miles = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)} mil` : String(n))
   return (
-    <span className="flex flex-wrap gap-1">
-      {d.spotify && (
+    <span className="flex flex-wrap items-center gap-1">
+      {d?.spotify && (
         <a className={chip} href={d.spotify.url} target="_blank" rel="noopener" title="Popularidad en Spotify (0 a 100)">
           Spotify {d.spotify.valor}
         </a>
       )}
-      {d.deezer && (
+      {d?.deezer && (
         <a className={chip} href={d.deezer.url} target="_blank" rel="noopener" title="Ranking en Deezer (más alto, más escuchada)">
           Deezer {miles(d.deezer.valor)}
+          {d.deezer.manual ? ' ✓' : ''}
         </a>
       )}
+      <ElegirDeezer videoId={videoId} artista={artista} titulo={titulo} />
     </span>
   )
 }
@@ -240,7 +323,7 @@ function EdicionesSection() {
                   <p className="text-xs text-muted-foreground">
                     {f.artista ?? 'Sin artista'} · +{num(f.vistas_semana)} en la semana · {num(f.vistas_totales)} en total
                   </p>
-                  <ApoyoChips apoyo={apoyoEd.data} videoId={f.video_id} />
+                  <ApoyoChips apoyo={apoyoEd.data} videoId={f.video_id} artista={f.artista} titulo={f.titulo} />
                 </div>
                 {f.fijado && <Pin className="size-4 text-brand" aria-label="Fijado" />}
               </li>
@@ -519,7 +602,7 @@ export function ChartPanel() {
                     {f.artista ?? 'Sin artista'} · +{num(f.vistas_semana)} esta semana
                     {f.parcial ? ' (estimado)' : ''}
                   </p>
-                  <ApoyoChips apoyo={apoyoVivo.data} videoId={f.video_id} />
+                  <ApoyoChips apoyo={apoyoVivo.data} videoId={f.video_id} artista={f.artista} titulo={f.titulo} />
                 </div>
                 {f.fijado && <Pin className="size-4 text-brand" aria-label="Fijado" />}
                 <Button

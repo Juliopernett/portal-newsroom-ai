@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 MAX_POSICION_FIJADA = 20
+DEEZER_NINGUNA = "ninguna"
 # YouTube does not flag Shorts in its API. A video this short, or one titled
 # with the #shorts hashtag, is treated as a Short and kept out of the chart
 # (a song is never under a minute; Shorts were the noise the owner reported).
@@ -58,6 +59,9 @@ class VideoChart:
     fijado_posicion: int | None = None
     manual: bool = False
     duracion_segundos: int | None = None  # None = not known yet (or a live stream)
+    # Deezer track the editor picked for the support column; None = automatic match,
+    # DEEZER_NINGUNA = show no Deezer figure for this video.
+    deezer_track_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.video_id.strip():

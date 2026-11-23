@@ -36,6 +36,7 @@ class ChartVideoModel(Base):
     fijado_posicion: Mapped[int | None] = mapped_column(Integer, nullable=True)
     manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     duracion_segundos: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deezer_track_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
 class ChartSnapshotModel(Base):

@@ -122,9 +122,15 @@ export const chartApi = {
     `${BASE}/en-vivo/imagen?lamina=${lamina}&formato=${formato}&v=${version}`,
   // Popularidad en Spotify / ranking en Deezer por canción (solo apoyo; no cambia el puesto).
   apoyo: (semana: string) =>
-    api.get<Record<string, Record<string, { valor: number; url: string }>>>(
+    api.get<Record<string, Record<string, { valor: number; url: string; manual?: boolean }>>>(
       `${BASE}/apoyo?semana=${semana}`,
     ),
+  buscarDeezer: (q: string) =>
+    api.get<{ id: string; titulo: string; artista: string; rank: number; url: string }[]>(
+      `${BASE}/deezer/buscar?q=${encodeURIComponent(q)}`,
+    ),
+  elegirDeezer: (videoId: string, cambio: { track_id?: string | null; ninguna?: boolean }) =>
+    api.put<unknown>(`${BASE}/videos/${videoId}/deezer`, cambio),
   textoRedes: (semana: string) => api.get<{ texto: string }>(`${BASE}/ediciones/${semana}/texto`),
   regenerarEdicion: (semana: string) => api.post<Edicion>(`${BASE}/ediciones/${semana}/regenerar`),
   publicarEdicion: (semana: string) => api.post<Edicion>(`${BASE}/ediciones/${semana}/publicar`),

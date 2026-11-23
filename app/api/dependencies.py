@@ -174,10 +174,17 @@ def get_youtube_reader() -> YouTubeReader:
 _SPOTIFY: dict = {}
 
 
+_DEEZER = DeezerBuscador()
+
+
+def get_deezer() -> DeezerBuscador:
+    return _DEEZER
+
+
 def get_buscadores_musica() -> list:
     """Deezer (always) plus Spotify when its credentials are set (Radar support column)."""
     s = get_settings()
-    buscadores: list = [DeezerBuscador()]
+    buscadores: list = [_DEEZER]
     if s.spotify_client_id and s.spotify_client_secret:
         # One instance so the access token is reused between requests.
         if "b" not in _SPOTIFY:

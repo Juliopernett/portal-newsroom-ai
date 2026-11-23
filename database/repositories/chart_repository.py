@@ -47,6 +47,7 @@ def _video(m: ChartVideoModel) -> VideoChart:
         fijado_posicion=m.fijado_posicion,
         manual=m.manual,
         duracion_segundos=m.duracion_segundos,
+        deezer_track_id=m.deezer_track_id,
     )
 
 
@@ -94,6 +95,7 @@ class SqlAlchemyChartRepository:
                 fijado_posicion=video.fijado_posicion,
                 manual=video.manual,
                 duracion_segundos=video.duracion_segundos,
+                deezer_track_id=video.deezer_track_id,
             )
         )
         self._session.flush()

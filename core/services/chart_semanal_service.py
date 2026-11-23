@@ -238,6 +238,7 @@ def cerrar_semana(
                         fijado_posicion=existente.fijado_posicion,
                         manual=existente.manual,
                         duracion_segundos=existente.duracion_segundos,
+                        deezer_track_id=existente.deezer_track_id,
                     )
                 )
 
