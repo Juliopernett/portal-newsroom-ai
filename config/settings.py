@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     # --- YouTube Data API v3 (Chart Vallenato). A plain API key restricted to
     # "YouTube Data API v3" in Google Cloud — see agents/youtube/client.py. ---
     youtube_api_key: str | None = None
+    # --- Spotify Web API (support column of the Radar): a free app at
+    # developer.spotify.com. Both must be set for the Spotify figure to appear. ---
+    spotify_client_id: str | None = None
+    spotify_client_secret: str | None = None
     # How long YouTube statistics (daily snapshots, weekly closes, published
     # editions) are kept. YouTube's policies allow 30 days without approval and
     # up to 36 months for derived metrics once the quota/audit form is approved:

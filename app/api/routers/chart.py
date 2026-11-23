@@ -21,12 +21,14 @@ from agents.images.descarga_imagenes import descargar_imagenes
 from agents.images.pillow_chart_renderer import FilaImagen, PillowChartRenderer
 from agents.portal.catalogo_artistas import CatalogoArtistas, get_catalogo_artistas
 from app.api.dependencies import (
+    get_buscadores_musica,
     get_current_user,
     get_settings_dep,
     get_unit_of_work,
     get_youtube_reader,
 )
 from app.api.schemas.chart import (
+    ApoyoPlataformaOut,
     CanalIn,
     CanalOut,
     ChartOut,
@@ -46,6 +48,7 @@ from config.settings import Settings
 from core.entities.chart import CanalChart, EdicionChart, FilaEdicion, VideoChart
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
+from core.services.chart_apoyo import buscar_apoyo
 from core.services.chart_enlaces import pagina_del_artista
 from core.services.chart_semanal_service import (
     EdicionPublicadaError,
@@ -313,6 +316,38 @@ def imagen_edicion(
             "Cache-Control": "no-store",
         },
     )
+
+
+_CACHE_APOYO: dict = {}
+
+
+@router.get("/apoyo")
+def apoyo_otras_plataformas(
+    semana: str = Query(description="Fecha de la edición (AAAA-MM-DD) o «vivo» (Top 10 de hoy)"),
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    buscadores: list = Depends(get_buscadores_musica),
+) -> dict[str, dict[str, ApoyoPlataformaOut]]:
+    """Spotify popularity / Deezer rank per song of the Top 10 — supporting info only.
+
+    Never changes the chart position. Songs without a confident match are simply absent.
+    """
+    if semana == "vivo":
+        _, posiciones, _, _ = _calcular(uow)
+        canciones = [(p.video.video_id, p.video.artista, p.video.titulo) for p in posiciones[:10]]
+    else:
+        try:
+            fecha = date.fromisoformat(semana)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Fecha inválida") from exc
+        edicion = uow.chart.get_edicion(fecha)
+        if edicion is None:
+            raise HTTPException(status_code=404, detail="Edition not found")
+        canciones = [(f.video_id, f.artista, f.titulo) for f in edicion.filas[:10]]
+    datos = buscar_apoyo(canciones, buscadores, _CACHE_APOYO, ahora=datetime.now(UTC).timestamp())
+    return {
+        vid: {pl: ApoyoPlataformaOut(valor=v, url=u) for pl, (v, u) in por.items()}
+        for vid, por in datos.items()
+    }
 
 
 @router.get("/ediciones/{semana_fin}/texto")

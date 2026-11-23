@@ -74,6 +74,41 @@ function TextoRedes({ semana }: { semana: string }) {
   )
 }
 
+type Apoyo = Record<string, Record<string, { valor: number; url: string }>>
+
+// Spotify (popularidad 0-100) y Deezer (ranking) de una canción: información de apoyo,
+// el puesto del Radar solo depende de las vistas en YouTube.
+function useApoyo(semana: string | undefined) {
+  return useQuery({
+    queryKey: ['chart-vallenato', 'apoyo', semana],
+    queryFn: () => chartApi.apoyo(semana!),
+    enabled: !!semana,
+    staleTime: 60 * 60 * 1000,
+    retry: false,
+  })
+}
+
+function ApoyoChips({ apoyo, videoId }: { apoyo: Apoyo | undefined; videoId: string }) {
+  const d = apoyo?.[videoId]
+  if (!d) return null
+  const chip = 'rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] hover:bg-accent'
+  const miles = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)} mil` : String(n))
+  return (
+    <span className="flex flex-wrap gap-1">
+      {d.spotify && (
+        <a className={chip} href={d.spotify.url} target="_blank" rel="noopener" title="Popularidad en Spotify (0 a 100)">
+          Spotify {d.spotify.valor}
+        </a>
+      )}
+      {d.deezer && (
+        <a className={chip} href={d.deezer.url} target="_blank" rel="noopener" title="Ranking en Deezer (más alto, más escuchada)">
+          Deezer {miles(d.deezer.valor)}
+        </a>
+      )}
+    </span>
+  )
+}
+
 function Tendencia({ fila }: { fila: Pick<FilaChart | FilaEdicion, 'tendencia'> }) {
   if (fila.tendencia === 'sube') return <ArrowUp className="size-4 text-success" aria-label="Sube" />
   if (fila.tendencia === 'baja') return <ArrowDown className="size-4 text-danger" aria-label="Baja" />
@@ -118,6 +153,7 @@ function EdicionesSection() {
     onError: (e) => toast.error(errorMessage(e)),
   })
   const ed = detalle.data
+  const apoyoEd = useApoyo(ultima?.semana_fin)
 
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-border p-3">
@@ -204,6 +240,7 @@ function EdicionesSection() {
                   <p className="text-xs text-muted-foreground">
                     {f.artista ?? 'Sin artista'} · +{num(f.vistas_semana)} en la semana · {num(f.vistas_totales)} en total
                   </p>
+                  <ApoyoChips apoyo={apoyoEd.data} videoId={f.video_id} />
                 </div>
                 {f.fijado && <Pin className="size-4 text-brand" aria-label="Fijado" />}
               </li>
@@ -380,6 +417,7 @@ export function ChartPanel() {
   const [busqueda, setBusqueda] = useState('')
 
   const refrescar = () => qc.invalidateQueries({ queryKey: KEY })
+  const apoyoVivo = useApoyo('vivo')
 
   const recolectar = useMutation({
     mutationFn: chartApi.recolectar,
@@ -481,6 +519,7 @@ export function ChartPanel() {
                     {f.artista ?? 'Sin artista'} · +{num(f.vistas_semana)} esta semana
                     {f.parcial ? ' (estimado)' : ''}
                   </p>
+                  <ApoyoChips apoyo={apoyoVivo.data} videoId={f.video_id} />
                 </div>
                 {f.fijado && <Pin className="size-4 text-brand" aria-label="Fijado" />}
                 <Button

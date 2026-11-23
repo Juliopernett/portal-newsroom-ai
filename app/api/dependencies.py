@@ -11,10 +11,8 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
-
-from datetime import timedelta
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
 
@@ -23,6 +21,8 @@ from agents.ai.openrouter_provider import OpenRouterAIProvider
 from agents.extractor.html_content_extractor import HtmlContentExtractor
 from agents.images.pillow_portada_renderer import PillowPortadaRenderer
 from agents.meta_social.client import MetaGraphSocialMediaReader
+from agents.musica.deezer import DeezerBuscador
+from agents.musica.spotify import SpotifyBuscador
 from agents.radar.fabrica import crear_adaptador
 from agents.radar.feed_detector import HttpFeedDetector
 from agents.radar.google_news_source_resolver import GoogleNewsSourceResolver
@@ -44,9 +44,9 @@ from core.ports.media_storage import MediaStorage
 from core.ports.password_hasher import PasswordHasher
 from core.ports.portada_renderer import PortadaRenderer
 from core.ports.social_media_reader import SocialMediaReader
-from core.ports.youtube_reader import YouTubeReader
 from core.ports.source_resolver import SourceResolver
 from core.ports.unit_of_work import UnitOfWork
+from core.ports.youtube_reader import YouTubeReader
 from database.engine import get_session_factory
 from database.unit_of_work import SqlAlchemyUnitOfWork
 from security.login_rate_limiter import LoginRateLimiter
@@ -169,6 +169,21 @@ def get_youtube_reader() -> YouTubeReader:
     `get_social_media_reader`.
     """
     return YouTubeDataApiReader(get_settings())
+
+
+_SPOTIFY: dict = {}
+
+
+def get_buscadores_musica() -> list:
+    """Deezer (always) plus Spotify when its credentials are set (Radar support column)."""
+    s = get_settings()
+    buscadores: list = [DeezerBuscador()]
+    if s.spotify_client_id and s.spotify_client_secret:
+        # One instance so the access token is reused between requests.
+        if "b" not in _SPOTIFY:
+            _SPOTIFY["b"] = SpotifyBuscador(s.spotify_client_id, s.spotify_client_secret)
+        buscadores.append(_SPOTIFY["b"])
+    return buscadores
 
 
 def get_source_resolver() -> SourceResolver:

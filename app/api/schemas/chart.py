@@ -84,6 +84,11 @@ class VideoPatch(BaseModel):
     quitar_fijo: bool = False
 
 
+class ApoyoPlataformaOut(BaseModel):
+    valor: int
+    url: str
+
+
 class RecoleccionOut(BaseModel):
     canales_ok: int
     canales_con_error: list[str]
