@@ -443,7 +443,9 @@ def test_sincronizar_wordpress_completa_la_solicitud_cuando_detecta_publicacion(
         f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
     )
     fake_cms_publisher.consulta_estado = ConsultaPostCMS(
-        estado=EstadoPostCMS.PUBLICADO, url="https://www.portalvallenato.com/nota-real/", fecha_publicacion=None
+        estado=EstadoPostCMS.PUBLICADO,
+        url="https://www.portalvallenato.com/nota-real/",
+        fecha_publicacion=None,
     )
 
     client.post(f"/publication-requests/{solicitud_id}/destinos/{destino_id}/sincronizar-wordpress")
@@ -878,3 +880,10 @@ def test_crear_borrador_wordpress_returns_503_when_not_configured(client: TestCl
         assert response.status_code == 503
     finally:
         del app.dependency_overrides[get_cms_publisher]
+
+
+def test_portada_download_is_404_until_a_cover_was_made(client: TestClient) -> None:
+    solicitud_id = client.post("/publication-requests", json={"texto": "Anuncio"}).json()["id"]
+
+    assert client.get(f"/publication-requests/{solicitud_id}/portada.jpg").status_code == 404
+    assert client.get("/publication-requests/no-existe/portada.jpg").status_code == 404

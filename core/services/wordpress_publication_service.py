@@ -28,6 +28,8 @@ from core.entities.publication_request import EstadoPreparacionIA, PublicationRe
 from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.media_storage import MediaStorage
+from core.ports.portada_renderer import PortadaRenderer, SolicitudPortada
+from core.services.candidate_draft_service import PortadaParaBorrador
 from core.services.editorial_ai_service import (
     EditorialAIError,
     aplicar_preparacion_exitosa,
@@ -137,6 +139,11 @@ def _primera_imagen(media_assets: Sequence[MediaAsset]) -> MediaAsset | None:
     return imagenes[0] if imagenes else None
 
 
+def clave_portada_solicitud(solicitud_id: str) -> str:
+    """Storage key of the cover JPEG kept for a solicitud's draft (for social networks)."""
+    return f"portadas/solicitud-{solicitud_id}.jpg"
+
+
 def preparar_y_crear_borrador(
     destino: DestinoPublicacion,
     solicitud: PublicationRequest,
@@ -144,8 +151,17 @@ def preparar_y_crear_borrador(
     ai_provider: AIProvider,
     cms_publisher: CMSPublisher,
     media_storage: MediaStorage,
+    *,
+    portada: PortadaParaBorrador | None = None,
+    portada_renderer: PortadaRenderer | None = None,
 ) -> tuple[DestinoPublicacion, PublicationRequest]:
     """Prepare `solicitud`'s content with AI, then create its WordPress draft.
+
+    With `portada` (the operator's photo and cover choices, same as the Radar's
+    "Crear noticia") the branded cover is rendered once the headline is known,
+    uploaded as the featured image and kept in `media_storage` under
+    `clave_portada_solicitud`; it takes the place of the first attached image.
+    A cover that cannot be rendered aborts before anything is created.
 
     Single transaction, all-or-nothing, matching the shape
     `crear_borrador` already had: if `cms_publisher` itself fails at any
@@ -207,7 +223,30 @@ def preparar_y_crear_borrador(
                 if nombre and nombre.strip()
             ]
 
-    imagen = _primera_imagen(media_assets)
+    if portada is not None:
+        if portada_renderer is None:
+            raise ValueError("portada_renderer is required when a portada is requested")
+        jpeg = portada_renderer.renderizar(
+            SolicitudPortada(
+                imagen_base=portada.imagen_base,
+                titular=portada.titular or str(content["title"]),
+                variante=portada.variante,
+                antetitulo=portada.antetitulo,
+                imagen_circulo=portada.imagen_circulo,
+                enfoque_x=portada.enfoque_x,
+                enfoque_y=portada.enfoque_y,
+            ),
+            formato="jpeg",
+        )
+        # Our own JPEG copy: WordPress converts its upload to WebP, which Instagram rejects.
+        media_storage.guardar(clave_portada_solicitud(solicitud.id), jpeg)
+        subida = cms_publisher.subir_media_con_url(
+            jpeg, f"portada-{content.get('slug') or solicitud.id}.jpg", "image/jpeg"
+        )
+        content["featured_media"] = subida.id
+        imagen = None
+    else:
+        imagen = _primera_imagen(media_assets)
     if imagen is not None:
         try:
             contenido_bytes = media_storage.leer(imagen.storage_key)

@@ -1,4 +1,5 @@
 import { api } from '@/api/client'
+import type { OpcionesPortada } from '@/features/radar/api'
 
 export type SolicitudEstado = 'recibida' | 'aceptada' | 'cancelada'
 
@@ -158,12 +159,23 @@ export const solicitudesApi = {
   // La preparación editorial con IA (2026-08-21) corre dentro de este mismo
   // llamado — la respuesta trae el destino más si la IA sí pudo prepararlo,
   // para que el toast en DestinosPanel sea honesto sin un fetch aparte.
-  crearBorradorWordpress: (id: string, destinoId: string) =>
-    api.post<{
+  crearBorradorWordpress: (id: string, destinoId: string, portada?: OpcionesPortada | null) => {
+    type Respuesta = {
       destino: DestinoPublicacion
       preparacion_ia_estado: EstadoPreparacionIA
       preparacion_ia_error: string | null
-    }>(`/publication-requests/${id}/destinos/${destinoId}/crear-borrador-wordpress`),
+    }
+    const ruta = `/publication-requests/${id}/destinos/${destinoId}/crear-borrador-wordpress`
+    if (!portada) return api.post<Respuesta>(ruta)
+    // Con foto: la portada se arma con el titular elegido (vacío = el de la IA).
+    const form = new FormData()
+    form.append('imagen_base', portada.imagenBase)
+    if (portada.imagenCirculo) form.append('imagen_circulo', portada.imagenCirculo)
+    form.append('variante', portada.variante)
+    if (portada.titular.trim()) form.append('titular_portada', portada.titular.trim())
+    if (portada.antetitulo.trim()) form.append('antetitulo', portada.antetitulo.trim())
+    return api.postForm<Respuesta>(ruta, form)
+  },
   // Sincronización con el estado real de WordPress (2026-08-24): lectura
   // pura contra la API REST de WordPress vía wp_post_id, nunca una orden
   // de publicar. Se usa tanto en silencio (auto-sync al abrir la

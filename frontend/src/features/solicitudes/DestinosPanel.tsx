@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SelectNative } from '@/components/ui/select-native'
+import { descargarArchivo } from '@/lib/descargar'
 import { formatFechaHoraNegocio } from '@/lib/format'
 import {
   solicitudesApi,
@@ -26,6 +27,8 @@ import {
   type PostRedSocial,
   type SolicitudContexto,
 } from './api'
+import type { OpcionesPortada } from '@/features/radar/api'
+import { CrearBorradorDialog } from './CrearBorradorDialog'
 import { CANALES_DESTINO, DESTINO_ESTADO_BADGE, DESTINO_ESTADO_LABELS } from './utils'
 
 // Umbral a partir del cual vale la pena destacar una coincidencia — por
@@ -156,7 +159,8 @@ function DestinoRow({
   const canalLabel = CANALES_DESTINO.find((c) => c.value === destino.canal)?.label ?? destino.canal
 
   const crearBorradorMutation = useMutation({
-    mutationFn: () => solicitudesApi.crearBorradorWordpress(solicitudId, destino.id),
+    mutationFn: (portada: OpcionesPortada | null) =>
+      solicitudesApi.crearBorradorWordpress(solicitudId, destino.id, portada),
     onSuccess: (data) => {
       // La IA prepara el texto antes de crear el borrador (2026-08-21) —
       // si no estuvo disponible, el borrador igual se crea con el texto
@@ -335,14 +339,24 @@ function DestinoRow({
             <a className="text-xs text-brand underline" href={destino.wp_url} target="_blank" rel="noopener">
               Ver borrador
             </a>
+            <button
+              type="button"
+              className="text-xs text-brand underline"
+              title="JPEG de la portada armada, listo para Instagram y Facebook (solo si se armó al crear el borrador)"
+              onClick={() => void descargarArchivo(`/publication-requests/${solicitudId}/portada.jpg`, `portada-${solicitudId}.jpg`)}
+            >
+              Descargar portada (JPG)
+            </button>
             <Button size="sm" disabled={acting} onClick={() => sincronizarMutation.mutate()}>
               Confirmar publicado
             </Button>
           </>
         ) : (
-          <Button size="sm" variant="secondary" disabled={acting} onClick={() => crearBorradorMutation.mutate()}>
-            Crear borrador
-          </Button>
+          <CrearBorradorDialog
+            idBase={destino.id}
+            disabled={acting}
+            crear={(portada) => crearBorradorMutation.mutateAsync(portada)}
+          />
         )}
         {destino.estado !== 'cancelado' && (
           <Button size="sm" variant="secondary" disabled={acting} onClick={() => cancelarMutation.mutate()}>

@@ -1,23 +1,13 @@
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  Copy,
-  ImageDown,
-  Minus,
-  Pin,
-  RefreshCw,
-  Trash2,
-} from "lucide-react";
-import { toast } from "sonner";
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertTriangle, ArrowDown, ArrowUp, Copy, ImageDown, Minus, Pin, RefreshCw, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 
-import { errorMessage } from "@/api/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { guardarBlob } from "@/lib/descargar";
-import { SelectNative } from "@/components/ui/select-native";
+import { errorMessage } from '@/api/client'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { guardarBlob } from '@/lib/descargar'
+import { SelectNative } from '@/components/ui/select-native'
 import {
   chartApi,
   type AlertaReaccion,
@@ -25,72 +15,51 @@ import {
   type FilaEdicion,
   type FormatoChart,
   type LaminaChart,
-} from "./chartApi";
+} from './chartApi'
 
-const KEY = ["chart-vallenato"];
-const KEY_CANALES = ["chart-vallenato", "canales"];
-const KEY_EDICIONES = ["chart-vallenato", "ediciones"];
-const KEY_ESTADO = ["chart-vallenato", "estado-semanal"];
-const num = (n: number) => n.toLocaleString("es-CO");
+const KEY = ['chart-vallenato']
+const KEY_CANALES = ['chart-vallenato', 'canales']
+const KEY_EDICIONES = ['chart-vallenato', 'ediciones']
+const KEY_ESTADO = ['chart-vallenato', 'estado-semanal']
+const num = (n: number) => n.toLocaleString('es-CO')
 const normalizar = (s: string) =>
-  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 // Descarga una tarjeta: en el teléfono abre la hoja de compartir; en escritorio baja el PNG.
-async function descargar(
-  semana: string,
-  lamina: LaminaChart,
-  formato: FormatoChart,
-) {
+async function descargar(semana: string, lamina: LaminaChart, formato: FormatoChart) {
   try {
-    const blob = await chartApi.descargarImagen(semana, lamina, formato);
-    await guardarBlob(
-      blob,
-      `chart-vallenato-${semana}-${lamina}-${formato}.png`,
-    );
+    const blob = await chartApi.descargarImagen(semana, lamina, formato)
+    await guardarBlob(blob, `chart-vallenato-${semana}-${lamina}-${formato}.png`)
   } catch (e) {
-    toast.error(errorMessage(e));
+    toast.error(errorMessage(e))
   }
 }
 
 // Texto para acompañar las tarjetas en redes: se arma con el Top de la edición elegida y
 // el editor puede ajustarlo antes de copiarlo.
 function TextoRedes({ semana }: { semana: string }) {
-  const q = useQuery({
-    queryKey: [...KEY_EDICIONES, semana, "texto"],
-    queryFn: () => chartApi.textoRedes(semana),
-  });
-  const [editado, setEditado] = useState<{
-    semana: string;
-    texto: string;
-  } | null>(null);
-  const texto =
-    editado?.semana === semana ? editado.texto : (q.data?.texto ?? "");
+  const q = useQuery({ queryKey: [...KEY_EDICIONES, semana, 'texto'], queryFn: () => chartApi.textoRedes(semana) })
+  const [editado, setEditado] = useState<{ semana: string; texto: string } | null>(null)
+  const texto = editado?.semana === semana ? editado.texto : (q.data?.texto ?? '')
   const copiar = async () => {
     try {
-      await navigator.clipboard.writeText(texto);
-      toast.success("Texto copiado.");
+      await navigator.clipboard.writeText(texto)
+      toast.success('Texto copiado.')
     } catch {
-      toast.error("No se pudo copiar: selecciona el texto y cópialo a mano.");
+      toast.error('No se pudo copiar: selecciona el texto y cópialo a mano.')
     }
-  };
+  }
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium">
-          Texto para la publicación (edición {semana})
-        </span>
+        <span className="text-xs font-medium">Texto para la publicación (edición {semana})</span>
         <div className="flex gap-2">
           {editado?.semana === semana && (
             <Button size="sm" variant="ghost" onClick={() => setEditado(null)}>
               Restablecer
             </Button>
           )}
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={!texto}
-            onClick={() => void copiar()}
-          >
+          <Button size="sm" variant="secondary" disabled={!texto} onClick={() => void copiar()}>
             <Copy className="size-3.5" /> Copiar texto
           </Button>
         </div>
@@ -98,100 +67,71 @@ function TextoRedes({ semana }: { semana: string }) {
       <textarea
         aria-label="Texto para redes"
         className="min-h-64 w-full rounded-md border border-border bg-background p-2 text-sm"
-        value={q.isLoading ? "Armando el texto…" : texto}
+        value={q.isLoading ? 'Armando el texto…' : texto}
         readOnly={q.isLoading}
         onChange={(e) => setEditado({ semana, texto: e.target.value })}
       />
     </div>
-  );
+  )
 }
 
-type Apoyo = Record<
-  string,
-  Record<string, { valor: number; url: string; manual?: boolean }>
->;
+type Apoyo = Record<string, Record<string, { valor: number; url: string; manual?: boolean }>>
 
 // Spotify (popularidad 0-100) y Deezer (ranking) de una canción: información de apoyo,
 // el puesto del Radar solo depende de las vistas en YouTube.
 function useApoyo(semana: string | undefined) {
   return useQuery({
-    queryKey: ["chart-vallenato", "apoyo", semana],
+    queryKey: ['chart-vallenato', 'apoyo', semana],
     queryFn: () => chartApi.apoyo(semana!),
     enabled: !!semana,
     staleTime: 60 * 60 * 1000,
     retry: false,
-  });
+  })
 }
 
 // Elegir a mano qué canción de Deezer corresponde a un video (p. ej. el emparejamiento
 // automático tomó la versión de estudio y el video es el "en vivo").
-function ElegirDeezer({
-  videoId,
-  artista,
-  titulo,
-}: {
-  videoId: string;
-  artista: string | null;
-  titulo: string;
-}) {
-  const qc = useQueryClient();
-  const [abierto, setAbierto] = useState(false);
-  const [q, setQ] = useState(
-    `${artista ?? ""} ${titulo.replace(/\(.*?\)|\[.*?\]/g, "")}`.trim(),
-  );
-  const [consulta, setConsulta] = useState<string | null>(null);
+function ElegirDeezer({ videoId, artista, titulo }: { videoId: string; artista: string | null; titulo: string }) {
+  const qc = useQueryClient()
+  const [abierto, setAbierto] = useState(false)
+  const [q, setQ] = useState(`${artista ?? ''} ${titulo.replace(/\(.*?\)|\[.*?\]/g, '')}`.trim())
+  const [consulta, setConsulta] = useState<string | null>(null)
   const res = useQuery({
-    queryKey: ["chart-vallenato", "deezer-buscar", consulta],
+    queryKey: ['chart-vallenato', 'deezer-buscar', consulta],
     queryFn: () => chartApi.buscarDeezer(consulta!),
     enabled: !!consulta,
-  });
+  })
   const guardar = useMutation({
-    mutationFn: (cambio: { track_id?: string | null; ninguna?: boolean }) =>
-      chartApi.elegirDeezer(videoId, cambio),
+    mutationFn: (cambio: { track_id?: string | null; ninguna?: boolean }) => chartApi.elegirDeezer(videoId, cambio),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["chart-vallenato", "apoyo"] });
-      setAbierto(false);
-      toast.success("Deezer actualizado.");
+      qc.invalidateQueries({ queryKey: ['chart-vallenato', 'apoyo'] })
+      setAbierto(false)
+      toast.success('Deezer actualizado.')
     },
     onError: (e) => toast.error(errorMessage(e)),
-  });
+  })
   if (!abierto)
     return (
-      <button
-        type="button"
-        className="text-[11px] text-brand underline"
-        onClick={() => setAbierto(true)}
-      >
+      <button type="button" className="text-[11px] text-brand underline" onClick={() => setAbierto(true)}>
         Elegir en Deezer
       </button>
-    );
+    )
   return (
     <div className="mt-1 flex flex-col gap-1 rounded-md border border-border bg-background p-2">
       <form
         className="flex gap-1"
         onSubmit={(e) => {
-          e.preventDefault();
-          if (q.trim().length >= 2) setConsulta(q.trim());
+          e.preventDefault()
+          if (q.trim().length >= 2) setConsulta(q.trim())
         }}
       >
-        <Input
-          className="!h-8 text-xs"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          aria-label="Buscar en Deezer"
-        />
+        <Input className="!h-8 text-xs" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar en Deezer" />
         <Button size="sm" type="submit" variant="secondary">
           Buscar
         </Button>
       </form>
-      {res.isLoading && (
-        <p className="text-xs text-muted-foreground">Buscando…</p>
-      )}
-      {res.data?.length === 0 && (
-        <p className="text-xs text-muted-foreground">
-          Sin resultados en Deezer.
-        </p>
-      )}
+      {res.isLoading && <p className="text-xs text-muted-foreground">Buscando…</p>}
+      {res.data?.length === 0 && <p className="text-xs text-muted-foreground">Sin resultados en Deezer.</p>}
       <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto">
         {res.data?.map((p) => (
           <li key={p.id}>
@@ -201,27 +141,16 @@ function ElegirDeezer({
               className="w-full rounded border border-border px-2 py-1 text-left text-xs hover:bg-accent"
               onClick={() => guardar.mutate({ track_id: p.id })}
             >
-              <span className="font-medium">{p.titulo}</span> · {p.artista} ·{" "}
-              {p.rank.toLocaleString("es-CO")}
+              <span className="font-medium">{p.titulo}</span> · {p.artista} · {p.rank.toLocaleString('es-CO')}
             </button>
           </li>
         ))}
       </ul>
       <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={guardar.isPending}
-          onClick={() => guardar.mutate({ ninguna: true })}
-        >
+        <Button size="sm" variant="ghost" disabled={guardar.isPending} onClick={() => guardar.mutate({ ninguna: true })}>
           No mostrar Deezer
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={guardar.isPending}
-          onClick={() => guardar.mutate({ track_id: null })}
-        >
+        <Button size="sm" variant="ghost" disabled={guardar.isPending} onClick={() => guardar.mutate({ track_id: null })}>
           Volver a automático
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setAbierto(false)}>
@@ -229,7 +158,7 @@ function ElegirDeezer({
         </Button>
       </div>
     </div>
-  );
+  )
 }
 
 function ApoyoChips({
@@ -238,44 +167,30 @@ function ApoyoChips({
   artista,
   titulo,
 }: {
-  apoyo: Apoyo | undefined;
-  videoId: string;
-  artista: string | null;
-  titulo: string;
+  apoyo: Apoyo | undefined
+  videoId: string
+  artista: string | null
+  titulo: string
 }) {
-  const d = apoyo?.[videoId];
-  const chip =
-    "rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] hover:bg-accent";
-  const miles = (n: number) =>
-    n >= 1000 ? `${Math.round(n / 1000)} mil` : String(n);
+  const d = apoyo?.[videoId]
+  const chip = 'rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] hover:bg-accent'
+  const miles = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)} mil` : String(n))
   return (
     <span className="flex flex-wrap items-center gap-1">
       {d?.spotify && (
-        <a
-          className={chip}
-          href={d.spotify.url}
-          target="_blank"
-          rel="noopener"
-          title="Popularidad en Spotify (0 a 100)"
-        >
+        <a className={chip} href={d.spotify.url} target="_blank" rel="noopener" title="Popularidad en Spotify (0 a 100)">
           Spotify {d.spotify.valor}
         </a>
       )}
       {d?.deezer && (
-        <a
-          className={chip}
-          href={d.deezer.url}
-          target="_blank"
-          rel="noopener"
-          title="Ranking en Deezer (más alto, más escuchada)"
-        >
+        <a className={chip} href={d.deezer.url} target="_blank" rel="noopener" title="Ranking en Deezer (más alto, más escuchada)">
           Deezer {miles(d.deezer.valor)}
-          {d.deezer.manual ? " ✓" : ""}
+          {d.deezer.manual ? ' ✓' : ''}
         </a>
       )}
       <ElegirDeezer videoId={videoId} artista={artista} titulo={titulo} />
     </span>
-  );
+  )
 }
 
 // Aviso de proporción atípica: muchas vistas pero pocos me gusta o comentarios frente al
@@ -283,16 +198,16 @@ function ApoyoChips({
 // reproducción en bucle o automática, pero también un clip viral.
 function useAlertas(semana: string | undefined) {
   return useQuery({
-    queryKey: ["chart-vallenato", "alertas", semana],
+    queryKey: ['chart-vallenato', 'alertas', semana],
     queryFn: () => chartApi.alertas(semana!),
     enabled: !!semana,
     staleTime: 5 * 60 * 1000,
     retry: false,
-  });
+  })
 }
 
 function AlertaChip({ alerta }: { alerta: AlertaReaccion | undefined }) {
-  if (!alerta) return null;
+  if (!alerta) return null
   return (
     <p
       role="note"
@@ -303,19 +218,19 @@ function AlertaChip({ alerta }: { alerta: AlertaReaccion | undefined }) {
         <strong>Revisar:</strong> {alerta.motivo}
       </span>
     </p>
-  );
+  )
 }
 
-type TabId = "edicion" | "redes" | "vivo" | "videos" | "config";
+type TabId = 'edicion' | 'redes' | 'vivo' | 'videos' | 'config'
 
 function Pestanas({
   tabs,
   value,
   onChange,
 }: {
-  tabs: { id: TabId; label: string; count?: number }[];
-  value: TabId;
-  onChange: (id: TabId) => void;
+  tabs: { id: TabId; label: string; count?: number }[]
+  value: TabId
+  onChange: (id: TabId) => void
 }) {
   return (
     <div
@@ -332,115 +247,95 @@ function Pestanas({
           onClick={() => onChange(t.id)}
           className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
             value === t.id
-              ? "border-brand bg-brand/10 text-foreground"
-              : "border-border bg-card text-muted-foreground hover:bg-accent"
+              ? 'border-brand bg-brand/10 text-foreground'
+              : 'border-border bg-card text-muted-foreground hover:bg-accent'
           }`}
         >
           {t.label}
           {t.count ? (
-            <span className="rounded-full bg-warning-bg px-1.5 text-xs font-semibold text-warning">
-              {t.count}
-            </span>
+            <span className="rounded-full bg-warning-bg px-1.5 text-xs font-semibold text-warning">{t.count}</span>
           ) : null}
         </button>
       ))}
     </div>
-  );
+  )
 }
 
-function Tendencia({
-  fila,
-}: {
-  fila: Pick<FilaChart | FilaEdicion, "tendencia">;
-}) {
-  if (fila.tendencia === "sube")
-    return <ArrowUp className="size-4 text-success" aria-label="Sube" />;
-  if (fila.tendencia === "baja")
-    return <ArrowDown className="size-4 text-danger" aria-label="Baja" />;
-  if (fila.tendencia === "nuevo")
-    return <span className="text-[10px] font-bold text-brand">NUEVO</span>;
-  if (fila.tendencia === "igual")
-    return (
-      <Minus className="size-4 text-muted-foreground" aria-label="Igual" />
-    );
-  return <span className="text-xs text-muted-foreground">—</span>;
+function Tendencia({ fila }: { fila: Pick<FilaChart | FilaEdicion, 'tendencia'> }) {
+  if (fila.tendencia === 'sube') return <ArrowUp className="size-4 text-success" aria-label="Sube" />
+  if (fila.tendencia === 'baja') return <ArrowDown className="size-4 text-danger" aria-label="Baja" />
+  if (fila.tendencia === 'nuevo')
+    return <span className="text-[10px] font-bold text-brand">NUEVO</span>
+  if (fila.tendencia === 'igual') return <Minus className="size-4 text-muted-foreground" aria-label="Igual" />
+  return <span className="text-xs text-muted-foreground">—</span>
 }
+
 
 // Edición semanal: se cierra el viernes a medianoche (hora de Colombia). Queda en
 // borrador para que el editor la revise (excluir / fijar abajo) y la publique.
 function EdicionesSection() {
-  const qc = useQueryClient();
-  const lista = useQuery({
-    queryKey: KEY_EDICIONES,
-    queryFn: chartApi.ediciones,
-  });
-  const estado = useQuery({
-    queryKey: KEY_ESTADO,
-    queryFn: chartApi.estadoSemanal,
-  });
-  const [semanaVista, setSemanaVista] = useState<string | null>(null);
-  const ultima =
-    lista.data?.find((e) => e.semana_fin === semanaVista) ?? lista.data?.[0];
+  const qc = useQueryClient()
+  const lista = useQuery({ queryKey: KEY_EDICIONES, queryFn: chartApi.ediciones })
+  const estado = useQuery({ queryKey: KEY_ESTADO, queryFn: chartApi.estadoSemanal })
+  const [semanaVista, setSemanaVista] = useState<string | null>(null)
+  const ultima = lista.data?.find((e) => e.semana_fin === semanaVista) ?? lista.data?.[0]
   const detalle = useQuery({
     queryKey: [...KEY_EDICIONES, ultima?.semana_fin],
     queryFn: () => chartApi.edicion(ultima!.semana_fin),
     enabled: !!ultima,
-  });
+  })
   const refrescar = () => {
-    qc.invalidateQueries({ queryKey: KEY_EDICIONES });
-    qc.invalidateQueries({ queryKey: KEY_ESTADO });
-  };
+    qc.invalidateQueries({ queryKey: KEY_EDICIONES })
+    qc.invalidateQueries({ queryKey: KEY_ESTADO })
+  }
   const regenerar = useMutation({
     mutationFn: (semana: string) => chartApi.regenerarEdicion(semana),
     onSuccess: () => {
-      refrescar();
-      toast.success("Borrador recalculado.");
+      refrescar()
+      toast.success('Borrador recalculado.')
     },
     onError: (e) => toast.error(errorMessage(e)),
-  });
+  })
   const publicar = useMutation({
     mutationFn: (semana: string) => chartApi.publicarEdicion(semana),
     onSuccess: () => {
-      refrescar();
-      toast.success("Edición publicada.");
+      refrescar()
+      toast.success('Edición publicada.')
     },
     onError: (e) => toast.error(errorMessage(e)),
-  });
-  const ed = detalle.data;
-  const apoyoEd = useApoyo(ultima?.semana_fin);
-  const alertasEd = useAlertas(ultima?.semana_fin);
+  })
+  const ed = detalle.data
+  const apoyoEd = useApoyo(ultima?.semana_fin)
+  const alertasEd = useAlertas(ultima?.semana_fin)
   // Sacar una canción del Radar y, si la edición es un borrador, recalcularla de una vez.
   const excluir = useMutation({
     mutationFn: async (videoId: string) => {
-      await chartApi.decidir(videoId, { excluido: true });
-      if (ultima?.estado === "borrador")
-        await chartApi.regenerarEdicion(ultima.semana_fin);
+      await chartApi.decidir(videoId, { excluido: true })
+      if (ultima?.estado === 'borrador') await chartApi.regenerarEdicion(ultima.semana_fin)
     },
     onSuccess: () => {
-      refrescar();
-      qc.invalidateQueries({ queryKey: KEY });
-      toast.success("Excluida. El borrador quedó recalculado.");
+      refrescar()
+      qc.invalidateQueries({ queryKey: KEY })
+      toast.success('Excluida. El borrador quedó recalculado.')
     },
     onError: (e) => toast.error(errorMessage(e)),
-  });
+  })
 
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-border p-3">
-      <h3 className="text-sm font-semibold">
-        Edición semanal (cierre del viernes)
-      </h3>
+      <h3 className="text-sm font-semibold">Edición semanal (cierre del viernes)</h3>
       {estado.data && (
         <p
-          role={estado.data.nivel === "error" ? "alert" : "status"}
+          role={estado.data.nivel === 'error' ? 'alert' : 'status'}
           className={
-            "rounded-md px-3 py-2 text-sm " +
-            (estado.data.nivel === "error"
-              ? "bg-danger-bg text-danger"
-              : estado.data.nivel === "atencion"
-                ? "bg-warning-bg text-warning"
-                : estado.data.nivel === "ok"
-                  ? "bg-success-bg text-success"
-                  : "bg-muted text-muted-foreground")
+            'rounded-md px-3 py-2 text-sm ' +
+            (estado.data.nivel === 'error'
+              ? 'bg-danger-bg text-danger'
+              : estado.data.nivel === 'atencion'
+                ? 'bg-warning-bg text-warning'
+                : estado.data.nivel === 'ok'
+                  ? 'bg-success-bg text-success'
+                  : 'bg-muted text-muted-foreground')
           }
         >
           {estado.data.mensaje}
@@ -450,8 +345,8 @@ function EdicionesSection() {
         <p className="text-sm text-muted-foreground">Cargando…</p>
       ) : !ultima ? (
         <p className="text-sm text-muted-foreground">
-          Aún no hay ediciones. El primer cierre (viernes a medianoche) solo
-          fija la línea base; la primera edición sale al cierre siguiente.
+          Aún no hay ediciones. El primer cierre (viernes a medianoche) solo fija la línea base; la
+          primera edición sale al cierre siguiente.
         </p>
       ) : (
         <>
@@ -464,35 +359,26 @@ function EdicionesSection() {
             >
               {lista.data.map((e, i) => (
                 <option key={e.semana_fin} value={e.semana_fin}>
-                  {e.semana_fin} ·{" "}
-                  {e.estado === "publicada" ? "publicada" : "borrador"}
-                  {i === 0 ? " (la más reciente)" : ""}
+                  {e.semana_fin} · {e.estado === 'publicada' ? 'publicada' : 'borrador'}
+                  {i === 0 ? ' (la más reciente)' : ''}
                 </option>
               ))}
             </SelectNative>
           )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm">
-              Semana cerrada el <strong>{ultima.semana_fin}</strong> ·{" "}
-              <span
-                className={
-                  ultima.estado === "publicada"
-                    ? "text-success"
-                    : "text-warning"
-                }
-              >
-                {ultima.estado === "publicada"
-                  ? "Publicada"
-                  : "Borrador por revisar"}
+              Semana cerrada el <strong>{ultima.semana_fin}</strong> ·{' '}
+              <span className={ultima.estado === 'publicada' ? 'text-success' : 'text-warning'}>
+                {ultima.estado === 'publicada' ? 'Publicada' : 'Borrador por revisar'}
               </span>
               {ultima.sin_base > 0 && (
                 <span className="text-muted-foreground">
-                  {" "}
+                  {' '}
                   · {ultima.sin_base} videos sin base de comparación (no entran)
                 </span>
               )}
             </p>
-            {ultima.estado === "borrador" && (
+            {ultima.estado === 'borrador' && (
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -502,11 +388,7 @@ function EdicionesSection() {
                 >
                   Recalcular borrador
                 </Button>
-                <Button
-                  size="sm"
-                  disabled={publicar.isPending}
-                  onClick={() => publicar.mutate(ultima.semana_fin)}
-                >
+                <Button size="sm" disabled={publicar.isPending} onClick={() => publicar.mutate(ultima.semana_fin)}>
                   Publicar edición
                 </Button>
               </div>
@@ -514,56 +396,37 @@ function EdicionesSection() {
           </div>
           <ol className="flex flex-col gap-1">
             {ed?.filas_detalle.map((f) => (
-              <li
-                key={f.video_id}
-                className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm"
-              >
-                <span className="w-6 text-center text-base font-bold text-brand">
-                  {f.posicion}
-                </span>
+              <li key={f.video_id} className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm">
+                <span className="w-6 text-center text-base font-bold text-brand">{f.posicion}</span>
                 <Tendencia fila={f} />
                 <div className="min-w-0 flex-1">
-                  <a
-                    className="block truncate font-medium hover:underline"
-                    href={f.url}
-                    target="_blank"
-                    rel="noopener"
-                  >
+                  <a className="block truncate font-medium hover:underline" href={f.url} target="_blank" rel="noopener">
                     {f.titulo}
                   </a>
                   <p className="text-xs text-muted-foreground">
-                    {f.artista ?? "Sin artista"} · +{num(f.vistas_semana)} en la
-                    semana · {num(f.vistas_totales)} en total
+                    {f.artista ?? 'Sin artista'} · +{num(f.vistas_semana)} en la semana · {num(f.vistas_totales)} en total
                   </p>
-                  <ApoyoChips
-                    apoyo={apoyoEd.data}
-                    videoId={f.video_id}
-                    artista={f.artista}
-                    titulo={f.titulo}
-                  />
+                  <ApoyoChips apoyo={apoyoEd.data} videoId={f.video_id} artista={f.artista} titulo={f.titulo} />
                   <AlertaChip alerta={alertasEd.data?.[f.video_id]} />
                 </div>
-                {f.fijado && (
-                  <Pin className="size-4 text-brand" aria-label="Fijado" />
+                {f.fijado && <Pin className="size-4 text-brand" aria-label="Fijado" />}
+                {ultima.estado === 'borrador' && alertasEd.data?.[f.video_id] && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={excluir.isPending}
+                    onClick={() => excluir.mutate(f.video_id)}
+                  >
+                    Excluir
+                  </Button>
                 )}
-                {ultima.estado === "borrador" &&
-                  alertasEd.data?.[f.video_id] && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={excluir.isPending}
-                      onClick={() => excluir.mutate(f.video_id)}
-                    >
-                      Excluir
-                    </Button>
-                  )}
               </li>
             ))}
           </ol>
         </>
       )}
     </section>
-  );
+  )
 }
 
 // El chart se calcula solo con las vistas de YouTube; aquí el editor tiene el
@@ -573,42 +436,35 @@ function EdicionesSection() {
 // solo de ediciones reales —cualquiera de la lista, no solo la última— y la vista previa
 // "en vivo" lleva marca de agua y no se descarga, para no publicarla por error.
 function ImagenesRedesSection() {
-  const lista = useQuery({
-    queryKey: KEY_EDICIONES,
-    queryFn: chartApi.ediciones,
-  });
-  const ediciones = lista.data ?? [];
-  const [origen, setOrigen] = useState<"vivo" | "edicion">("edicion");
-  const [semana, setSemana] = useState<string | null>(null);
-  const [formato, setFormato] = useState<FormatoChart>("feed");
-  const [version, setVersion] = useState(0);
-  const [pedida, setPedida] = useState<string | null>(null);
+  const lista = useQuery({ queryKey: KEY_EDICIONES, queryFn: chartApi.ediciones })
+  const ediciones = lista.data ?? []
+  const [origen, setOrigen] = useState<'vivo' | 'edicion'>('edicion')
+  const [semana, setSemana] = useState<string | null>(null)
+  const [formato, setFormato] = useState<FormatoChart>('feed')
+  const [version, setVersion] = useState(0)
+  const [pedida, setPedida] = useState<string | null>(null)
 
-  const elegida =
-    ediciones.find((e) => e.semana_fin === semana) ?? ediciones[0];
-  const deEdicion = origen === "edicion" && !!elegida;
-  const firma = (v: number) =>
-    [deEdicion ? elegida!.semana_fin : "vivo", formato, v].join("|");
-  const mostrar = pedida === firma(version);
+  const elegida = ediciones.find((e) => e.semana_fin === semana) ?? ediciones[0]
+  const deEdicion = origen === 'edicion' && !!elegida
+  const firma = (v: number) => [deEdicion ? elegida!.semana_fin : 'vivo', formato, v].join('|')
+  const mostrar = pedida === firma(version)
   const laminas: [LaminaChart, string][] = [
-    ["portada", "Portada"],
-    ["lista", "Top 10"],
-  ];
+    ['portada', 'Portada'],
+    ['lista', 'Top 10'],
+  ]
   const url = (lamina: LaminaChart) =>
     deEdicion
       ? `${chartApi.urlImagen(elegida!.semana_fin, lamina, formato)}&v=${version}`
-      : chartApi.urlImagenEnVivo(lamina, formato, version);
+      : chartApi.urlImagenEnVivo(lamina, formato, version)
   const opcion = (activa: boolean) =>
     `rounded-md border px-2.5 py-1 text-xs font-medium ${
-      activa
-        ? "border-brand bg-brand/10"
-        : "border-border bg-background hover:bg-accent"
-    }`;
-  const verPrevia = () => setPedida(firma(version));
+      activa ? 'border-brand bg-brand/10' : 'border-border bg-background hover:bg-accent'
+    }`
+  const verPrevia = () => setPedida(firma(version))
   const actualizar = () => {
-    setVersion(version + 1);
-    setPedida(firma(version + 1));
-  };
+    setVersion(version + 1)
+    setPedida(firma(version + 1))
+  }
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
@@ -617,24 +473,18 @@ function ImagenesRedesSection() {
       </h3>
 
       <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-x-3">
-        <span className="text-xs font-medium text-muted-foreground">
-          Origen
-        </span>
+        <span className="text-xs font-medium text-muted-foreground">Origen</span>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={opcion(!deEdicion)}
-            onClick={() => setOrigen("vivo")}
-          >
+          <button type="button" className={opcion(!deEdicion)} onClick={() => setOrigen('vivo')}>
             Top 10 en vivo
           </button>
           <button
             type="button"
-            className={opcion(deEdicion) + (elegida ? "" : " opacity-50")}
+            className={opcion(deEdicion) + (elegida ? '' : ' opacity-50')}
             disabled={!elegida}
-            onClick={() => setOrigen("edicion")}
+            onClick={() => setOrigen('edicion')}
           >
-            {elegida ? "Edición semanal" : "Edición (aún no hay)"}
+            {elegida ? 'Edición semanal' : 'Edición (aún no hay)'}
           </button>
           {deEdicion && ediciones.length > 1 && (
             <SelectNative
@@ -645,28 +495,21 @@ function ImagenesRedesSection() {
             >
               {ediciones.map((e) => (
                 <option key={e.semana_fin} value={e.semana_fin}>
-                  {e.semana_fin} ·{" "}
-                  {e.estado === "publicada" ? "publicada" : "borrador"}
+                  {e.semana_fin} · {e.estado === 'publicada' ? 'publicada' : 'borrador'}
                 </option>
               ))}
             </SelectNative>
           )}
         </div>
-        <span className="text-xs font-medium text-muted-foreground">
-          Formato
-        </span>
+        <span className="text-xs font-medium text-muted-foreground">Formato</span>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={opcion(formato === "feed")}
-            onClick={() => setFormato("feed")}
-          >
+          <button type="button" className={opcion(formato === 'feed')} onClick={() => setFormato('feed')}>
             Feed 4:5
           </button>
           <button
             type="button"
-            className={opcion(formato === "historia")}
-            onClick={() => setFormato("historia")}
+            className={opcion(formato === 'historia')}
+            onClick={() => setFormato('historia')}
           >
             Historia 9:16
           </button>
@@ -677,14 +520,14 @@ function ImagenesRedesSection() {
         <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted px-3 py-2">
           <span className="text-xs font-medium">
             Descargar edición {elegida!.semana_fin}
-            {elegida!.estado === "borrador" ? " (borrador)" : ""}:
+            {elegida!.estado === 'borrador' ? ' (borrador)' : ''}:
           </span>
           {(
             [
-              ["portada", "feed", "Portada 4:5"],
-              ["lista", "feed", "Top 10 4:5"],
-              ["portada", "historia", "Portada 9:16"],
-              ["lista", "historia", "Top 10 9:16"],
+              ['portada', 'feed', 'Portada 4:5'],
+              ['lista', 'feed', 'Top 10 4:5'],
+              ['portada', 'historia', 'Portada 9:16'],
+              ['lista', 'historia', 'Top 10 9:16'],
             ] as [LaminaChart, FormatoChart, string][]
           ).map(([lamina, fmt, etiqueta]) => (
             <button
@@ -705,20 +548,15 @@ function ImagenesRedesSection() {
         <>
           <div className="grid max-w-xl grid-cols-2 gap-3">
             {laminas.map(([lamina, etiqueta]) => (
-              <figure
-                key={`${lamina}-${firma(version)}`}
-                className="flex flex-col gap-1"
-              >
+              <figure key={`${lamina}-${firma(version)}`} className="flex flex-col gap-1">
                 <img
                   src={url(lamina)}
-                  alt={`${etiqueta} (${deEdicion ? "edición" : "vista previa en vivo"})`}
+                  alt={`${etiqueta} (${deEdicion ? 'edición' : 'vista previa en vivo'})`}
                   className={`w-full rounded-md border border-border bg-muted object-cover ${
-                    formato === "feed" ? "aspect-[4/5]" : "aspect-[9/16]"
+                    formato === 'feed' ? 'aspect-[4/5]' : 'aspect-[9/16]'
                   }`}
                 />
-                <figcaption className="text-xs text-muted-foreground">
-                  {etiqueta}
-                </figcaption>
+                <figcaption className="text-xs text-muted-foreground">{etiqueta}</figcaption>
               </figure>
             ))}
           </div>
@@ -738,97 +576,78 @@ function ImagenesRedesSection() {
 
       <p className="text-xs text-muted-foreground">
         {deEdicion
-          ? "La imagen se arma con la edición elegida y las fotos de artista (si no hay foto, la miniatura de su video). Las ediciones anteriores siguen en la lista mientras se conserven los datos de YouTube."
-          : "Vista previa con el Top 10 de hoy, solo para ti: lleva marca de agua y no se descarga. Se actualiza solo cuando pulsas el botón. La imagen para publicar se descarga de la edición semanal, cuando se cierre la semana."}
+          ? 'La imagen se arma con la edición elegida y las fotos de artista (si no hay foto, la miniatura de su video). Las ediciones anteriores siguen en la lista mientras se conserven los datos de YouTube.'
+          : 'Vista previa con el Top 10 de hoy, solo para ti: lleva marca de agua y no se descarga. Se actualiza solo cuando pulsas el botón. La imagen para publicar se descarga de la edición semanal, cuando se cierre la semana.'}
       </p>
     </section>
-  );
+  )
 }
 
 export function ChartPanel() {
-  const qc = useQueryClient();
-  const chart = useQuery({ queryKey: KEY, queryFn: chartApi.obtener });
-  const canales = useQuery({
-    queryKey: KEY_CANALES,
-    queryFn: chartApi.canales,
-  });
-  const [canalRef, setCanalRef] = useState("");
-  const [canalArtista, setCanalArtista] = useState("");
-  const [videoRef, setVideoRef] = useState("");
-  const [videoArtista, setVideoArtista] = useState("");
-  const [busqueda, setBusqueda] = useState("");
+  const qc = useQueryClient()
+  const chart = useQuery({ queryKey: KEY, queryFn: chartApi.obtener })
+  const canales = useQuery({ queryKey: KEY_CANALES, queryFn: chartApi.canales })
+  const [canalRef, setCanalRef] = useState('')
+  const [canalArtista, setCanalArtista] = useState('')
+  const [videoRef, setVideoRef] = useState('')
+  const [videoArtista, setVideoArtista] = useState('')
+  const [busqueda, setBusqueda] = useState('')
 
-  const refrescar = () => qc.invalidateQueries({ queryKey: KEY });
-  const apoyoVivo = useApoyo("vivo");
-  const alertasVivo = useAlertas("vivo");
-  const [tab, setTab] = useState<TabId>("edicion");
-  const edicionesLista = useQuery({
-    queryKey: KEY_EDICIONES,
-    queryFn: chartApi.ediciones,
-  });
-  const alertasUltima = useAlertas(edicionesLista.data?.[0]?.semana_fin);
+  const refrescar = () => qc.invalidateQueries({ queryKey: KEY })
+  const apoyoVivo = useApoyo('vivo')
+  const alertasVivo = useAlertas('vivo')
+  const [tab, setTab] = useState<TabId>('edicion')
+  const edicionesLista = useQuery({ queryKey: KEY_EDICIONES, queryFn: chartApi.ediciones })
+  const alertasUltima = useAlertas(edicionesLista.data?.[0]?.semana_fin)
 
   const recolectar = useMutation({
     mutationFn: chartApi.recolectar,
     onSuccess: (r) => {
-      refrescar();
-      if (r.error_estadisticas) toast.error(r.error_estadisticas);
-      else if (r.canales_con_error.length)
-        toast.warning(`${r.canales_con_error.length} canal(es) con error`);
-      else
-        toast.success(
-          `Listo: ${r.videos_seguidos} videos, ${r.videos_nuevos} nuevos.`,
-        );
+      refrescar()
+      if (r.error_estadisticas) toast.error(r.error_estadisticas)
+      else if (r.canales_con_error.length) toast.warning(`${r.canales_con_error.length} canal(es) con error`)
+      else toast.success(`Listo: ${r.videos_seguidos} videos, ${r.videos_nuevos} nuevos.`)
     },
     onError: (e) => toast.error(errorMessage(e)),
-  });
+  })
   const decidir = useMutation({
-    mutationFn: ({
-      id,
-      cambio,
-    }: {
-      id: string;
-      cambio: Parameters<typeof chartApi.decidir>[1];
-    }) => chartApi.decidir(id, cambio),
+    mutationFn: ({ id, cambio }: { id: string; cambio: Parameters<typeof chartApi.decidir>[1] }) =>
+      chartApi.decidir(id, cambio),
     onSuccess: refrescar,
     onError: (e) => toast.error(errorMessage(e)),
-  });
+  })
   const agregarCanal = useMutation({
-    mutationFn: () =>
-      chartApi.agregarCanal(canalRef.trim(), canalArtista.trim() || null),
+    mutationFn: () => chartApi.agregarCanal(canalRef.trim(), canalArtista.trim() || null),
     onSuccess: (c) => {
-      toast.success(
-        `Siguiendo a ${c.nombre}. Pulsa «Actualizar ahora» para traer sus videos.`,
-      );
-      setCanalRef("");
-      setCanalArtista("");
-      qc.invalidateQueries({ queryKey: KEY_CANALES });
+      toast.success(`Siguiendo a ${c.nombre}. Pulsa «Actualizar ahora» para traer sus videos.`)
+      setCanalRef('')
+      setCanalArtista('')
+      qc.invalidateQueries({ queryKey: KEY_CANALES })
     },
     onError: (e) => toast.error(errorMessage(e)),
-  });
+  })
   const quitarCanal = useMutation({
     mutationFn: (id: string) => chartApi.quitarCanal(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY_CANALES }),
     onError: (e) => toast.error(errorMessage(e)),
-  });
+  })
   const agregarVideo = useMutation({
-    mutationFn: () =>
-      chartApi.agregarVideo(videoRef.trim(), videoArtista.trim() || null),
+    mutationFn: () => chartApi.agregarVideo(videoRef.trim(), videoArtista.trim() || null),
     onSuccess: () => {
-      toast.success("Video agregado. Pulsa «Actualizar ahora» para medirlo.");
-      setVideoRef("");
-      setVideoArtista("");
-      refrescar();
+      toast.success('Video agregado. Pulsa «Actualizar ahora» para medirlo.')
+      setVideoRef('')
+      setVideoArtista('')
+      refrescar()
     },
     onError: (e) => toast.error(errorMessage(e)),
-  });
+  })
 
-  const data = chart.data;
-  const ocupado = decidir.isPending;
-  const q = normalizar(busqueda.trim());
+  const data = chart.data
+  const ocupado = decidir.isPending
+  const q = normalizar(busqueda.trim())
   const videosFiltrados = (data?.videos ?? []).filter(
-    (v) => !q || normalizar(`${v.titulo} ${v.artista ?? ""}`).includes(q),
-  );
+    (v) => !q || normalizar(`${v.titulo} ${v.artista ?? ''}`).includes(q),
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -836,26 +655,21 @@ export function ChartPanel() {
         <div>
           <h2 className="text-base font-semibold">Cierre semanal</h2>
           <p className="text-sm text-muted-foreground">
-            Cada viernes a medianoche (hora de Colombia) se cierra el conteo de
-            la semana y queda un borrador que tú revisas (excluir o fijar
-            canciones) y publicas.
-            {data?.actualizado ? ` Última medición: ${data.actualizado}.` : ""}
+            Cada viernes a medianoche (hora de Colombia) se cierra el conteo de la semana y queda un
+            borrador que tú revisas (excluir o fijar canciones) y publicas.
+            {data?.actualizado ? ` Última medición: ${data.actualizado}.` : ''}
           </p>
         </div>
-        <Button
-          onClick={() => recolectar.mutate()}
-          disabled={recolectar.isPending}
-        >
-          <RefreshCw className={recolectar.isPending ? "animate-spin" : ""} />
-          {recolectar.isPending ? "Consultando YouTube…" : "Actualizar ahora"}
+        <Button onClick={() => recolectar.mutate()} disabled={recolectar.isPending}>
+          <RefreshCw className={recolectar.isPending ? 'animate-spin' : ''} />
+          {recolectar.isPending ? 'Consultando YouTube…' : 'Actualizar ahora'}
         </Button>
       </div>
 
       {data && !data.youtube_configurado && (
         <p className="rounded-md bg-warning-bg px-3 py-2 text-sm text-warning">
-          Falta la clave de YouTube: agrega la variable{" "}
-          <code>YOUTUBE_API_KEY</code> en Railway (servicio portal-newsroom-ai)
-          para poder medir.
+          Falta la clave de YouTube: agrega la variable <code>YOUTUBE_API_KEY</code> en Railway
+          (servicio portal-newsroom-ai) para poder medir.
         </p>
       )}
 
@@ -863,293 +677,186 @@ export function ChartPanel() {
         value={tab}
         onChange={setTab}
         tabs={[
-          {
-            id: "edicion",
-            label: "Edición semanal",
-            count: Object.keys(alertasUltima.data ?? {}).length,
-          },
-          { id: "redes", label: "Imágenes y texto" },
-          {
-            id: "vivo",
-            label: "Top en vivo",
-            count: Object.keys(alertasVivo.data ?? {}).length,
-          },
-          { id: "videos", label: "Videos seguidos" },
-          { id: "config", label: "Canales y ajustes" },
+          { id: 'edicion', label: 'Edición semanal', count: Object.keys(alertasUltima.data ?? {}).length },
+          { id: 'redes', label: 'Imágenes y texto' },
+          { id: 'vivo', label: 'Top en vivo', count: Object.keys(alertasVivo.data ?? {}).length },
+          { id: 'videos', label: 'Videos seguidos' },
+          { id: 'config', label: 'Canales y ajustes' },
         ]}
       />
 
-      {tab === "edicion" && <EdicionesSection />}
+      {tab === 'edicion' && <EdicionesSection />}
 
-      {tab === "redes" && <ImagenesRedesSection />}
+      {tab === 'redes' && <ImagenesRedesSection />}
 
-      {tab === "vivo" && (
-        <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">
-            Top 10 actual (en vivo, solo para ti)
-          </h3>
-          {chart.isLoading ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
-          ) : !data || data.filas.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Aún no hay ranking: necesita al menos 3 días de mediciones. Agrega
-              canales abajo y actualiza.
-            </p>
-          ) : (
-            <ol className="flex flex-col gap-1">
-              {data.filas.map((f) => (
-                <li
-                  key={f.video_id}
-                  className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm"
-                >
-                  <span className="w-6 text-center text-base font-bold text-brand">
-                    {f.posicion}
-                  </span>
-                  <Tendencia fila={f} />
-                  <div className="min-w-0 flex-1">
-                    <a
-                      className="block truncate font-medium hover:underline"
-                      href={f.url}
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      {f.titulo}
-                    </a>
-                    <p className="text-xs text-muted-foreground">
-                      {f.artista ?? "Sin artista"} · +{num(f.vistas_semana)}{" "}
-                      esta semana
-                      {f.parcial ? " (estimado)" : ""}
-                    </p>
-                    <ApoyoChips
-                      apoyo={apoyoVivo.data}
-                      videoId={f.video_id}
-                      artista={f.artista}
-                      titulo={f.titulo}
-                    />
-                    <AlertaChip alerta={alertasVivo.data?.[f.video_id]} />
-                  </div>
-                  {f.fijado && (
-                    <Pin className="size-4 text-brand" aria-label="Fijado" />
-                  )}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={ocupado}
-                    onClick={() =>
-                      decidir.mutate({
-                        id: f.video_id,
-                        cambio: { excluido: true },
-                      })
-                    }
-                  >
-                    Excluir
-                  </Button>
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
-      )}
-
-      {tab === "videos" && (
-        <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">
-            Videos seguidos ({q ? `${videosFiltrados.length} de ` : ""}
-            {data?.videos.length ?? 0})
-          </h3>
-          <Input
-            type="search"
-            placeholder="Buscar por título o artista…"
-            aria-label="Buscar video por título o artista"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-          />
-          <ul className="flex flex-col gap-1 sm:max-h-[32rem] sm:overflow-y-auto">
-            {videosFiltrados.length === 0 && (
-              <li className="text-sm text-muted-foreground">
-                {q
-                  ? "Ningún video coincide con esa búsqueda."
-                  : "Aún no hay videos."}
-              </li>
-            )}
-            {videosFiltrados.map((v) => (
-              <li
-                key={v.video_id}
-                className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2 text-sm"
-              >
+      {tab === 'vivo' && (
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold">Top 10 actual (en vivo, solo para ti)</h3>
+        {chart.isLoading ? (
+          <p className="text-sm text-muted-foreground">Cargando…</p>
+        ) : !data || data.filas.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aún no hay ranking: necesita al menos 3 días de mediciones. Agrega canales abajo y
+            actualiza.
+          </p>
+        ) : (
+          <ol className="flex flex-col gap-1">
+            {data.filas.map((f) => (
+              <li key={f.video_id} className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm">
+                <span className="w-6 text-center text-base font-bold text-brand">{f.posicion}</span>
+                <Tendencia fila={f} />
                 <div className="min-w-0 flex-1">
-                  <a
-                    className="block truncate hover:underline"
-                    href={v.url}
-                    target="_blank"
-                    rel="noopener"
-                  >
-                    {v.titulo}
+                  <a className="block truncate font-medium hover:underline" href={f.url} target="_blank" rel="noopener">
+                    {f.titulo}
                   </a>
                   <p className="text-xs text-muted-foreground">
-                    {v.artista ?? "Sin artista"}
-                    {v.manual ? " · manual" : ""}
-                    {v.vistas_semana != null
-                      ? ` · +${num(v.vistas_semana)} semana`
-                      : " · sin medir aún"}
-                    {v.excluido ? " · EXCLUIDO" : ""}
-                    {v.es_short && v.fijado_posicion == null
-                      ? " · Short/clip (omitido)"
-                      : ""}
-                    {v.fijado_posicion
-                      ? ` · fijado en #${v.fijado_posicion}`
-                      : ""}
+                    {f.artista ?? 'Sin artista'} · +{num(f.vistas_semana)} esta semana
+                    {f.parcial ? ' (estimado)' : ''}
                   </p>
+                  <ApoyoChips apoyo={apoyoVivo.data} videoId={f.video_id} artista={f.artista} titulo={f.titulo} />
+                  <AlertaChip alerta={alertasVivo.data?.[f.video_id]} />
                 </div>
-                <SelectNative
-                  aria-label="Fijar en posición"
-                  className="!h-8 w-24 text-xs"
-                  value={v.fijado_posicion ?? ""}
-                  disabled={ocupado}
-                  onChange={(e) =>
-                    e.target.value
-                      ? decidir.mutate({
-                          id: v.video_id,
-                          cambio: { fijar_en: Number(e.target.value) },
-                        })
-                      : decidir.mutate({
-                          id: v.video_id,
-                          cambio: { quitar_fijo: true },
-                        })
-                  }
-                >
-                  <option value="">Fijar…</option>
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>
-                      #{n}
-                    </option>
-                  ))}
-                </SelectNative>
+                {f.fijado && <Pin className="size-4 text-brand" aria-label="Fijado" />}
                 <Button
                   size="sm"
                   variant="secondary"
                   disabled={ocupado}
-                  onClick={() =>
-                    decidir.mutate({
-                      id: v.video_id,
-                      cambio: { excluido: !v.excluido },
-                    })
-                  }
+                  onClick={() => decidir.mutate({ id: f.video_id, cambio: { excluido: true } })}
                 >
-                  {v.excluido ? "Incluir" : "Excluir"}
+                  Excluir
                 </Button>
               </li>
             ))}
-          </ul>
-        </section>
+          </ol>
+        )}
+      </section>
       )}
 
-      {tab === "config" && (
-        <div className="rounded-lg border border-border">
-          <div className="flex flex-col gap-4 p-3">
-            <section className="flex flex-col gap-2">
-              <h3 className="text-sm font-semibold">
-                Canales de YouTube que se siguen
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Pega la dirección del canal, su @usuario o su ID. Sus videos
-                nuevos entran solos al chart.
-              </p>
-              <form
-                className="flex flex-wrap gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (canalRef.trim()) agregarCanal.mutate();
-                }}
+      {tab === 'videos' && (
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold">
+          Videos seguidos ({q ? `${videosFiltrados.length} de ` : ''}
+          {data?.videos.length ?? 0})
+        </h3>
+        <Input
+          type="search"
+          placeholder="Buscar por título o artista…"
+          aria-label="Buscar video por título o artista"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+        <ul className="flex flex-col gap-1 sm:max-h-[32rem] sm:overflow-y-auto">
+          {videosFiltrados.length === 0 && (
+            <li className="text-sm text-muted-foreground">
+              {q ? 'Ningún video coincide con esa búsqueda.' : 'Aún no hay videos.'}
+            </li>
+          )}
+          {videosFiltrados.map((v) => (
+            <li key={v.video_id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2 text-sm">
+              <div className="min-w-0 flex-1">
+                <a className="block truncate hover:underline" href={v.url} target="_blank" rel="noopener">
+                  {v.titulo}
+                </a>
+                <p className="text-xs text-muted-foreground">
+                  {v.artista ?? 'Sin artista'}
+                  {v.manual ? ' · manual' : ''}
+                  {v.vistas_semana != null ? ` · +${num(v.vistas_semana)} semana` : ' · sin medir aún'}
+                  {v.excluido ? ' · EXCLUIDO' : ''}
+                  {v.es_short && v.fijado_posicion == null ? ' · Short/clip (omitido)' : ''}
+                  {v.fijado_posicion ? ` · fijado en #${v.fijado_posicion}` : ''}
+                </p>
+              </div>
+              <SelectNative
+                aria-label="Fijar en posición"
+                className="!h-8 w-24 text-xs"
+                value={v.fijado_posicion ?? ''}
+                disabled={ocupado}
+                onChange={(e) =>
+                  e.target.value
+                    ? decidir.mutate({ id: v.video_id, cambio: { fijar_en: Number(e.target.value) } })
+                    : decidir.mutate({ id: v.video_id, cambio: { quitar_fijo: true } })
+                }
               >
-                <Input
-                  className="min-w-56 flex-1"
-                  placeholder="@usuario o enlace del canal"
-                  value={canalRef}
-                  onChange={(e) => setCanalRef(e.target.value)}
-                />
-                <Input
-                  className="w-48"
-                  placeholder="Artista (opcional)"
-                  value={canalArtista}
-                  onChange={(e) => setCanalArtista(e.target.value)}
-                />
-                <Button
-                  type="submit"
-                  disabled={agregarCanal.isPending || !canalRef.trim()}
-                >
-                  Seguir canal
-                </Button>
-              </form>
-              <ul className="flex flex-col gap-1">
-                {canales.data?.map((c) => (
-                  <li
-                    key={c.canal_id}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-border p-2 text-sm"
-                  >
-                    <span className="min-w-0 truncate">
-                      {c.nombre}
-                      {c.artista ? (
-                        <span className="text-muted-foreground">
-                          {" "}
-                          · {c.artista}
-                        </span>
-                      ) : null}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      aria-label={`Dejar de seguir ${c.nombre}`}
-                      onClick={() => quitarCanal.mutate(c.canal_id)}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </li>
+                <option value="">Fijar…</option>
+                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>
+                    #{n}
+                  </option>
                 ))}
-                {canales.data?.length === 0 && (
-                  <li className="text-sm text-muted-foreground">
-                    Aún no sigues ningún canal.
-                  </li>
-                )}
-              </ul>
-            </section>
-
-            <section className="flex flex-col gap-2 border-t border-border pt-4">
-              <h3 className="text-sm font-semibold">Agregar un video suelto</h3>
-              <p className="text-xs text-muted-foreground">
-                Para canciones de artistas cuyo canal no sigues: pega el enlace
-                del video.
-              </p>
-              <form
-                className="flex flex-wrap gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (videoRef.trim()) agregarVideo.mutate();
-                }}
+              </SelectNative>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={ocupado}
+                onClick={() => decidir.mutate({ id: v.video_id, cambio: { excluido: !v.excluido } })}
               >
-                <Input
-                  className="min-w-56 flex-1"
-                  placeholder="Enlace del video de YouTube"
-                  value={videoRef}
-                  onChange={(e) => setVideoRef(e.target.value)}
-                />
-                <Input
-                  className="w-48"
-                  placeholder="Artista (opcional)"
-                  value={videoArtista}
-                  onChange={(e) => setVideoArtista(e.target.value)}
-                />
-                <Button
-                  type="submit"
-                  disabled={agregarVideo.isPending || !videoRef.trim()}
-                >
-                  Agregar video
-                </Button>
-              </form>
-            </section>
-          </div>
+                {v.excluido ? 'Incluir' : 'Excluir'}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </section>
+      )}
+
+      {tab === 'config' && (
+      <div className="rounded-lg border border-border">
+        <div className="flex flex-col gap-4 p-3">
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold">Canales de YouTube que se siguen</h3>
+        <p className="text-xs text-muted-foreground">
+          Pega la dirección del canal, su @usuario o su ID. Sus videos nuevos entran solos al chart.
+        </p>
+        <form
+          className="flex flex-wrap gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (canalRef.trim()) agregarCanal.mutate()
+          }}
+        >
+          <Input className="min-w-56 flex-1" placeholder="@usuario o enlace del canal" value={canalRef} onChange={(e) => setCanalRef(e.target.value)} />
+          <Input className="w-48" placeholder="Artista (opcional)" value={canalArtista} onChange={(e) => setCanalArtista(e.target.value)} />
+          <Button type="submit" disabled={agregarCanal.isPending || !canalRef.trim()}>
+            Seguir canal
+          </Button>
+        </form>
+        <ul className="flex flex-col gap-1">
+          {canales.data?.map((c) => (
+            <li key={c.canal_id} className="flex items-center justify-between gap-2 rounded-lg border border-border p-2 text-sm">
+              <span className="min-w-0 truncate">
+                {c.nombre}
+                {c.artista ? <span className="text-muted-foreground"> · {c.artista}</span> : null}
+              </span>
+              <Button size="sm" variant="ghost" aria-label={`Dejar de seguir ${c.nombre}`} onClick={() => quitarCanal.mutate(c.canal_id)}>
+                <Trash2 />
+              </Button>
+            </li>
+          ))}
+          {canales.data?.length === 0 && <li className="text-sm text-muted-foreground">Aún no sigues ningún canal.</li>}
+        </ul>
+      </section>
+
+      <section className="flex flex-col gap-2 border-t border-border pt-4">
+        <h3 className="text-sm font-semibold">Agregar un video suelto</h3>
+        <p className="text-xs text-muted-foreground">
+          Para canciones de artistas cuyo canal no sigues: pega el enlace del video.
+        </p>
+        <form
+          className="flex flex-wrap gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (videoRef.trim()) agregarVideo.mutate()
+          }}
+        >
+          <Input className="min-w-56 flex-1" placeholder="Enlace del video de YouTube" value={videoRef} onChange={(e) => setVideoRef(e.target.value)} />
+          <Input className="w-48" placeholder="Artista (opcional)" value={videoArtista} onChange={(e) => setVideoArtista(e.target.value)} />
+          <Button type="submit" disabled={agregarVideo.isPending || !videoRef.trim()}>
+            Agregar video
+          </Button>
+        </form>
+      </section>
         </div>
+      </div>
       )}
     </div>
-  );
+  )
 }

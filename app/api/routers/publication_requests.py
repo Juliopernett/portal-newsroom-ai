@@ -74,7 +74,7 @@ import re
 from urllib.parse import quote
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from app.api.dependencies import (
@@ -82,8 +82,10 @@ from app.api.dependencies import (
     get_cms_publisher,
     get_current_user,
     get_media_storage,
+    get_portada_renderer,
     get_unit_of_work,
 )
+from app.api.routers.portadas import leer_imagen_subida
 from app.api.schemas.destino_publicacion import (
     CrearBorradorWordpressOut,
     DestinoPublicacionConfirmarPublicacion,
@@ -109,7 +111,9 @@ from core.entities.user import User
 from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.media_storage import MediaStorage
+from core.ports.portada_renderer import PortadaRenderer, VariantePortada
 from core.ports.unit_of_work import UnitOfWork
+from core.services.candidate_draft_service import PortadaParaBorrador
 from core.services.destino_publicacion_service import (
     cancelar,
     corregir_enlace,
@@ -132,7 +136,11 @@ from core.services.publication_request_service import (
     reabrir_si_incompleta,
 )
 from core.services.reporte_service import ReporteSolicitud, construir_reporte
-from core.services.wordpress_publication_service import preparar_y_crear_borrador
+from core.services.wordpress_publication_service import (
+    clave_portada_solicitud,
+    preparar_y_crear_borrador,
+)
+
 
 def _content_disposition_inline(nombre: str) -> str:
     """RFC 6266 header: ASCII fallback plus UTF-8 `filename*`, so quotes,
@@ -378,6 +386,14 @@ def crear_borrador_wordpress(
     cms_publisher: CMSPublisher = Depends(get_cms_publisher),
     ai_provider: AIProvider = Depends(get_ai_provider),
     media_storage: MediaStorage = Depends(get_media_storage),
+    portada_renderer: PortadaRenderer = Depends(get_portada_renderer),
+    imagen_base: UploadFile | None = File(None),
+    imagen_circulo: UploadFile | None = File(None),
+    variante: VariantePortada = Form(VariantePortada.NOTICIAS),
+    titular_portada: str | None = Form(None, max_length=200),
+    antetitulo: str | None = Form(None, max_length=60),
+    enfoque_x: float = Form(0.5, ge=0, le=1),
+    enfoque_y: float = Form(0.3, ge=0, le=1),
 ) -> CrearBorradorWordpressOut:
     """Prepare `request_id`'s content with AI, then create its WordPress draft.
 
@@ -395,16 +411,44 @@ def crear_borrador_wordpress(
     never blocks this endpoint. If WordPress itself fails, nothing is
     saved (see `preparar_y_crear_borrador`'s own docstring) and the
     request is safely retriable.
+
+    Optional multipart fields (same as the Radar's "Crear noticia"): `imagen_base`
+    (the operator's own photo) renders the branded cover as the draft's featured
+    image, `imagen_circulo` selects the two-photo template, and `titular_portada`
+    empty means "use the draft's headline". Without `imagen_base` the previous
+    behaviour holds (first attached image, if any).
     """
     solicitud = uow.publication_requests.get_by_id(request_id)
     if solicitud is None:
         raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    portada = None
+    if imagen_base is not None and imagen_base.filename:
+        portada = PortadaParaBorrador(
+            imagen_base=leer_imagen_subida(imagen_base, "imagen base"),
+            variante=variante,
+            titular=(titular_portada or "").strip() or None,
+            antetitulo=(antetitulo or "").strip() or None,
+            imagen_circulo=(
+                leer_imagen_subida(imagen_circulo, "imagen del círculo")
+                if imagen_circulo is not None and imagen_circulo.filename
+                else None
+            ),
+            enfoque_x=enfoque_x,
+            enfoque_y=enfoque_y,
+        )
     destino = uow.destinos_publicacion.get_by_id(destino_id)
     if destino is None or destino.publication_request_id != request_id:
         raise HTTPException(status_code=404, detail="DestinoPublicacion not found")
     media_assets = uow.media_assets.list_by_publication_request_id(request_id)
     con_borrador, solicitud_actualizada = preparar_y_crear_borrador(
-        destino, solicitud, media_assets, ai_provider, cms_publisher, media_storage
+        destino,
+        solicitud,
+        media_assets,
+        ai_provider,
+        cms_publisher,
+        media_storage,
+        portada=portada,
+        portada_renderer=portada_renderer,
     )
     uow.destinos_publicacion.save(con_borrador)
     uow.publication_requests.save(solicitud_actualizada)
@@ -413,6 +457,28 @@ def crear_borrador_wordpress(
         destino=DestinoPublicacionOut.model_validate(con_borrador),
         preparacion_ia_estado=solicitud_actualizada.preparacion_ia_estado,
         preparacion_ia_error=solicitud_actualizada.preparacion_ia_error,
+    )
+
+
+@router.get("/{request_id}/portada.jpg")
+def descargar_portada_solicitud(
+    request_id: str,
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    media_storage: MediaStorage = Depends(get_media_storage),
+) -> Response:
+    """Download the cover JPEG kept when the draft was created (for social networks)."""
+    if uow.publication_requests.get_by_id(request_id) is None:
+        raise HTTPException(status_code=404, detail="PublicationRequest not found")
+    try:
+        contenido = media_storage.leer(clave_portada_solicitud(request_id))
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Esta solicitud no tiene una portada guardada"
+        ) from exc
+    return Response(
+        content=contenido,
+        media_type="image/jpeg",
+        headers={"Content-Disposition": 'attachment; filename="portada.jpg"'},
     )
 
 
