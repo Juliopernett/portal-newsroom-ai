@@ -42,6 +42,10 @@ def _miniatura(snippet: dict[str, Any]) -> str | None:
 _DURACION = re.compile(r"^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$")
 
 
+def _entero(valor: str | None) -> int | None:
+    return int(valor) if valor is not None and str(valor).isdigit() else None
+
+
 def _segundos(iso: str | None) -> int | None:
     """Parse an ISO 8601 duration ("PT1M30S") to seconds; 0 / unknown → None (live streams)."""
     m = _DURACION.match(iso or "")
@@ -207,13 +211,13 @@ class YouTubeDataApiReader:
     def detalles(self, video_ids: list[str]) -> dict[str, DetalleVideo]:
         if not video_ids:
             return {}
-        datos = self._get(
-            "videos", part="statistics,contentDetails", id=",".join(video_ids[:50])
-        )
+        datos = self._get("videos", part="statistics,contentDetails", id=",".join(video_ids[:50]))
         return {
             item["id"]: DetalleVideo(
                 vistas=int(item["statistics"]["viewCount"]),
                 duracion_segundos=_segundos(item.get("contentDetails", {}).get("duration")),
+                me_gusta=_entero(item["statistics"].get("likeCount")),
+                comentarios=_entero(item["statistics"].get("commentCount")),
             )
             for item in datos.get("items", [])
             if "viewCount" in item.get("statistics", {})

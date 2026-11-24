@@ -82,10 +82,13 @@ class FakeYouTubeReader:
         return set()
 
     def detalles(self, video_ids: list[str]) -> dict[str, DetalleVideo]:
-        return {
-            vid: DetalleVideo(
-                vistas=50_000 + _n(vid, 400_000) + self._dia() * (200 + _n(vid, 3_000)),
+        resultado = {}
+        for vid in video_ids:
+            vistas = 50_000 + _n(vid, 400_000) + self._dia() * (200 + _n(vid, 3_000))
+            resultado[vid] = DetalleVideo(
+                vistas=vistas,
                 duracion_segundos=200 + _n(vid, 120),
+                me_gusta=vistas * (10 + _n(vid, 20)) // 1000,
+                comentarios=vistas * (1 + _n(vid, 3)) // 1000,
             )
-            for vid in video_ids
-        }
+        return resultado

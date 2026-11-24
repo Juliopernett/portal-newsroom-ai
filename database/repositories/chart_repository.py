@@ -122,7 +122,11 @@ class SqlAlchemyChartRepository:
     def save_snapshot(self, snapshot: SnapshotVistas) -> None:
         self._session.merge(
             ChartSnapshotModel(
-                video_id=snapshot.video_id, fecha=snapshot.fecha, vistas=snapshot.vistas
+                video_id=snapshot.video_id,
+                fecha=snapshot.fecha,
+                vistas=snapshot.vistas,
+                me_gusta=snapshot.me_gusta,
+                comentarios=snapshot.comentarios,
             )
         )
 
@@ -139,7 +143,15 @@ class SqlAlchemyChartRepository:
             .order_by(ChartSnapshotModel.fecha)
         )
         for m in self._session.execute(stmt).scalars():
-            resultado[m.video_id].append(SnapshotVistas(m.video_id, m.fecha, int(m.vistas)))
+            resultado[m.video_id].append(
+                SnapshotVistas(
+                    m.video_id,
+                    m.fecha,
+                    int(m.vistas),
+                    None if m.me_gusta is None else int(m.me_gusta),
+                    None if m.comentarios is None else int(m.comentarios),
+                )
+            )
         return resultado
 
     def purgar_anteriores_a(self, fecha: date) -> tuple[int, int, int]:

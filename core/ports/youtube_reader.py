@@ -32,6 +32,8 @@ class DetalleVideo:
 
     vistas: int
     duracion_segundos: int | None  # None for live streams / unknown
+    me_gusta: int | None = None  # None when the uploader hides them
+    comentarios: int | None = None  # None when comments are off
 
 
 class YouTubeReader(Protocol):

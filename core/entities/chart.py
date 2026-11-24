@@ -94,6 +94,9 @@ class SnapshotVistas:
     video_id: str
     fecha: date
     vistas: int
+    # Reactions the same day (None = unknown: old snapshot, or the uploader hides them).
+    me_gusta: int | None = None
+    comentarios: int | None = None
 
     def __post_init__(self) -> None:
         if self.vistas < 0:

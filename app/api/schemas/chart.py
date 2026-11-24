@@ -90,6 +90,13 @@ class ApoyoPlataformaOut(BaseModel):
     manual: bool = False  # the editor picked this track by hand
 
 
+class AlertaReaccionOut(BaseModel):
+    motivo: str
+    me_gusta_pct: float | None
+    comentarios_pct: float | None
+    base: str  # "semana" | "total"
+
+
 class DeezerPistaOut(BaseModel):
     id: str
     titulo: str

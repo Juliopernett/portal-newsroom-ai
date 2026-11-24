@@ -30,6 +30,7 @@ from app.api.dependencies import (
     get_youtube_reader,
 )
 from app.api.schemas.chart import (
+    AlertaReaccionOut,
     ApoyoPlataformaOut,
     CanalIn,
     CanalOut,
@@ -52,6 +53,7 @@ from config.settings import Settings
 from core.entities.chart import DEEZER_NINGUNA, CanalChart, EdicionChart, FilaEdicion, VideoChart
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
+from core.services.chart_alertas import evaluar_reacciones
 from core.services.chart_apoyo import buscar_apoyo
 from core.services.chart_enlaces import pagina_del_artista
 from core.services.chart_semanal_service import (
@@ -374,6 +376,33 @@ def apoyo_otras_plataformas(
                 valor=hit[1].valor, url=hit[1].url, manual=True
             )
     return salida
+
+
+@router.get("/alertas", response_model=dict[str, AlertaReaccionOut])
+def alertas_de_reacciones(
+    semana: str = Query(description="Fecha de la edición (AAAA-MM-DD) o «vivo» (Top 10 de hoy)"),
+    uow: UnitOfWork = Depends(get_unit_of_work),
+) -> dict[str, AlertaReaccionOut]:
+    """Songs of the Top 10 whose likes/comments are far below the chart's norm.
+
+    Only a hint for the editor (never excludes or moves anything). A song with no
+    reaction figures yet is absent: the data starts accumulating with each measurement.
+    """
+    if semana == "vivo":
+        _, posiciones, _, snaps = _calcular(uow)
+        ids, fin = [p.video.video_id for p in posiciones[:10]], _hoy()
+    else:
+        try:
+            fin = date.fromisoformat(semana)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Fecha inválida") from exc
+        edicion = uow.chart.get_edicion(fin)
+        if edicion is None:
+            raise HTTPException(status_code=404, detail="Edition not found")
+        ids = [f.video_id for f in edicion.filas[:10]]
+        snaps = uow.chart.list_snapshots(ids, desde=fin - timedelta(days=_HISTORIAL_DIAS))
+    alertas = evaluar_reacciones({i: snaps.get(i, []) for i in ids}, fin)
+    return {vid: AlertaReaccionOut(**asdict(a)) for vid, a in alertas.items()}
 
 
 @router.get("/deezer/buscar", response_model=list[DeezerPistaOut])

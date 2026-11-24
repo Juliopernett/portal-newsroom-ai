@@ -49,6 +49,8 @@ class ChartSnapshotModel(Base):
     )
     fecha: Mapped[date] = mapped_column(Date, primary_key=True)
     vistas: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    me_gusta: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    comentarios: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
 
 class ChartCorteModel(Base):

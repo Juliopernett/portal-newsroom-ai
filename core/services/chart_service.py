@@ -339,7 +339,15 @@ def recolectar_chart(
         for i in range(0, len(ids), _LOTE_ESTADISTICAS):
             for vid, d in reader.detalles(ids[i : i + _LOTE_ESTADISTICAS]).items():
                 devueltos.add(vid)
-                uow.chart.save_snapshot(SnapshotVistas(video_id=vid, fecha=hoy, vistas=d.vistas))
+                uow.chart.save_snapshot(
+                    SnapshotVistas(
+                        video_id=vid,
+                        fecha=hoy,
+                        vistas=d.vistas,
+                        me_gusta=d.me_gusta,
+                        comentarios=d.comentarios,
+                    )
+                )
                 res.snapshots += 1
                 video = por_id[vid]
                 if d.duracion_segundos != video.duracion_segundos:
@@ -380,9 +388,7 @@ def retirar_no_disponibles(
         ausentes = reader.videos_no_disponibles(faltan)
     except YouTubeError:
         return 0
-    if len(ausentes) > _MAX_RETIRO_MINIMO and len(ausentes) > _MAX_RETIRO_PROPORCION * len(
-        pedidos
-    ):
+    if len(ausentes) > _MAX_RETIRO_MINIMO and len(ausentes) > _MAX_RETIRO_PROPORCION * len(pedidos):
         return 0
     for video_id in ausentes:
         uow.chart.delete_video(video_id)

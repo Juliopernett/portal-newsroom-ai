@@ -468,3 +468,21 @@ def test_cover_asks_for_the_hd_thumbnail_of_the_number_one_only(
     hd = "https://i.ytimg.com/vi/b/maxresdefault.jpg"  # "b" is the most viewed in the seed
     assert hd in pedidas[0]
     assert not any("maxresdefault" in u for u in pedidas[1])
+
+
+def test_reaction_alerts_endpoint_answers_empty_without_data(client: TestClient) -> None:
+    assert client.get("/chart-vallenato/alertas?semana=vivo").json() == {}
+    assert client.get("/chart-vallenato/alertas?semana=2026-11-20").status_code == 404
+    assert client.get("/chart-vallenato/alertas?semana=nada").status_code == 422
+
+
+def test_collect_stores_likes_and_comments(client: TestClient) -> None:
+    from app.api.main import app
+    from app.api.dependencies import get_unit_of_work
+
+    _canal(client)
+    client.post("/chart-vallenato/recolectar")
+    uow = next(app.dependency_overrides.get(get_unit_of_work, get_unit_of_work)())
+    video_id = client.get("/chart-vallenato").json()["videos"][0]["video_id"]
+    snaps = uow.chart.list_snapshots([video_id], desde=datetime(2020, 1, 1).date())[video_id]
+    assert snaps[-1].me_gusta and snaps[-1].comentarios
