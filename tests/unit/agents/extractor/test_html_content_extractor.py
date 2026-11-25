@@ -105,38 +105,50 @@ def test_extract_raises_when_the_page_has_no_recognizable_content() -> None:
     """A near-empty body is what a JS-rendered page looks like to a plain HTTP fetch."""
     extractor = HtmlContentExtractor()
 
-    with patch(
-        "agents.radar.url_segura.requests.get",
-        return_value=_mock_response(_PAGINA_VACIA),
-    ), pytest.raises(ContentExtractorError):
+    with (
+        patch(
+            "agents.radar.url_segura.requests.get",
+            return_value=_mock_response(_PAGINA_VACIA),
+        ),
+        pytest.raises(ContentExtractorError),
+    ):
         extractor.extract(_URL)
 
 
 def test_extract_raises_content_extractor_error_on_network_failure() -> None:
     extractor = HtmlContentExtractor()
 
-    with patch(
-        "agents.radar.url_segura.requests.get",
-        side_effect=requests.ConnectionError("no se pudo conectar"),
-    ), pytest.raises(ContentExtractorError):
+    with (
+        patch(
+            "agents.radar.url_segura.requests.get",
+            side_effect=requests.ConnectionError("no se pudo conectar"),
+        ),
+        pytest.raises(ContentExtractorError),
+    ):
         extractor.extract(_URL)
 
 
 def test_extract_raises_content_extractor_error_on_a_non_2xx_response() -> None:
     extractor = HtmlContentExtractor()
 
-    with patch(
-        "agents.radar.url_segura.requests.get",
-        return_value=_mock_response("", status_ok=False),
-    ), pytest.raises(ContentExtractorError):
+    with (
+        patch(
+            "agents.radar.url_segura.requests.get",
+            return_value=_mock_response("", status_ok=False),
+        ),
+        pytest.raises(ContentExtractorError),
+    ):
         extractor.extract(_URL)
 
 
 def test_extract_raises_content_extractor_error_on_timeout() -> None:
     extractor = HtmlContentExtractor()
 
-    with patch(
-        "agents.radar.url_segura.requests.get",
-        side_effect=requests.Timeout("tardó demasiado"),
-    ), pytest.raises(ContentExtractorError):
+    with (
+        patch(
+            "agents.radar.url_segura.requests.get",
+            side_effect=requests.Timeout("tardó demasiado"),
+        ),
+        pytest.raises(ContentExtractorError),
+    ):
         extractor.extract(_URL)

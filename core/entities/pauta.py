@@ -96,9 +96,7 @@ class Pauta:
         if self.valor_pagado < 0:
             raise ValueError(f"valor_pagado must not be negative, got {self.valor_pagado!r}")
         if self.saldo_pendiente < 0:
-            raise ValueError(
-                f"saldo_pendiente must not be negative, got {self.saldo_pendiente!r}"
-            )
+            raise ValueError(f"saldo_pendiente must not be negative, got {self.saldo_pendiente!r}")
 
     @property
     def peso_comercial(self) -> Decimal:

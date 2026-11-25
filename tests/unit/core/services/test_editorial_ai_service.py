@@ -165,7 +165,9 @@ def test_generar_contenido_editorial_uses_provided_seo_fields_when_present() -> 
 
 def test_generar_contenido_editorial_truncates_an_oversized_meta_titulo() -> None:
     provider = _FakeAIProvider(
-        respuesta=json.dumps({"titulo": "Titular", "contenido": "Cuerpo.", "meta_titulo": "x" * 100})
+        respuesta=json.dumps(
+            {"titulo": "Titular", "contenido": "Cuerpo.", "meta_titulo": "x" * 100}
+        )
     )
 
     resultado = generar_contenido_editorial(_solicitud(), [], provider)
@@ -278,5 +280,8 @@ def test_desde_texto_falla_con_mensaje_claro_si_siempre_viene_vacia() -> None:
 
     with pytest.raises(EditorialAIError, match="respuesta vacía"):
         generar_contenido_editorial_desde_texto(
-            "texto", None, [], _ProveedorSecuencia(["", ""])  # type: ignore[arg-type]
+            "texto",
+            None,
+            [],
+            _ProveedorSecuencia(["", ""]),  # type: ignore[arg-type]
         )

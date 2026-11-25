@@ -44,7 +44,11 @@ def test_resumen_sums_posts_with_data_and_counts_the_rest() -> None:
 
     r = resumir(filas)
 
-    assert (r.publicaciones_total, r.publicaciones_con_datos, r.publicaciones_sin_datos) == (3, 2, 1)
+    assert (r.publicaciones_total, r.publicaciones_con_datos, r.publicaciones_sin_datos) == (
+        3,
+        2,
+        1,
+    )
     assert r.alcance_total == 150
     assert r.vistas_total == 150  # the post without views is skipped, not counted as 0
     assert r.interacciones_total == 16

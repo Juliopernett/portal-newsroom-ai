@@ -41,12 +41,8 @@ def upgrade() -> None:
         sa.Column("confidence", sa.Float(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_news_candidates_source"), "news_candidates", ["source"], unique=False
-    )
-    op.create_index(
-        op.f("ix_news_candidates_hash"), "news_candidates", ["hash"], unique=True
-    )
+    op.create_index(op.f("ix_news_candidates_source"), "news_candidates", ["source"], unique=False)
+    op.create_index(op.f("ix_news_candidates_hash"), "news_candidates", ["hash"], unique=True)
 
 
 def downgrade() -> None:

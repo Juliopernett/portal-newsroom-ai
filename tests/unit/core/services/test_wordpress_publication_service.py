@@ -72,7 +72,9 @@ class _FakeCMSPublisher:
 class _FakeAIProvider:
     """In-memory AIProvider — returns a canned structured response, or raises."""
 
-    def __init__(self, respuesta: str | None = _RESPUESTA_IA_VALIDA, error: Exception | None = None) -> None:
+    def __init__(
+        self, respuesta: str | None = _RESPUESTA_IA_VALIDA, error: Exception | None = None
+    ) -> None:
         self._respuesta = respuesta
         self._error = error
 
@@ -332,9 +334,13 @@ def test_preparar_y_crear_borrador_discards_blank_etiquetas_before_resolving() -
         etiquetas_editorial=("vallenato", "", "   ", "Karen Lizarazo"),
     )
     destino = _destino()
-    publisher = _FakeCMSPublisher(resultado=CMSDraftResult(post_id="1", url="https://example.com/?p=1"))
+    publisher = _FakeCMSPublisher(
+        resultado=CMSDraftResult(post_id="1", url="https://example.com/?p=1")
+    )
 
-    preparar_y_crear_borrador(destino, solicitud, [], _FakeAIProvider(), publisher, _FakeMediaStorage())
+    preparar_y_crear_borrador(
+        destino, solicitud, [], _FakeAIProvider(), publisher, _FakeMediaStorage()
+    )
 
     assert publisher.etiquetas_resueltas == ["vallenato", "Karen Lizarazo"]
 

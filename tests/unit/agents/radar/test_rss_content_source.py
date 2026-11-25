@@ -194,10 +194,13 @@ def test_fetch_candidates_raises_content_source_error_on_network_failure() -> No
     source = _source()
     adapter = RssContentSource(source)
 
-    with patch(
-        "agents.radar.rss_content_source.requests.get",
-        side_effect=requests.ConnectionError("no se pudo conectar"),
-    ), pytest.raises(ContentSourceError):
+    with (
+        patch(
+            "agents.radar.rss_content_source.requests.get",
+            side_effect=requests.ConnectionError("no se pudo conectar"),
+        ),
+        pytest.raises(ContentSourceError),
+    ):
         adapter.fetch_candidates()
 
 
@@ -205,10 +208,13 @@ def test_fetch_candidates_raises_content_source_error_on_a_non_2xx_response() ->
     source = _source()
     adapter = RssContentSource(source)
 
-    with patch(
-        "agents.radar.rss_content_source.requests.get",
-        return_value=_mock_response(b"", status_ok=False),
-    ), pytest.raises(ContentSourceError):
+    with (
+        patch(
+            "agents.radar.rss_content_source.requests.get",
+            return_value=_mock_response(b"", status_ok=False),
+        ),
+        pytest.raises(ContentSourceError),
+    ):
         adapter.fetch_candidates()
 
 
@@ -216,8 +222,11 @@ def test_fetch_candidates_raises_content_source_error_on_a_malformed_feed() -> N
     source = _source()
     adapter = RssContentSource(source)
 
-    with patch(
-        "agents.radar.rss_content_source.requests.get",
-        return_value=_mock_response(_FEED_MALFORMADO),
-    ), pytest.raises(ContentSourceError):
+    with (
+        patch(
+            "agents.radar.rss_content_source.requests.get",
+            return_value=_mock_response(_FEED_MALFORMADO),
+        ),
+        pytest.raises(ContentSourceError),
+    ):
         adapter.fetch_candidates()

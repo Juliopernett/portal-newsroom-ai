@@ -49,6 +49,4 @@ class OtroIngreso:
         if self.monto_usd is not None and self.monto_usd < 0:
             raise ValueError(f"monto_usd must not be negative, got {self.monto_usd!r}")
         if self.observaciones == "":
-            raise ValueError(
-                "observaciones must not be an empty string — use None if not set"
-            )
+            raise ValueError("observaciones must not be an empty string — use None if not set")

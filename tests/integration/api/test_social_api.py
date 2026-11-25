@@ -32,9 +32,7 @@ def test_posts_recientes_returns_instagram_posts(client: TestClient) -> None:
 
 
 def test_posts_recientes_respects_limite(client: TestClient) -> None:
-    response = client.get(
-        "/social/posts-recientes", params={"canal": "facebook", "limite": 2}
-    )
+    response = client.get("/social/posts-recientes", params={"canal": "facebook", "limite": 2})
 
     assert response.status_code == 200
     assert len(response.json()) == 2

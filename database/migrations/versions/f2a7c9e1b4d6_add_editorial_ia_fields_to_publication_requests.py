@@ -33,9 +33,7 @@ def upgrade() -> None:
     op.add_column(
         "publication_requests", sa.Column("entradilla_editorial", sa.String(), nullable=True)
     )
-    op.add_column(
-        "publication_requests", sa.Column("titulo_editorial", sa.String(), nullable=True)
-    )
+    op.add_column("publication_requests", sa.Column("titulo_editorial", sa.String(), nullable=True))
     op.add_column(
         "publication_requests", sa.Column("categoria_editorial", sa.String(), nullable=True)
     )

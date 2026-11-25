@@ -125,9 +125,7 @@ def test_create_publication_request_rejects_an_oversized_texto(client: TestClien
 
 
 def test_create_publication_request_rejects_an_oversized_titulo(client: TestClient) -> None:
-    response = client.post(
-        "/publication-requests", json={"texto": "Anuncio", "titulo": "x" * 301}
-    )
+    response = client.post("/publication-requests", json={"texto": "Anuncio", "titulo": "x" * 301})
 
     assert response.status_code == 422
 

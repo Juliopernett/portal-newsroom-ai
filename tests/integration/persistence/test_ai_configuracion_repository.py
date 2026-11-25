@@ -24,7 +24,9 @@ def test_get_returns_none_before_first_save(session: Session) -> None:
 
 def test_save_and_get_round_trips(session: Session) -> None:
     repository = SqlAlchemyAIConfiguracionRepository(session)
-    configuracion = _configuracion(proveedor=ProveedorIA.OPENROUTER, modelo="deepseek/deepseek-chat")
+    configuracion = _configuracion(
+        proveedor=ProveedorIA.OPENROUTER, modelo="deepseek/deepseek-chat"
+    )
 
     repository.save(configuracion)
     session.commit()
@@ -40,7 +42,9 @@ def test_save_again_replaces_the_singleton_row_instead_of_creating_a_second_one(
     repository.save(original)
     session.commit()
 
-    actualizada = replace(original, proveedor=ProveedorIA.OPENROUTER, modelo="deepseek/deepseek-chat")
+    actualizada = replace(
+        original, proveedor=ProveedorIA.OPENROUTER, modelo="deepseek/deepseek-chat"
+    )
     repository.save(actualizada)
     session.commit()
 

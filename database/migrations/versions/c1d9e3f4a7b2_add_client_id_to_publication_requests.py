@@ -36,8 +36,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     with op.batch_alter_table("publication_requests") as batch_op:
-        batch_op.drop_constraint(
-            "fk_publication_requests_client_id_clients", type_="foreignkey"
-        )
+        batch_op.drop_constraint("fk_publication_requests_client_id_clients", type_="foreignkey")
         batch_op.drop_index(op.f("ix_publication_requests_client_id"))
         batch_op.drop_column("client_id")

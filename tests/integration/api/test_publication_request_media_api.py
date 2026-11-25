@@ -109,7 +109,9 @@ def test_subir_media_rejects_svg(client: TestClient) -> None:
 
 def test_subir_media_rejects_a_file_over_the_imagen_limit(client: TestClient) -> None:
     solicitud_id = _crear_solicitud(client)
-    contenido_grande = bytes([0xFF, 0xD8, 0xFF]) + b"x" * (10 * 1024 * 1024)  # over the 10 MB default
+    contenido_grande = bytes([0xFF, 0xD8, 0xFF]) + b"x" * (
+        10 * 1024 * 1024
+    )  # over the 10 MB default
 
     response = client.post(
         f"/publication-requests/{solicitud_id}/media",

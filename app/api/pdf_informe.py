@@ -685,7 +685,7 @@ def _num(valor: int | None) -> str:
 def _seccion_metricas(
     resumen: ResumenMetricas, filas: list[FilaMetrica], styles: _Styles
 ) -> list[Flowable]:
-    """"Resultados en redes sociales" — only built when at least one post has data."""
+    """ "Resultados en redes sociales" — only built when at least one post has data."""
     medidas = [f for f in filas if f.metrica is not None and f.metrica.metricas.tiene_datos]
     if not medidas:
         return []
@@ -719,7 +719,9 @@ def _seccion_metricas(
                 Paragraph(_num(m.interacciones), styles.celda_tabla),
             ]
         )
-    tabla = Table(detalle, colWidths=[6.6 * cm, 2.4 * cm, 2.4 * cm, 2.6 * cm, 2.6 * cm], repeatRows=1)
+    tabla = Table(
+        detalle, colWidths=[6.6 * cm, 2.4 * cm, 2.4 * cm, 2.6 * cm, 2.6 * cm], repeatRows=1
+    )
     tabla.setStyle(
         TableStyle(
             [

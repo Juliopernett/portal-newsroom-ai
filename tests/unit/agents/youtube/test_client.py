@@ -127,7 +127,10 @@ def test_network_failure_does_not_leak_the_key_either() -> None:
     import requests
 
     boom = requests.ConnectionError(f"https://x/?key={SECRETA}")
-    with patch("agents.youtube.client.requests.get", side_effect=boom), pytest.raises(YouTubeError) as err:
+    with (
+        patch("agents.youtube.client.requests.get", side_effect=boom),
+        pytest.raises(YouTubeError) as err,
+    ):
         _reader().detalles(["AAAAAAAAAAA"])
 
     assert SECRETA not in str(err.value)
@@ -184,10 +187,19 @@ def test_catalog_pages_through_the_whole_uploads_playlist() -> None:
 
 def test_catalog_respects_the_maximum() -> None:
     items = [
-        {"snippet": {"title": f"T{i}", "publishedAt": "2020-01-01T00:00:00Z", "resourceId": {"videoId": f"{i:011d}"}}}
+        {
+            "snippet": {
+                "title": f"T{i}",
+                "publishedAt": "2020-01-01T00:00:00Z",
+                "resourceId": {"videoId": f"{i:011d}"},
+            }
+        }
         for i in range(50)
     ]
-    with patch("agents.youtube.client.requests.get", return_value=_resp({"items": items, "nextPageToken": "X"})):
+    with patch(
+        "agents.youtube.client.requests.get",
+        return_value=_resp({"items": items, "nextPageToken": "X"}),
+    ):
         assert len(_reader().catalogo_canal(CANAL, maximo=60)) == 60
 
 

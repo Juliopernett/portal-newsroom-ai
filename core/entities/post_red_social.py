@@ -36,9 +36,7 @@ class PostRedSocial:
     def __post_init__(self) -> None:
         if self.canal not in _CANALES_VALIDOS:
             canales_validos = sorted(c.value for c in _CANALES_VALIDOS)
-            raise ValueError(
-                f"canal must be one of {canales_validos}, got {self.canal.value!r}"
-            )
+            raise ValueError(f"canal must be one of {canales_validos}, got {self.canal.value!r}")
         if not self.id:
             raise ValueError("id must not be empty")
         if not self.permalink:

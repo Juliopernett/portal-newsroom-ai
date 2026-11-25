@@ -165,10 +165,14 @@ def cambiar_password(
     """
     ip = client_ip(request)
     if ip_limiter.esta_bloqueado(ip):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Demasiados intentos")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Demasiados intentos"
+        )
     if not password_hasher.verify(payload.password_actual, user.password_hash):
         ip_limiter.registrar(ip)
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Contraseña actual incorrecta")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Contraseña actual incorrecta"
+        )
     uow.users.save(replace(user, password_hash=password_hasher.hash(payload.password_nueva)))
     uow.sessions.delete_by_user_id(user.id, except_id=session.id)
     uow.commit()

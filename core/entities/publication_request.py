@@ -124,9 +124,7 @@ class PublicationRequest:
                 "pauta_id must not be an empty string — use None if not linked to a Pauta yet"
             )
         if self.client_id == "":
-            raise ValueError(
-                "client_id must not be an empty string — use None if not set"
-            )
+            raise ValueError("client_id must not be an empty string — use None if not set")
         if not self.texto:
             raise ValueError("texto must not be empty")
         if self.titulo == "":

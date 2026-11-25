@@ -30,7 +30,9 @@ class _FakeCMSPublisherEstado:
         self.post_id_consultado: str | None = None
         self.llamadas = 0
 
-    def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:  # pragma: no cover - unused here
+    def create_draft(
+        self, content: dict[str, Any]
+    ) -> CMSDraftResult:  # pragma: no cover - unused here
         raise NotImplementedError
 
     def listar_categorias(self) -> list[CategoriaCMS]:  # pragma: no cover - unused here
@@ -354,9 +356,7 @@ def test_puede_eliminarse_es_false_cuando_es_el_unico_destino_publicado() -> Non
         estado=EstadoDestino.PUBLICADO,
         fecha_publicacion=datetime(2026, 8, 6, tzinfo=UTC),
     )
-    instagram_cancelado = _destino(
-        canal=CanalPublicacion.INSTAGRAM, estado=EstadoDestino.CANCELADO
-    )
+    instagram_cancelado = _destino(canal=CanalPublicacion.INSTAGRAM, estado=EstadoDestino.CANCELADO)
 
     assert puede_eliminarse_sin_afectar_completitud(wordpress, [instagram_cancelado]) is False
 
@@ -385,8 +385,7 @@ def test_puede_eliminarse_es_true_cuando_ya_estaba_incompleta_sin_el() -> None:
     instagram_pendiente = _destino(canal=CanalPublicacion.INSTAGRAM)
 
     assert (
-        puede_eliminarse_sin_afectar_completitud(wordpress_pendiente, [instagram_pendiente])
-        is True
+        puede_eliminarse_sin_afectar_completitud(wordpress_pendiente, [instagram_pendiente]) is True
     )
 
 
@@ -395,7 +394,9 @@ def test_sincronizar_estado_wordpress_marca_publicado_cuando_wordpress_lo_report
     fecha = datetime(2026, 8, 24, 12, 0, tzinfo=UTC)
     cms = _FakeCMSPublisherEstado(
         ConsultaPostCMS(
-            estado=EstadoPostCMS.PUBLICADO, url="https://example.com/nota-real/", fecha_publicacion=fecha
+            estado=EstadoPostCMS.PUBLICADO,
+            url="https://example.com/nota-real/",
+            fecha_publicacion=fecha,
         )
     )
 
@@ -410,7 +411,11 @@ def test_sincronizar_estado_wordpress_marca_publicado_cuando_wordpress_lo_report
 def test_sincronizar_estado_wordpress_mantiene_wp_url_si_wordpress_no_da_link() -> None:
     destino = _destino(wp_post_id="42", wp_url="https://example.com/?p=42")
     cms = _FakeCMSPublisherEstado(
-        ConsultaPostCMS(estado=EstadoPostCMS.PUBLICADO, url=None, fecha_publicacion=datetime(2026, 8, 24, tzinfo=UTC))
+        ConsultaPostCMS(
+            estado=EstadoPostCMS.PUBLICADO,
+            url=None,
+            fecha_publicacion=datetime(2026, 8, 24, tzinfo=UTC),
+        )
     )
 
     resultado = sincronizar_estado_wordpress(destino, cms)
@@ -471,7 +476,9 @@ def test_sincronizar_estado_wordpress_es_no_op_sin_wp_post_id() -> None:
 
 
 def test_sincronizar_estado_wordpress_es_no_op_para_canal_no_wordpress() -> None:
-    destino = _destino(canal=CanalPublicacion.FACEBOOK, url_publicacion="https://facebook.com/post/1")
+    destino = _destino(
+        canal=CanalPublicacion.FACEBOOK, url_publicacion="https://facebook.com/post/1"
+    )
     cms = _FakeCMSPublisherEstado()
 
     resultado = sincronizar_estado_wordpress(destino, cms)

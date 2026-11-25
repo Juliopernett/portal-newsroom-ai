@@ -372,7 +372,9 @@ def actualizar_metricas_pauta(
             metricas: MetricasPost = reader.metricas_post(fila.canal, destino.meta_post_id or "")
         except requests.RequestException as exc:
             detalle = _detalle_meta(exc)
-            logger.warning("Metricas Meta fallo %s %s: %s", fila.canal.value, fila.destino_id, detalle)
+            logger.warning(
+                "Metricas Meta fallo %s %s: %s", fila.canal.value, fila.destino_id, detalle
+            )
             errores.append(f"{fila.titulo[:40]} ({fila.canal.value}): {detalle}")
             continue
         uow.metricas_publicacion.save(

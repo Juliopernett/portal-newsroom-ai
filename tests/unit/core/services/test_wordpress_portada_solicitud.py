@@ -26,7 +26,9 @@ class _CMSConPortada(_FakeCMSPublisher):
         super().__init__(resultado=CMSDraftResult(post_id="1", url="https://example.com/?p=1"))
         self.subidas: list[tuple[str, bytes]] = []
 
-    def subir_media_con_url(self, contenido: bytes, nombre: str, content_type: str) -> MediaSubidaCMS:
+    def subir_media_con_url(
+        self, contenido: bytes, nombre: str, content_type: str
+    ) -> MediaSubidaCMS:
         self.subidas.append((nombre, contenido))
         return MediaSubidaCMS(id="media-9", url="https://example.com/portada.jpg")
 

@@ -27,9 +27,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.add_column(
-        "destinos_publicacion", sa.Column("meta_post_id", sa.String(), nullable=True)
-    )
+    op.add_column("destinos_publicacion", sa.Column("meta_post_id", sa.String(), nullable=True))
     op.create_index(
         op.f("ix_destinos_publicacion_meta_post_id"),
         "destinos_publicacion",
@@ -40,7 +38,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index(
-        op.f("ix_destinos_publicacion_meta_post_id"), table_name="destinos_publicacion"
-    )
+    op.drop_index(op.f("ix_destinos_publicacion_meta_post_id"), table_name="destinos_publicacion")
     op.drop_column("destinos_publicacion", "meta_post_id")

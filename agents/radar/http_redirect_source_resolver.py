@@ -72,9 +72,7 @@ class HttpRedirectSourceResolver:
             return ResolvedSource(success=False, resolved_url=None, error=str(exc))
 
         if _mismo_host(url, resolved_url):
-            logger.info(
-                "'%s' no redirigió a otro dominio (posible redirect por JavaScript)", url
-            )
+            logger.info("'%s' no redirigió a otro dominio (posible redirect por JavaScript)", url)
             return ResolvedSource(
                 success=False,
                 resolved_url=None,

@@ -184,10 +184,15 @@ def test_cambiar_password_then_login_with_the_new_one(
 
     client.cookies.clear()
     assert (
-        client.post("/auth/login", json={"email": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD}).status_code
+        client.post(
+            "/auth/login", json={"email": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD}
+        ).status_code
         == 401
     )
-    assert client.post("/auth/login", json={"email": TEST_USER_EMAIL, "password": nueva}).status_code == 200
+    assert (
+        client.post("/auth/login", json={"email": TEST_USER_EMAIL, "password": nueva}).status_code
+        == 200
+    )
 
 
 def test_logout_all_closes_the_session(client: TestClient) -> None:

@@ -44,9 +44,7 @@ class FakeContentSource:
 
     def fetch_candidates(self) -> list[NewsCandidate]:
         """Read the fixture file and return one `NewsCandidate` per entry."""
-        raw_items: list[dict[str, Any]] = json.loads(
-            self._fixture_path.read_text(encoding="utf-8")
-        )
+        raw_items: list[dict[str, Any]] = json.loads(self._fixture_path.read_text(encoding="utf-8"))
         return [self._build_candidate(item) for item in raw_items]
 
     def _build_candidate(self, item: dict[str, Any]) -> NewsCandidate:

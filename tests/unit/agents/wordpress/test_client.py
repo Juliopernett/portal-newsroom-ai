@@ -151,7 +151,10 @@ def test_listar_categorias_returns_id_and_name_pairs() -> None:
     with patch("agents.wordpress.client.requests.get", return_value=mock_response) as mock_get:
         resultado = publisher.listar_categorias()
 
-    assert resultado == [CategoriaCMS(id="3", nombre="Noticias"), CategoriaCMS(id="7", nombre="Crónicas")]
+    assert resultado == [
+        CategoriaCMS(id="3", nombre="Noticias"),
+        CategoriaCMS(id="7", nombre="Crónicas"),
+    ]
     args, _kwargs = mock_get.call_args
     assert args[0] == "https://www.portalvallenato.com/wp-json/wp/v2/categories"
     mock_response.raise_for_status.assert_called_once()
@@ -180,9 +183,7 @@ def test_resolver_o_crear_etiqueta_creates_a_new_tag_when_not_found() -> None:
     mock_create.json.return_value = {"id": 11, "name": "nueva-etiqueta"}
 
     with patch("agents.wordpress.client.requests.get", return_value=mock_search):
-        with patch(
-            "agents.wordpress.client.requests.post", return_value=mock_create
-        ) as mock_post:
+        with patch("agents.wordpress.client.requests.post", return_value=mock_create) as mock_post:
             resultado = publisher.resolver_o_crear_etiqueta("nueva-etiqueta")
 
     assert resultado == "11"
@@ -207,9 +208,7 @@ def test_resolver_o_crear_etiqueta_reuses_the_term_id_wordpress_reports_on_a_con
     }
 
     with patch("agents.wordpress.client.requests.get", return_value=mock_search):
-        with patch(
-            "agents.wordpress.client.requests.post", return_value=mock_create
-        ) as mock_post:
+        with patch("agents.wordpress.client.requests.post", return_value=mock_create) as mock_post:
             resultado = publisher.resolver_o_crear_etiqueta("Karen Lizarazo")
 
     assert resultado == "572"
@@ -282,7 +281,9 @@ def test_consultar_estado_post_maps_trash_to_eliminado() -> None:
     with patch("agents.wordpress.client.requests.get", return_value=mock_response):
         resultado = publisher.consultar_estado_post("42")
 
-    assert resultado == ConsultaPostCMS(estado=EstadoPostCMS.ELIMINADO, url=None, fecha_publicacion=None)
+    assert resultado == ConsultaPostCMS(
+        estado=EstadoPostCMS.ELIMINADO, url=None, fecha_publicacion=None
+    )
 
 
 def test_consultar_estado_post_maps_draft_to_borrador() -> None:
@@ -294,7 +295,9 @@ def test_consultar_estado_post_maps_draft_to_borrador() -> None:
     with patch("agents.wordpress.client.requests.get", return_value=mock_response):
         resultado = publisher.consultar_estado_post("42")
 
-    assert resultado == ConsultaPostCMS(estado=EstadoPostCMS.BORRADOR, url=None, fecha_publicacion=None)
+    assert resultado == ConsultaPostCMS(
+        estado=EstadoPostCMS.BORRADOR, url=None, fecha_publicacion=None
+    )
 
 
 def test_consultar_estado_post_maps_a_404_to_error() -> None:
@@ -306,7 +309,9 @@ def test_consultar_estado_post_maps_a_404_to_error() -> None:
     with patch("agents.wordpress.client.requests.get", return_value=mock_response):
         resultado = publisher.consultar_estado_post("42")
 
-    assert resultado == ConsultaPostCMS(estado=EstadoPostCMS.ERROR, url=None, fecha_publicacion=None)
+    assert resultado == ConsultaPostCMS(
+        estado=EstadoPostCMS.ERROR, url=None, fecha_publicacion=None
+    )
 
 
 def test_consultar_estado_post_maps_a_network_error_to_error_without_raising() -> None:
@@ -319,4 +324,6 @@ def test_consultar_estado_post_maps_a_network_error_to_error_without_raising() -
     ):
         resultado = publisher.consultar_estado_post("42")
 
-    assert resultado == ConsultaPostCMS(estado=EstadoPostCMS.ERROR, url=None, fecha_publicacion=None)
+    assert resultado == ConsultaPostCMS(
+        estado=EstadoPostCMS.ERROR, url=None, fecha_publicacion=None
+    )

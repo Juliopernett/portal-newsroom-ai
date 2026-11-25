@@ -1,5 +1,3 @@
-
-
 def test_get_seguro_rejects_a_redirect_to_an_internal_address(monkeypatch) -> None:
     """A public site bouncing the server to the cloud-metadata address must be refused."""
     from unittest.mock import MagicMock

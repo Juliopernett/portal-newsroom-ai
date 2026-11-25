@@ -88,7 +88,14 @@ def test_delete_expired_removes_only_expired_sessions(session: SqlAlchemySession
     user = _create_user(session)
     repository = SqlAlchemySessionRepository(session)
     now = datetime.now(UTC)
-    repository.save(_session_entity(user.id, token_hash="viejo", created_at=now - timedelta(days=9), expires_at=now - timedelta(days=2)))
+    repository.save(
+        _session_entity(
+            user.id,
+            token_hash="viejo",
+            created_at=now - timedelta(days=9),
+            expires_at=now - timedelta(days=2),
+        )
+    )
     repository.save(_session_entity(user.id, token_hash="vigente"))
     session.commit()
 

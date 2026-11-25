@@ -72,7 +72,10 @@ def descargar_rentabilidad_csv(
         desde=desde_final,
         hasta=hasta_final,
     )
-    filas = [[f"{item.anio}-{item.mes:02d}", item.ingresos, item.gastos, item.rentabilidad] for item in items]
+    filas = [
+        [f"{item.anio}-{item.mes:02d}", item.ingresos, item.gastos, item.rentabilidad]
+        for item in items
+    ]
     return _csv_response(
         "rentabilidad_mensual.csv", ["Mes", "Ingresos", "Gastos", "Rentabilidad"], filas
     )

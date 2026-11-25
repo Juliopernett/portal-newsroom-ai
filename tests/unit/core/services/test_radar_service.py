@@ -65,7 +65,11 @@ class _FakeNewsCandidateRepository:
 
 
 def _source(**overrides: object) -> Source:
-    defaults: dict[str, object] = {"name": "Fuente de prueba", "type": "rss", "url": "https://example.com"}
+    defaults: dict[str, object] = {
+        "name": "Fuente de prueba",
+        "type": "rss",
+        "url": "https://example.com",
+    }
     defaults.update(overrides)
     return Source(**defaults)
 

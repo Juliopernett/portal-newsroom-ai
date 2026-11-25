@@ -34,9 +34,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["pauta_id"], ["pautas.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_informe_links_pauta_id"), "informe_links", ["pauta_id"], unique=False
-    )
+    op.create_index(op.f("ix_informe_links_pauta_id"), "informe_links", ["pauta_id"], unique=False)
     op.create_index(
         op.f("ix_informe_links_token_hash"), "informe_links", ["token_hash"], unique=True
     )
