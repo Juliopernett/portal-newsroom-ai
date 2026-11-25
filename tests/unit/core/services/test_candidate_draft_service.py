@@ -33,6 +33,7 @@ class _FakeCMS:
         self.contenido: dict[str, Any] | None = None
         self.llamadas_create = 0
         self.media_subida: list[tuple[str, bytes]] = []
+        self.textos_alternativos: list[str] = []
         self.consultas = 0
         self.consulta = ConsultaPostCMS(
             estado=EstadoPostCMS.BORRADOR, url=None, fecha_publicacion=None
@@ -44,9 +45,10 @@ class _FakeCMS:
         return CMSDraftResult(post_id="77", url="https://www.portalvallenato.com/?p=77")
 
     def subir_media_con_url(
-        self, contenido: bytes, nombre_archivo: str, content_type: str
+        self, contenido: bytes, nombre_archivo: str, content_type: str, texto_alternativo: str
     ) -> MediaSubidaCMS:
         self.media_subida.append((nombre_archivo, contenido))
+        self.textos_alternativos.append(texto_alternativo)
         return MediaSubidaCMS(id="media-9", url="https://www.portalvallenato.com/portada.jpg")
 
     def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
@@ -165,6 +167,8 @@ def test_with_a_portada_it_uploads_the_cover_as_featured_image() -> None:
     assert cms.contenido["featured_media"] == "media-9"
     assert resultado.portada_url == "https://www.portalvallenato.com/portada.jpg"
     assert cms.media_subida == [("portada-titular-reescrito.jpg", b"portada-jpeg")]
+    # No photo description given: the alt text is the article's title.
+    assert cms.textos_alternativos == ["Titular reescrito"]
     # No headline given: the cover uses the one the AI wrote.
     assert renderer.solicitud is not None
     assert renderer.solicitud.titular == "Titular reescrito"

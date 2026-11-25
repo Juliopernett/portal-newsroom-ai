@@ -38,6 +38,7 @@ class _FakeCMSPublisher:
         self.contenido_recibido: dict[str, Any] | None = None
         self.etiquetas_resueltas: list[str] = []
         self.media_subida: list[tuple[str, str, int]] = []
+        self.textos_alternativos: list[str] = []
         # Sprint 2026-08-24 — sincronización de estado. Por defecto reporta
         # que el post sigue en borrador, como cualquier draft recién creado.
         self.consulta_estado = ConsultaPostCMS(
@@ -58,8 +59,11 @@ class _FakeCMSPublisher:
         self.etiquetas_resueltas.append(nombre)
         return f"tag-{nombre}"
 
-    def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
+    def subir_media(
+        self, contenido: bytes, nombre_archivo: str, content_type: str, texto_alternativo: str
+    ) -> str:
         self.media_subida.append((nombre_archivo, content_type, len(contenido)))
+        self.textos_alternativos.append(texto_alternativo)
         return "media-1"
 
     def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
@@ -229,10 +233,12 @@ def test_crear_borrador_wordpress_attaches_the_solicitud_featured_image(
     ).json()["id"]
 
     response = client.post(
-        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress"
+        f"/publication-requests/{solicitud_id}/destinos/{destino_id}/crear-borrador-wordpress",
+        data={"descripcion_foto": "Acordeonero en tarima"},
     )
 
     assert response.status_code == 200
+    assert fake_cms_publisher.textos_alternativos == ["Acordeonero en tarima"]
     assert fake_cms_publisher.media_subida == [
         ("foto.jpg", "image/jpeg", len(bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"fake"))
     ]

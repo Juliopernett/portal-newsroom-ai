@@ -157,27 +157,32 @@ class WordPressCMSPublisher:
         creacion.raise_for_status()
         return str(creacion.json()["id"])
 
-    def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
+    def subir_media(
+        self, contenido: bytes, nombre_archivo: str, content_type: str, texto_alternativo: str
+    ) -> str:
         """Upload a file to WordPress's media library and return its attachment id."""
-        return str(self._subir_media(contenido, nombre_archivo, content_type)["id"])
+        data = self._subir_media(contenido, nombre_archivo, content_type, texto_alternativo)
+        return str(data["id"])
 
     def subir_media_con_url(
-        self, contenido: bytes, nombre_archivo: str, content_type: str
+        self, contenido: bytes, nombre_archivo: str, content_type: str, texto_alternativo: str
     ) -> MediaSubidaCMS:
         """Upload a file to WordPress's media library; return its attachment id and URL."""
-        data = self._subir_media(contenido, nombre_archivo, content_type)
+        data = self._subir_media(contenido, nombre_archivo, content_type, texto_alternativo)
         return MediaSubidaCMS(id=str(data["id"]), url=data["source_url"])
 
     def _subir_media(
-        self, contenido: bytes, nombre_archivo: str, content_type: str
+        self, contenido: bytes, nombre_archivo: str, content_type: str, texto_alternativo: str
     ) -> dict[str, Any]:
         """POST the file to `/wp-json/wp/v2/media` and return WordPress's JSON answer.
 
         Sent as the raw request body with `Content-Disposition`, WordPress's
         own documented convention for that endpoint — not a multipart form.
+        Because the body is the file itself, `alt_text` travels in the query.
         """
         response = requests.post(
             self._media_url,
+            params={"alt_text": texto_alternativo},
             data=contenido,
             headers={
                 "Content-Disposition": f'attachment; filename="{nombre_archivo}"',

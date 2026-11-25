@@ -25,11 +25,13 @@ class _CMSConPortada(_FakeCMSPublisher):
     def __init__(self) -> None:
         super().__init__(resultado=CMSDraftResult(post_id="1", url="https://example.com/?p=1"))
         self.subidas: list[tuple[str, bytes]] = []
+        self.textos_alternativos: list[str] = []
 
     def subir_media_con_url(
-        self, contenido: bytes, nombre: str, content_type: str
+        self, contenido: bytes, nombre: str, content_type: str, texto_alternativo: str
     ) -> MediaSubidaCMS:
         self.subidas.append((nombre, contenido))
+        self.textos_alternativos.append(texto_alternativo)
         return MediaSubidaCMS(id="media-9", url="https://example.com/portada.jpg")
 
 
@@ -54,6 +56,7 @@ def _crear(portada: PortadaParaBorrador | None, **extra: Any) -> tuple[Any, ...]
         storage,
         portada=portada,
         portada_renderer=renderer,
+        descripcion_foto=extra.get("descripcion"),
     )
     return cms, renderer, storage
 
@@ -90,3 +93,17 @@ def test_without_portada_nothing_changes() -> None:
         pass
     else:  # pragma: no cover
         raise AssertionError("no cover should be stored")
+
+
+def test_photo_description_is_the_alt_text() -> None:
+    cms, _, _ = _crear(
+        PortadaParaBorrador(imagen_base=b"foto"), descripcion="  Cantante   en tarima "
+    )
+
+    assert cms.textos_alternativos == ["Cantante en tarima"]
+
+
+def test_without_description_the_alt_text_is_the_draft_title() -> None:
+    cms, _, _ = _crear(PortadaParaBorrador(imagen_base=b"foto"), descripcion="   ")
+
+    assert cms.textos_alternativos == ["Titular generado"]

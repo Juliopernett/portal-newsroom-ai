@@ -66,6 +66,16 @@ class BorradorDesdeCandidatoError(RuntimeError):
     """The editorial AI could not produce a usable rewrite — no draft was created."""
 
 
+def texto_alternativo(descripcion_foto: str | None, titulo: str) -> str:
+    """Alt text for the featured image: the operator's description of the photo.
+
+    Without one, the article's title, so the image is never left unnamed (the
+    theme also uses it as a link on listing pages).
+    """
+    descripcion = " ".join((descripcion_foto or "").split())
+    return descripcion or " ".join(titulo.split())
+
+
 def _pie_de_fuente(candidato: NewsCandidate) -> str:
     contenido = candidato.extracted_content
     assert contenido is not None
@@ -106,6 +116,7 @@ def crear_borrador_desde_candidato(
     portada: PortadaParaBorrador | None = None,
     portada_renderer: PortadaRenderer | None = None,
     media_storage: MediaStorage | None = None,
+    descripcion_foto: str | None = None,
 ) -> NewsCandidate:
     """Rewrite `candidato` with the editorial AI and create its WordPress draft.
 
@@ -182,7 +193,10 @@ def crear_borrador_desde_candidato(
             portada_storage_key = f"portadas/{candidato.id}.jpg"
             media_storage.guardar(portada_storage_key, imagen)
         subida = cms_publisher.subir_media_con_url(
-            imagen, f"portada-{contenido.slug}.jpg", "image/jpeg"
+            imagen,
+            f"portada-{contenido.slug}.jpg",
+            "image/jpeg",
+            texto_alternativo(descripcion_foto, contenido.titulo),
         )
         payload["featured_media"] = subida.id
         portada_url = subida.url

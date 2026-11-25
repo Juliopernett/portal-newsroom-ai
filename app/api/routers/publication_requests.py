@@ -394,6 +394,7 @@ def crear_borrador_wordpress(
     antetitulo: str | None = Form(None, max_length=60),
     enfoque_x: float = Form(0.5, ge=0, le=1),
     enfoque_y: float = Form(0.3, ge=0, le=1),
+    descripcion_foto: str | None = Form(None, max_length=300),
 ) -> CrearBorradorWordpressOut:
     """Prepare `request_id`'s content with AI, then create its WordPress draft.
 
@@ -416,7 +417,8 @@ def crear_borrador_wordpress(
     (the operator's own photo) renders the branded cover as the draft's featured
     image, `imagen_circulo` selects the two-photo template, and `titular_portada`
     empty means "use the draft's headline". Without `imagen_base` the previous
-    behaviour holds (first attached image, if any).
+    behaviour holds (first attached image, if any). `descripcion_foto` becomes
+    the alt text of whichever image is uploaded (empty = the draft's title).
     """
     solicitud = uow.publication_requests.get_by_id(request_id)
     if solicitud is None:
@@ -449,6 +451,7 @@ def crear_borrador_wordpress(
         media_storage,
         portada=portada,
         portada_renderer=portada_renderer,
+        descripcion_foto=descripcion_foto,
     )
     uow.destinos_publicacion.save(con_borrador)
     uow.publication_requests.save(solicitud_actualizada)

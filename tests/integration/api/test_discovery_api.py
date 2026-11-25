@@ -162,6 +162,9 @@ def test_descartar_lote_discards_many_and_skips_unknown(
 
 
 class _FakeCMS:
+    def __init__(self) -> None:
+        self.textos_alternativos: list[str] = []
+
     def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:
         return CMSDraftResult(post_id="42", url="https://www.portalvallenato.com/?p=42")
 
@@ -179,14 +182,17 @@ class _FakeCMS:
         return "1"
 
     def subir_media_con_url(
-        self, contenido: bytes, nombre_archivo: str, content_type: str
+        self, contenido: bytes, nombre_archivo: str, content_type: str, texto_alternativo: str
     ) -> MediaSubidaCMS:
         assert contenido[:2] == b"\xff\xd8"  # a real JPEG, rendered by the real renderer
+        self.textos_alternativos.append(texto_alternativo)
         return MediaSubidaCMS(id="7", url="https://www.portalvallenato.com/portada.jpg")
 
 
-def _con_cms_falso() -> None:
-    app.dependency_overrides[get_cms_publisher] = lambda: _FakeCMS()
+def _con_cms_falso() -> _FakeCMS:
+    cms = _FakeCMS()
+    app.dependency_overrides[get_cms_publisher] = lambda: cms
+    return cms
 
 
 def _extraido() -> ExtractedContent:
@@ -212,7 +218,7 @@ def test_crear_noticia_creates_a_wordpress_draft_and_marks_procesado(
 def test_crear_noticia_with_a_photo_renders_and_stores_the_cover(
     client: TestClient, _test_engine: Engine
 ) -> None:
-    _con_cms_falso()
+    cms = _con_cms_falso()
     candidato = _candidato(extracted_content=_extraido())
     _seed(_test_engine, candidato)
     buffer = io.BytesIO()
@@ -221,13 +227,18 @@ def test_crear_noticia_with_a_photo_renders_and_stores_the_cover(
     response = client.post(
         f"/discovery/{candidato.id}/crear-noticia",
         files={"imagen_base": ("foto.jpg", buffer.getvalue(), "image/jpeg")},
-        data={"variante": "lo_ultimo", "titular_portada": "Titular corto"},
+        data={
+            "variante": "lo_ultimo",
+            "titular_portada": "Titular corto",
+            "descripcion_foto": "Cantante saludando",
+        },
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["estado"] == "procesado"
     assert body["portada_url"] == "https://www.portalvallenato.com/portada.jpg"
+    assert cms.textos_alternativos == ["Cantante saludando"]
 
 
 class _MemoriaStorage:

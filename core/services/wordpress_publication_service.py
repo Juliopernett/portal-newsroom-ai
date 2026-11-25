@@ -29,7 +29,7 @@ from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.media_storage import MediaStorage
 from core.ports.portada_renderer import PortadaRenderer, SolicitudPortada
-from core.services.candidate_draft_service import PortadaParaBorrador
+from core.services.candidate_draft_service import PortadaParaBorrador, texto_alternativo
 from core.services.editorial_ai_service import (
     EditorialAIError,
     aplicar_preparacion_exitosa,
@@ -154,6 +154,7 @@ def preparar_y_crear_borrador(
     *,
     portada: PortadaParaBorrador | None = None,
     portada_renderer: PortadaRenderer | None = None,
+    descripcion_foto: str | None = None,
 ) -> tuple[DestinoPublicacion, PublicationRequest]:
     """Prepare `solicitud`'s content with AI, then create its WordPress draft.
 
@@ -241,7 +242,10 @@ def preparar_y_crear_borrador(
         # Our own JPEG copy: WordPress converts its upload to WebP, which Instagram rejects.
         media_storage.guardar(clave_portada_solicitud(solicitud.id), jpeg)
         subida = cms_publisher.subir_media_con_url(
-            jpeg, f"portada-{content.get('slug') or solicitud.id}.jpg", "image/jpeg"
+            jpeg,
+            f"portada-{content.get('slug') or solicitud.id}.jpg",
+            "image/jpeg",
+            texto_alternativo(descripcion_foto, str(content["title"])),
         )
         content["featured_media"] = subida.id
         imagen = None
@@ -263,7 +267,10 @@ def preparar_y_crear_borrador(
             )
         else:
             media_id = cms_publisher.subir_media(
-                contenido_bytes, imagen.nombre_archivo, imagen.content_type
+                contenido_bytes,
+                imagen.nombre_archivo,
+                imagen.content_type,
+                texto_alternativo(descripcion_foto, str(content["title"])),
             )
             content["featured_media"] = media_id
 

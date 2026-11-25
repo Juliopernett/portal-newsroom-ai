@@ -50,6 +50,8 @@ export interface OpcionesPortada {
   variante: 'noticias' | 'lo_ultimo'
   titular: string
   antetitulo: string
+  // Texto alternativo de la imagen en WordPress; vacío = el titular de la nota.
+  descripcionFoto: string
 }
 
 export const radarApi = {
@@ -77,6 +79,8 @@ export const radarApi = {
     form.append('variante', portada.variante)
     if (portada.titular.trim()) form.append('titular_portada', portada.titular.trim())
     if (portada.antetitulo.trim()) form.append('antetitulo', portada.antetitulo.trim())
+    if (portada.descripcionFoto.trim())
+      form.append('descripcion_foto', portada.descripcionFoto.trim())
     return api.postForm<NewsCandidate>(`/discovery/${id}/crear-noticia`, form)
   },
   // Sprint Discovery 3: resuelve la fuente real y extrae su contenido —

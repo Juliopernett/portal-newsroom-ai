@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SelectNative } from '@/components/ui/select-native'
 import type { OpcionesPortada } from '@/features/radar/api'
+import { CampoDescripcionFoto } from '@/features/radar/CampoDescripcionFoto'
 
 // «Crear borrador» de WordPress con la portada opcional: igual que «Crear noticia» del
 // Radar, se sube la foto, se escoge el titular y la portada queda armada de una vez como
@@ -29,7 +30,7 @@ export function CrearBorradorDialog({
 }: {
   idBase: string
   disabled: boolean
-  crear: (portada: OpcionesPortada | null) => Promise<unknown>
+  crear: (portada: OpcionesPortada | null, descripcionFoto: string) => Promise<unknown>
 }) {
   const [abierto, setAbierto] = useState(false)
   const [pendiente, setPendiente] = useState(false)
@@ -39,12 +40,18 @@ export function CrearBorradorDialog({
   const [variante, setVariante] = useState<OpcionesPortada['variante']>('noticias')
   const [titular, setTitular] = useState('')
   const [antetitulo, setAntetitulo] = useState('')
+  const [descripcionFoto, setDescripcionFoto] = useState('')
 
   async function confirmar() {
     setPendiente(true)
     setError(null)
     try {
-      await crear(imagenBase ? { imagenBase, imagenCirculo, variante, titular, antetitulo } : null)
+      await crear(
+        imagenBase
+          ? { imagenBase, imagenCirculo, variante, titular, antetitulo, descripcionFoto }
+          : null,
+        descripcionFoto,
+      )
       setAbierto(false)
     } catch (e) {
       setError(errorMessage(e))
@@ -92,6 +99,11 @@ export function CrearBorradorDialog({
               onChange={(e) => setImagenBase(e.target.files?.[0] ?? null)}
             />
           </div>
+          <CampoDescripcionFoto
+            id={`portada-descripcion-${idBase}`}
+            value={descripcionFoto}
+            onChange={setDescripcionFoto}
+          />
           {imagenBase && (
             <>
               <div className="grid grid-cols-2 gap-3">

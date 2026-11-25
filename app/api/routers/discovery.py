@@ -241,6 +241,7 @@ def crear_noticia_desde_candidato(
     antetitulo: str | None = Form(None, max_length=60),
     enfoque_x: float = Form(0.5, ge=0, le=1),
     enfoque_y: float = Form(0.3, ge=0, le=1),
+    descripcion_foto: str | None = Form(None, max_length=300),
 ) -> NewsCandidate:
     """Rewrite the candidate with the editorial AI and create a WordPress draft.
 
@@ -248,6 +249,7 @@ def crear_noticia_desde_candidato(
     own photo) turns on the branded cover as the draft's featured image;
     `imagen_circulo` selects the two-photo template, `titular_portada` empty
     means "use the AI's headline". Without `imagen_base`, no image is attached.
+    `descripcion_foto` becomes the image's alt text (empty = the article's title).
 
     Sprint Discovery 5. Needs the candidate prepared first (422 otherwise).
     Never publishes — only a draft (docs/PROJECT_RULES.md rule 1); marks the
@@ -278,6 +280,7 @@ def crear_noticia_desde_candidato(
             portada=portada,
             portada_renderer=portada_renderer,
             media_storage=media_storage,
+            descripcion_foto=descripcion_foto,
         )
     except BorradorDesdeCandidatoError as exc:
         raise HTTPException(

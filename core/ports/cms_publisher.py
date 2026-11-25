@@ -121,8 +121,12 @@ class CMSPublisher(Protocol):
         """
         ...
 
-    def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
+    def subir_media(
+        self, contenido: bytes, nombre_archivo: str, content_type: str, texto_alternativo: str
+    ) -> str:
         """Upload a file to the CMS's media library and return its id.
+
+        `texto_alternativo` is the image's alt text, what a screen reader says.
 
         The returned id is what `create_draft` expects as
         `featured_media`.
@@ -130,7 +134,7 @@ class CMSPublisher(Protocol):
         ...
 
     def subir_media_con_url(
-        self, contenido: bytes, nombre_archivo: str, content_type: str
+        self, contenido: bytes, nombre_archivo: str, content_type: str, texto_alternativo: str
     ) -> MediaSubidaCMS:
         """Like `subir_media`, but also returns the file's public URL.
 

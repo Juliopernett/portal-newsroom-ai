@@ -240,11 +240,14 @@ def test_subir_media_sends_content_disposition_and_returns_id() -> None:
     mock_response.json.return_value = {"id": 21}
 
     with patch("agents.wordpress.client.requests.post", return_value=mock_response) as mock_post:
-        resultado = publisher.subir_media(b"contenido", "foto.jpg", "image/jpeg")
+        resultado = publisher.subir_media(
+            b"contenido", "foto.jpg", "image/jpeg", "Silvestre en tarima"
+        )
 
     assert resultado == "21"
     _args, kwargs = mock_post.call_args
     assert kwargs["data"] == b"contenido"
+    assert kwargs["params"] == {"alt_text": "Silvestre en tarima"}
     assert kwargs["headers"]["Content-Disposition"] == 'attachment; filename="foto.jpg"'
     assert kwargs["headers"]["Content-Type"] == "image/jpeg"
 

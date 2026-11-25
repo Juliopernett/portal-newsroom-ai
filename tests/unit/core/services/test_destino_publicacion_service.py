@@ -41,7 +41,9 @@ class _FakeCMSPublisherEstado:
     def resolver_o_crear_etiqueta(self, nombre: str) -> str:  # pragma: no cover - unused here
         raise NotImplementedError
 
-    def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
+    def subir_media(
+        self, contenido: bytes, nombre_archivo: str, content_type: str, texto_alternativo: str
+    ) -> str:
         raise NotImplementedError  # pragma: no cover - unused here
 
     def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:

@@ -46,6 +46,7 @@ class _FakeCMSPublisher:
         self.contenido_recibido: dict[str, Any] | None = None
         self.etiquetas_resueltas: list[str] = []
         self.media_subida: list[tuple[str, str, int]] = []
+        self.textos_alternativos: list[str] = []
 
     def create_draft(self, content: dict[str, Any]) -> CMSDraftResult:
         if self.error_create_draft is not None:
@@ -61,8 +62,11 @@ class _FakeCMSPublisher:
         self.etiquetas_resueltas.append(nombre)
         return f"tag-{nombre}"
 
-    def subir_media(self, contenido: bytes, nombre_archivo: str, content_type: str) -> str:
+    def subir_media(
+        self, contenido: bytes, nombre_archivo: str, content_type: str, texto_alternativo: str
+    ) -> str:
         self.media_subida.append((nombre_archivo, content_type, len(contenido)))
+        self.textos_alternativos.append(texto_alternativo)
         return "media-1"
 
     def consultar_estado_post(self, post_id: str) -> ConsultaPostCMS:
@@ -441,6 +445,7 @@ def test_preparar_y_crear_borrador_attaches_the_earliest_imagen() -> None:
     )
 
     assert publisher.media_subida == [("vieja.jpg", "image/jpeg", 4)]
+    assert publisher.textos_alternativos == ["Titular generado"]
     assert publisher.contenido_recibido is not None
     assert publisher.contenido_recibido["featured_media"] == "media-1"
 

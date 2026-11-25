@@ -159,8 +159,14 @@ function DestinoRow({
   const canalLabel = CANALES_DESTINO.find((c) => c.value === destino.canal)?.label ?? destino.canal
 
   const crearBorradorMutation = useMutation({
-    mutationFn: (portada: OpcionesPortada | null) =>
-      solicitudesApi.crearBorradorWordpress(solicitudId, destino.id, portada),
+    mutationFn: ({
+      portada,
+      descripcionFoto,
+    }: {
+      portada: OpcionesPortada | null
+      descripcionFoto: string
+    }) =>
+      solicitudesApi.crearBorradorWordpress(solicitudId, destino.id, portada, descripcionFoto),
     onSuccess: (data) => {
       // La IA prepara el texto antes de crear el borrador (2026-08-21) —
       // si no estuvo disponible, el borrador igual se crea con el texto
@@ -355,7 +361,9 @@ function DestinoRow({
           <CrearBorradorDialog
             idBase={destino.id}
             disabled={acting}
-            crear={(portada) => crearBorradorMutation.mutateAsync(portada)}
+            crear={(portada, descripcionFoto) =>
+              crearBorradorMutation.mutateAsync({ portada, descripcionFoto })
+            }
           />
         )}
         {destino.estado !== 'cancelado' && (

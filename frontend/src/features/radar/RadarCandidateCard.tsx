@@ -35,6 +35,7 @@ import { descargarArchivo } from '@/lib/descargar'
 import { formatFechaHoraNegocio } from '@/lib/format'
 import { formatHoras, horasEnEspera } from '@/features/solicitudes/utils'
 import { radarApi, type NewsCandidate, type OpcionesPortada } from './api'
+import { CampoDescripcionFoto } from './CampoDescripcionFoto'
 import { PanelPublicacion } from './PanelPublicacion'
 
 const ESTADO_LABELS: Record<NewsCandidate['estado'], string> = {
@@ -80,6 +81,7 @@ export function RadarCandidateCard({
   const [variantePortada, setVariantePortada] = useState<OpcionesPortada['variante']>('noticias')
   const [titularPortada, setTitularPortada] = useState('')
   const [antetituloPortada, setAntetituloPortada] = useState('')
+  const [descripcionFoto, setDescripcionFoto] = useState('')
 
   function onExito(mensaje: string) {
     queryClient.invalidateQueries({ queryKey: RADAR_KEY })
@@ -107,6 +109,7 @@ export function RadarCandidateCard({
               variante: variantePortada,
               titular: titularPortada,
               antetitulo: antetituloPortada,
+              descripcionFoto,
             }
           : null,
       ),
@@ -363,6 +366,11 @@ export function RadarCandidateCard({
                   </div>
                   {imagenPortada && (
                     <>
+                      <CampoDescripcionFoto
+                        id={`portada-descripcion-${candidato.id}`}
+                        value={descripcionFoto}
+                        onChange={setDescripcionFoto}
+                      />
                       <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1.5">
                           <Label htmlFor={`portada-plantilla-${candidato.id}`}>Plantilla</Label>

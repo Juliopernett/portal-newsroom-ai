@@ -159,16 +159,25 @@ export const solicitudesApi = {
   // La preparación editorial con IA (2026-08-21) corre dentro de este mismo
   // llamado — la respuesta trae el destino más si la IA sí pudo prepararlo,
   // para que el toast en DestinosPanel sea honesto sin un fetch aparte.
-  crearBorradorWordpress: (id: string, destinoId: string, portada?: OpcionesPortada | null) => {
+  crearBorradorWordpress: (
+    id: string,
+    destinoId: string,
+    portada: OpcionesPortada | null,
+    descripcionFoto: string,
+  ) => {
     type Respuesta = {
       destino: DestinoPublicacion
       preparacion_ia_estado: EstadoPreparacionIA
       preparacion_ia_error: string | null
     }
     const ruta = `/publication-requests/${id}/destinos/${destinoId}/crear-borrador-wordpress`
-    if (!portada) return api.post<Respuesta>(ruta)
-    // Con foto: la portada se arma con el titular elegido (vacío = el de la IA).
+    const descripcion = descripcionFoto.trim()
+    if (!portada && !descripcion) return api.post<Respuesta>(ruta)
     const form = new FormData()
+    // La descripción vale también para la imagen adjunta, sin portada.
+    if (descripcion) form.append('descripcion_foto', descripcion)
+    if (!portada) return api.postForm<Respuesta>(ruta, form)
+    // Con foto: la portada se arma con el titular elegido (vacío = el de la IA).
     form.append('imagen_base', portada.imagenBase)
     if (portada.imagenCirculo) form.append('imagen_circulo', portada.imagenCirculo)
     form.append('variante', portada.variante)
