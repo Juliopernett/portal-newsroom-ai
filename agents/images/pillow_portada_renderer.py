@@ -46,21 +46,31 @@ _TITULAR_TRACKING = 0.01
 _TITULAR_ESCALA = 0.90
 _SOMBRA = (-6, 6)
 
-# Layout with a hook (`antetitulo`), approved 2026-11-26: the hook on one gold
-# line, a short gold rule, and a smaller white headline over a deeper gradient.
+# Layout with a hook (`antetitulo`), approved 2026-11-26: the hook on one line
+# inside a yellow button, and a smaller white headline over a deep blue gradient.
+# Colours are the ones portalvallenato.com uses (its Brochure button).
 # `_GANCHO_ALTO_MAX` keeps the whole block below the highlight circle.
-_ORO = (245, 190, 60)
-_GANCHO_ANCHO = 1000
+_AMARILLO_WEB = (0xE1, 0xCE, 0x26)
+_AZUL_NOCHE_WEB = (0x08, 0x3A, 0x7A)
+_GANCHO_ANCHO = 940
 _GANCHO_BASE_Y = 1250
 _GANCHO_ALTO_MAX = 270
-_GANCHO_TAMANO_MAX = 100
-_GANCHO_INTERLINEA = 1.08
-_GANCHO_RAYA_ESPACIO = 38
-_GANCHO_RAYA = (120, 7)
-_GANCHO_TITULAR_TAMANO_MAX = 52
+_GANCHO_TAMANO_MAX = 92
+_GANCHO_CAJA_ALTO = 1.34  # times the font size
+_GANCHO_CAJA_LINEA_BASE = 1.10
+_GANCHO_CAJA_MARGEN = 30
+_GANCHO_CAJA_RADIO = 14
+_GANCHO_CAJA_SEPARACION = 18
+_GANCHO_TITULAR_ANCHO = 1000
+_GANCHO_TITULAR_TAMANO_MAX = 54
 _GANCHO_TITULAR_TAMANO_COMODO = 40
 _GANCHO_TITULAR_INTERLINEA = 1.14
-_GANCHO_GRAD = (835, 470, (24, 44, 96))
+_GANCHO_GRAD = (835, 470, _AZUL_NOCHE_WEB)
+
+# A quoted name up to this long ("‘LINDA REMIX’") is never split across lines.
+_CITA_MAX_CARACTERES = 24
+_CITA = re.compile("[‘“\"'][^‘’“”\"']+[’”\"']")
+_ESPACIO_FIJO = "\u00a0"
 
 # Highlight circle (template page 3/4).
 _CIRCULO_CENTRO = (814, 772)
@@ -152,8 +162,8 @@ def _envolver(
 ) -> list[str]:
     lineas: list[str] = []
     actual = ""
-    for palabra in texto.split():
-        prueba = f"{actual} {palabra}".strip()
+    for palabra in texto.split(" "):
+        prueba = f"{actual} {palabra}".strip(" ")
         if actual and _ancho(prueba, fuente, tracking) > ancho_max:
             lineas.append(actual)
             actual = palabra
@@ -162,6 +172,18 @@ def _envolver(
     if actual:
         lineas.append(actual)
     return lineas
+
+
+def _unir_citas(texto: str) -> str:
+    """Glue the words of a short quoted name so the wrap keeps them together."""
+
+    def unir(cita: re.Match[str]) -> str:
+        frase = cita.group(0)
+        if len(frase) > _CITA_MAX_CARACTERES:
+            return frase
+        return frase.replace(" ", _ESPACIO_FIJO)
+
+    return _CITA.sub(unir, texto)
 
 
 def _limpiar(texto: str) -> str:
@@ -259,33 +281,38 @@ class PillowPortadaRenderer:
     def _gancho_y_titular(self, draw: ImageDraw.ImageDraw, gancho: str, titular: str) -> None:
         # El gancho va siempre en una línea: se reduce hasta caber.
         tam_gancho = _GANCHO_TAMANO_MAX
-        while tam_gancho > 1:
+        while True:
             fuente = _fuente("Anton-Regular.ttf", tam_gancho)
-            if _ancho(gancho, fuente, _TITULAR_TRACKING * tam_gancho) <= _GANCHO_ANCHO:
+            ancho_gancho = _ancho(gancho, fuente, _TITULAR_TRACKING * tam_gancho)
+            if ancho_gancho <= _GANCHO_ANCHO or tam_gancho <= 1:
                 break
             tam_gancho -= 1
-        alto_gancho = tam_gancho * _GANCHO_INTERLINEA + _GANCHO_RAYA_ESPACIO
+        alto_caja = tam_gancho * _GANCHO_CAJA_ALTO
+        alto_gancho = alto_caja + _GANCHO_CAJA_SEPARACION
 
         # El titular prefiere dos líneas; si es muy largo usa más, cada vez menores.
+        titular = _unir_citas(titular)
         tam = _GANCHO_TITULAR_TAMANO_MAX
         while True:
             fuente = _fuente("Anton-Regular.ttf", tam)
-            lineas = _envolver(titular, fuente, _TITULAR_TRACKING * tam, _GANCHO_ANCHO)
+            lineas = _envolver(titular, fuente, _TITULAR_TRACKING * tam, _GANCHO_TITULAR_ANCHO)
             alto = alto_gancho + len(lineas) * tam * _GANCHO_TITULAR_INTERLINEA
             comodo = len(lineas) <= 2 or tam <= _GANCHO_TITULAR_TAMANO_COMODO
             if (alto <= _GANCHO_ALTO_MAX and comodo) or tam <= 20:
                 break
             tam -= 1
 
-        sombra = (round(_SOMBRA[0] * 0.7), round(_SOMBRA[1] * 0.7))
         y = _GANCHO_BASE_Y - alto
-        self._linea_centrada(draw, gancho, tam_gancho, y + tam_gancho * 0.9, _ORO, sombra)
-        y += tam_gancho * _GANCHO_INTERLINEA
-        ancho_raya, grosor = _GANCHO_RAYA
-        x = (_ANCHO - ancho_raya) / 2
-        draw.rectangle((x, y + 14, x + ancho_raya, y + 14 + grosor), fill=_ORO)
-        y += _GANCHO_RAYA_ESPACIO
-        for texto in lineas:
+        x = (_ANCHO - ancho_gancho) / 2 - _GANCHO_CAJA_MARGEN
+        draw.rounded_rectangle(
+            (x, y, _ANCHO - x, y + alto_caja), radius=_GANCHO_CAJA_RADIO, fill=_AMARILLO_WEB
+        )
+        base = y + tam_gancho * _GANCHO_CAJA_LINEA_BASE
+        self._linea_centrada(draw, gancho, tam_gancho, base, _AZUL_NOCHE_WEB, None)
+        y += alto_gancho
+        sombra = (round(_SOMBRA[0] * 0.7), round(_SOMBRA[1] * 0.7))
+        for linea in lineas:
+            texto = linea.replace(_ESPACIO_FIJO, " ")
             self._linea_centrada(draw, texto, tam, y + tam * 0.9, _BLANCO, sombra)
             y += tam * _GANCHO_TITULAR_INTERLINEA
 
@@ -296,12 +323,14 @@ class PillowPortadaRenderer:
         tamano: float,
         baseline: float,
         color: tuple[int, int, int],
-        sombra: tuple[int, int],
+        sombra: tuple[int, int] | None,
     ) -> None:
         fuente = _fuente("Anton-Regular.ttf", tamano)
         tracking = _TITULAR_TRACKING * tamano
         x = (_ANCHO - _ancho(texto, fuente, tracking)) / 2
-        _dibujar(draw, x + sombra[0], baseline + sombra[1], texto, fuente, _NEGRO, tracking)
+        if sombra is not None:
+            dx, dy = sombra
+            _dibujar(draw, x + dx, baseline + dy, texto, fuente, _NEGRO, tracking)
         _dibujar(draw, x, baseline, texto, fuente, color, tracking)
 
     def _pie(self, lienzo: Image.Image, draw: ImageDraw.ImageDraw) -> None:

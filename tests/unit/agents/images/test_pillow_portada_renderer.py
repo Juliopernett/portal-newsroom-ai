@@ -7,7 +7,7 @@ import io
 import pytest
 from PIL import Image
 
-from agents.images.pillow_portada_renderer import PillowPortadaRenderer
+from agents.images.pillow_portada_renderer import PillowPortadaRenderer, _unir_citas
 from core.ports.portada_renderer import (
     MAX_CARACTERES_ANTETITULO,
     PortadaError,
@@ -108,12 +108,12 @@ def test_a_long_kicker_stays_inside_the_cover(antetitulo: str) -> None:
             assert min(imagen.getpixel((x, y))) < 230, (x, y)
 
 
-def _es_oro(pixel: tuple[int, ...]) -> bool:
+def _es_amarillo(pixel: tuple[int, ...]) -> bool:
     r, g, b = pixel[:3]
-    return r > 225 and 170 < g < 210 and b < 90
+    return r > 205 and 190 < g < 225 and b < 70
 
 
-def test_the_hook_is_one_gold_line_below_the_circle() -> None:
+def test_the_hook_button_stays_below_the_circle() -> None:
     resultado = PillowPortadaRenderer().renderizar(
         SolicitudPortada(
             imagen_base=_foto((40, 40, 40)),
@@ -125,20 +125,24 @@ def test_the_hook_is_one_gold_line_below_the_circle() -> None:
 
     imagen = _abrir(resultado).convert("RGB")
     filas = [
-        y for y in range(700, 1270) if any(_es_oro(imagen.getpixel((x, y))) for x in range(1080))
+        y
+        for y in range(700, 1270)
+        if any(_es_amarillo(imagen.getpixel((x, y))) for x in range(1080))
     ]
-    # Gold appears (hook and rule), all of it under the circle, which ends at y=967.
+    # The yellow button appears, all of it under the circle, which ends at y=967.
     assert filas and filas[0] > 975
 
 
-def test_without_a_hook_nothing_is_gold() -> None:
+def test_without_a_hook_nothing_is_yellow() -> None:
     resultado = PillowPortadaRenderer().renderizar(
         SolicitudPortada(imagen_base=_foto((40, 40, 40)), titular="Titular sin gancho")
     )
 
     imagen = _abrir(resultado).convert("RGB")
     assert not any(
-        _es_oro(imagen.getpixel((x, y))) for x in range(0, 1080, 2) for y in range(850, 1270, 2)
+        _es_amarillo(imagen.getpixel((x, y)))
+        for x in range(0, 1080, 2)
+        for y in range(850, 1270, 2)
     )
 
 
@@ -182,6 +186,18 @@ def test_every_category_has_its_own_label() -> None:
     }
 
     assert len(portadas) == len(VariantePortada) == 5
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("ESTRENAN ‘LINDA REMIX’, YA", "ESTRENAN ‘LINDA\u00a0REMIX’, YA"),
+        ('EL TEMA "MI GRAN AMOR" SUENA', 'EL TEMA "MI\u00a0GRAN\u00a0AMOR" SUENA'),
+        ("‘UNA CITA DEMASIADO LARGA PARA UNA SOLA LÍNEA’", None),
+    ],
+)
+def test_short_quoted_names_are_kept_together(texto: str, esperado: str | None) -> None:
+    assert _unir_citas(texto) == (esperado or texto)
 
 
 def test_rejects_an_empty_headline() -> None:

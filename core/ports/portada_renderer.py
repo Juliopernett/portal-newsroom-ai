@@ -42,8 +42,8 @@ class SolicitudPortada:
 
     `imagen_circulo`, when given, selects the "two photos" template: it
     is shown inside a highlight circle with an arrow pointing at it.
-    `antetitulo` is the optional hook (e.g. "¡CONFIRMADO!"): one highlighted
-    line above a smaller headline.
+    `antetitulo` is the optional hook (e.g. "¡CONFIRMADO!"): one line inside a
+    yellow button, above a smaller headline.
     `enfoque_x`/`enfoque_y` (0..1) pick which part of the base photo
     survives the crop to 4:5 — 0.5/0.3 keeps faces, which sit high in
     most photos. At `zoom=1` the photo can only move along the side that

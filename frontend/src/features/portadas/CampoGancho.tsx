@@ -16,7 +16,7 @@ export function CampoGancho({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <Label htmlFor={id}>Gancho (línea dorada, opcional)</Label>
+        <Label htmlFor={id}>Gancho (botón amarillo, opcional)</Label>
         <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
           {value.length}/{MAX_GANCHO}
         </span>
@@ -30,7 +30,7 @@ export function CampoGancho({
         onChange={(e) => onChange(e.target.value)}
       />
       <p id={`${id}-ayuda`} className="text-xs text-muted-foreground">
-        Una sola línea, hasta {MAX_GANCHO} caracteres: va grande en dorado y el titular debajo.
+        Una sola línea, hasta {MAX_GANCHO} caracteres: va en un botón amarillo sobre el titular.
       </p>
     </div>
   )
