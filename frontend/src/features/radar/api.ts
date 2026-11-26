@@ -1,4 +1,4 @@
-import type { Encuadre } from '@/features/portadas/api'
+import type { Encuadre, VariantePortada } from '@/features/portadas/api'
 import { api } from '@/api/client'
 
 export type EstadoNewsCandidate = 'nuevo' | 'guardado' | 'descartado' | 'procesado'
@@ -48,7 +48,7 @@ export interface NewsCandidate {
 export interface OpcionesPortada extends Encuadre {
   imagenBase: File
   imagenCirculo: File | null
-  variante: 'noticias' | 'lo_ultimo'
+  variante: VariantePortada
   titular: string
   antetitulo: string
   // Texto alternativo de la imagen en WordPress; vacío = el titular de la nota.

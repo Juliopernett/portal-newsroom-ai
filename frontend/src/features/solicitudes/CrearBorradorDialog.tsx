@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SelectNative } from '@/components/ui/select-native'
-import { ENCUADRE_INICIAL } from '@/features/portadas/api'
+import { ENCUADRE_INICIAL, VARIANTES_PORTADA } from '@/features/portadas/api'
 import { CampoGancho } from '@/features/portadas/CampoGancho'
 import { EncuadrePortada } from '@/features/portadas/EncuadrePortada'
 import type { OpcionesPortada } from '@/features/radar/api'
@@ -123,14 +123,17 @@ export function CrearBorradorDialog({
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={`portada-plantilla-${idBase}`}>Plantilla</Label>
+                  <Label htmlFor={`portada-plantilla-${idBase}`}>Categoría</Label>
                   <SelectNative
                     id={`portada-plantilla-${idBase}`}
                     value={variante}
                     onChange={(e) => setVariante(e.target.value as OpcionesPortada['variante'])}
                   >
-                    <option value="noticias">Noticias</option>
-                    <option value="lo_ultimo">Lo último</option>
+                    {VARIANTES_PORTADA.map((v) => (
+                      <option key={v.value} value={v.value}>
+                        {v.label}
+                      </option>
+                    ))}
                   </SelectNative>
                 </div>
                 <div className="flex flex-col gap-1.5">

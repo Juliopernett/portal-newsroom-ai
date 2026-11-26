@@ -174,6 +174,16 @@ def test_zoom_lets_a_4_5_photo_move_both_ways(
     assert _abrir(resultado).convert("RGB").getpixel((540, 500)) == esperado
 
 
+def test_every_category_has_its_own_label() -> None:
+    renderer = PillowPortadaRenderer()
+    portadas = {
+        renderer.renderizar(SolicitudPortada(imagen_base=_foto(), titular="T", variante=v))
+        for v in VariantePortada
+    }
+
+    assert len(portadas) == len(VariantePortada) == 5
+
+
 def test_rejects_an_empty_headline() -> None:
     with pytest.raises(PortadaError):
         PillowPortadaRenderer().renderizar(SolicitudPortada(imagen_base=_foto(), titular="  🚨 "))

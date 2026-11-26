@@ -37,7 +37,7 @@ import { formatHoras, horasEnEspera } from '@/features/solicitudes/utils'
 import { radarApi, type NewsCandidate, type OpcionesPortada } from './api'
 import { CampoDescripcionFoto } from './CampoDescripcionFoto'
 import { PanelPublicacion } from './PanelPublicacion'
-import { ENCUADRE_INICIAL } from '@/features/portadas/api'
+import { ENCUADRE_INICIAL, VARIANTES_PORTADA } from '@/features/portadas/api'
 import { CampoGancho } from '@/features/portadas/CampoGancho'
 import { EncuadrePortada } from '@/features/portadas/EncuadrePortada'
 
@@ -381,7 +381,7 @@ export function RadarCandidateCard({
                       />
                       <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1.5">
-                          <Label htmlFor={`portada-plantilla-${candidato.id}`}>Plantilla</Label>
+                          <Label htmlFor={`portada-plantilla-${candidato.id}`}>Categoría</Label>
                           <SelectNative
                             id={`portada-plantilla-${candidato.id}`}
                             value={variantePortada}
@@ -389,8 +389,11 @@ export function RadarCandidateCard({
                               setVariantePortada(e.target.value as OpcionesPortada['variante'])
                             }
                           >
-                            <option value="noticias">Noticias</option>
-                            <option value="lo_ultimo">Lo último</option>
+                            {VARIANTES_PORTADA.map((v) => (
+                              <option key={v.value} value={v.value}>
+                                {v.label}
+                              </option>
+                            ))}
                           </SelectNative>
                         </div>
                         <div className="flex flex-col gap-1.5">

@@ -23,10 +23,13 @@ ZOOM_MAXIMO = 2.5
 
 
 class VariantePortada(StrEnum):
-    """Which label the cover carries — the two template families."""
+    """Which label the cover carries — the label families."""
 
     NOTICIAS = "noticias"
     LO_ULTIMO = "lo_ultimo"
+    DE_INTERES = "de_interes"
+    MEMES = "memes"
+    DE_OPINION = "de_opinion"
 
 
 class PortadaError(ValueError):

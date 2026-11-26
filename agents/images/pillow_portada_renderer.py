@@ -68,7 +68,13 @@ _CIRCULO_DIAMETRO = 391
 _CIRCULO_BORDE = 8
 _CIRCULO_COLOR_BORDE = (0xF9, 0xEB, 0xE9)
 
-_ETIQUETAS = {VariantePortada.NOTICIAS: "NOTICIAS", VariantePortada.LO_ULTIMO: "LO ÚLTIMO"}
+_ETIQUETAS = {
+    VariantePortada.NOTICIAS: "NOTICIAS",
+    VariantePortada.LO_ULTIMO: "LO ÚLTIMO",
+    VariantePortada.DE_INTERES: "DE INTERÉS",
+    VariantePortada.MEMES: "MEMES",
+    VariantePortada.DE_OPINION: "DE OPINIÓN",
+}
 
 # Emoji have no glyph in the bundled fonts; drop them instead of printing tofu boxes.
 _EMOJI = re.compile("[\U0001f000-\U0001faff☀-➿️‍]")

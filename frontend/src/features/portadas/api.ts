@@ -1,6 +1,16 @@
 import { ApiError } from '@/api/client'
 
-export type VariantePortada = 'noticias' | 'lo_ultimo'
+// Etiqueta de la esquina superior izquierda. Mismos valores que `VariantePortada`
+// en el backend; la lista alimenta Portadas, Radar y Solicitudes.
+export const VARIANTES_PORTADA = [
+  { value: 'noticias', label: 'Noticias' },
+  { value: 'lo_ultimo', label: 'Lo último' },
+  { value: 'de_interes', label: 'De interés' },
+  { value: 'memes', label: 'Memes' },
+  { value: 'de_opinion', label: 'De opinión' },
+] as const
+
+export type VariantePortada = (typeof VARIANTES_PORTADA)[number]['value']
 
 // Qué parte de la foto queda en la portada: enfoques de 0 a 1 y zoom desde 1.
 export interface Encuadre {

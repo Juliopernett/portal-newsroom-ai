@@ -9,7 +9,12 @@ import { guardarBlob } from '@/lib/descargar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SelectNative } from '@/components/ui/select-native'
-import { ENCUADRE_INICIAL, portadasApi, type VariantePortada } from './api'
+import {
+  ENCUADRE_INICIAL,
+  portadasApi,
+  VARIANTES_PORTADA,
+  type VariantePortada,
+} from './api'
 import { CampoGancho } from './CampoGancho'
 import { ControlesEncuadre } from './ControlesEncuadre'
 
@@ -63,14 +68,17 @@ export function PortadasPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,26rem)_1fr]">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="portada-variante">Plantilla</Label>
+            <Label htmlFor="portada-variante">Categoría</Label>
             <SelectNative
               id="portada-variante"
               value={variante}
               onChange={(e) => setVariante(e.target.value as VariantePortada)}
             >
-              <option value="noticias">Noticias</option>
-              <option value="lo_ultimo">Lo último (noticia de último momento)</option>
+              {VARIANTES_PORTADA.map((v) => (
+                <option key={v.value} value={v.value}>
+                  {v.label}
+                </option>
+              ))}
             </SelectNative>
           </div>
 
