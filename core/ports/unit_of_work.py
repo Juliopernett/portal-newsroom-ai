@@ -15,12 +15,13 @@ from types import TracebackType
 from core.ports.ai_configuracion_repository import AIConfiguracionRepository
 from core.ports.chart_repository import ChartRepository
 from core.ports.client_repository import ClientRepository
+from core.ports.colores_marca_repository import ColoresMarcaRepository
 from core.ports.destino_publicacion_repository import DestinoPublicacionRepository
 from core.ports.gasto_repository import GastoRepository
 from core.ports.identidad_comercial_repository import IdentidadComercialRepository
 from core.ports.informe_link_repository import InformeLinkRepository
-from core.ports.metrica_publicacion_repository import MetricaPublicacionRepository
 from core.ports.media_asset_repository import MediaAssetRepository
+from core.ports.metrica_publicacion_repository import MetricaPublicacionRepository
 from core.ports.news_candidate_repository import NewsCandidateRepository
 from core.ports.otro_ingreso_repository import OtroIngresoRepository
 from core.ports.pauta_repository import PautaRepository
@@ -54,6 +55,7 @@ class UnitOfWork(ABC):
     otros_ingresos: OtroIngresoRepository
     identidad_comercial: IdentidadComercialRepository
     ai_configuracion: AIConfiguracionRepository
+    colores_marca: ColoresMarcaRepository
     informe_links: InformeLinkRepository
     metricas_publicacion: MetricaPublicacionRepository
     chart: ChartRepository

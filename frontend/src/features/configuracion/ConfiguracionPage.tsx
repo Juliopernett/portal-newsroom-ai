@@ -15,6 +15,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 import { authApi } from '@/features/auth/api'
+import { ColoresPanel } from '@/features/colores/ColoresPanel'
 import { formatMoneda } from '@/lib/format'
 import { identidadApi, LOGO_URL, type IdentidadComercialInput } from '@/features/identidad/api'
 import { IdentidadForm } from '@/features/identidad/IdentidadForm'
@@ -26,7 +27,7 @@ const PLANES_KEY = ['planes-pauta']
 const IDENTIDAD_KEY = ['identidad-comercial']
 const AI_CONFIGURACION_KEY = ['ai-configuracion']
 
-type ConfiguracionTab = 'planes' | 'identidad' | 'ia' | 'cuenta'
+type ConfiguracionTab = 'planes' | 'identidad' | 'colores' | 'ia' | 'cuenta'
 
 function PlanesPautaPanel() {
   const queryClient = useQueryClient()
@@ -417,6 +418,7 @@ export function ConfiguracionPage() {
           [
             { id: 'planes', label: 'Planes de Pauta' },
             { id: 'identidad', label: 'Identidad comercial' },
+            { id: 'colores', label: 'Colores' },
             { id: 'ia', label: 'IA' },
             { id: 'cuenta', label: 'Cuenta' },
           ] as const
@@ -438,7 +440,7 @@ export function ConfiguracionPage() {
         ))}
       </div>
 
-      {tab === 'planes' ? <PlanesPautaPanel /> : tab === 'identidad' ? <IdentidadPanel /> : tab === 'cuenta' ? <CuentaPanel /> : <IAPanel />}
+      {tab === 'planes' ? <PlanesPautaPanel /> : tab === 'identidad' ? <IdentidadPanel /> : tab === 'colores' ? <ColoresPanel /> : tab === 'cuenta' ? <CuentaPanel /> : <IAPanel />}
     </div>
   )
 }

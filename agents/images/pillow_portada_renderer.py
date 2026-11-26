@@ -20,12 +20,12 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, UnidentifiedImageError
 
+from core.entities.colores_marca import ColoresMarca
 from core.ports.portada_renderer import PortadaError, SolicitudPortada, VariantePortada
 
 _ASSETS = Path(__file__).parent / "assets"
 
 _ANCHO, _ALTO = 1080, 1350
-_AZUL = (0x3B, 0x58, 0x98)
 _BLANCO = (255, 255, 255)
 _NEGRO = (0, 0, 0)
 
@@ -48,10 +48,8 @@ _SOMBRA = (-6, 6)
 
 # Layout with a hook (`antetitulo`), approved 2026-11-26: the hook on one line
 # inside a yellow button, and a smaller white headline over the site's menu blue.
-# Colours are the ones portalvallenato.com uses.
+# Colours come from `ColoresMarca` (by default, portalvallenato.com's).
 # `_GANCHO_ALTO_MAX` keeps the whole block below the highlight circle.
-_AMARILLO_WEB = (0xE1, 0xCE, 0x26)
-_AZUL_NOCHE_WEB = (0x08, 0x3A, 0x7A)
 _GANCHO_ANCHO = 940
 _GANCHO_BASE_Y = 1250
 _GANCHO_ALTO_MAX = 270
@@ -65,7 +63,7 @@ _GANCHO_TITULAR_ANCHO = 1000
 _GANCHO_TITULAR_TAMANO_MAX = 54
 _GANCHO_TITULAR_TAMANO_COMODO = 40
 _GANCHO_TITULAR_INTERLINEA = 1.14
-_GANCHO_GRAD = (835, 470, _AZUL)  # el azul del menú de la web
+_GANCHO_GRAD = (835, 470)  # inicio y largo del degradado
 
 # A quoted name up to this long ("‘LINDA REMIX’") is never split across lines.
 _CITA_MAX_CARACTERES = 24
@@ -143,9 +141,7 @@ def _abrir(datos: bytes, nombre: str) -> Image.Image:
         raise PortadaError(f"No se pudo leer la {nombre}: {exc}") from exc
 
 
-def _degradado(
-    inicio: int = _GRAD_INICIO, largo: int = _GRAD_LARGO, color: tuple[int, int, int] = _AZUL
-) -> Image.Image:
+def _degradado(color: tuple[int, int, int], inicio: int, largo: int) -> Image.Image:
     capa = Image.new("RGBA", (_ANCHO, _ALTO), (*color, 0))
     px = capa.load()
     for y in range(_ALTO):
@@ -190,8 +186,19 @@ def _limpiar(texto: str) -> str:
     return " ".join(_EMOJI.sub("", texto).split()).upper()
 
 
+def _rgb(color: str) -> tuple[int, int, int]:
+    """`#RRGGBB` as an RGB tuple."""
+    return int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+
+
 class PillowPortadaRenderer:
     """`PortadaRenderer` implemented with Pillow."""
+
+    def __init__(self, colores: ColoresMarca | None = None) -> None:
+        colores = colores or ColoresMarca()
+        self._color_fondo = _rgb(colores.fondo)
+        self._color_destacado = _rgb(colores.destacado)
+        self._color_texto_destacado = _rgb(colores.texto_destacado)
 
     def renderizar(self, solicitud: SolicitudPortada, *, formato: str = "png") -> bytes:
         titular = _limpiar(solicitud.titular)
@@ -204,7 +211,8 @@ class PillowPortadaRenderer:
             base, _ANCHO, _ALTO, solicitud.enfoque_x, solicitud.enfoque_y, solicitud.zoom
         )
         lienzo = lienzo.convert("RGBA")
-        lienzo.alpha_composite(_degradado(*_GANCHO_GRAD) if antetitulo else _degradado())
+        geometria = _GANCHO_GRAD if antetitulo else (_GRAD_INICIO, _GRAD_LARGO)
+        lienzo.alpha_composite(_degradado(self._color_fondo, *geometria))
 
         if solicitud.imagen_circulo is not None:
             self._circulo(lienzo, _abrir(solicitud.imagen_circulo, "imagen del círculo"))
@@ -305,10 +313,10 @@ class PillowPortadaRenderer:
         y = _GANCHO_BASE_Y - alto
         x = (_ANCHO - ancho_gancho) / 2 - _GANCHO_CAJA_MARGEN
         draw.rounded_rectangle(
-            (x, y, _ANCHO - x, y + alto_caja), radius=_GANCHO_CAJA_RADIO, fill=_AMARILLO_WEB
+            (x, y, _ANCHO - x, y + alto_caja), radius=_GANCHO_CAJA_RADIO, fill=self._color_destacado
         )
         base = y + tam_gancho * _GANCHO_CAJA_LINEA_BASE
-        self._linea_centrada(draw, gancho, tam_gancho, base, _AZUL_NOCHE_WEB, None)
+        self._linea_centrada(draw, gancho, tam_gancho, base, self._color_texto_destacado, None)
         y += alto_gancho
         sombra = (round(_SOMBRA[0] * 0.7), round(_SOMBRA[1] * 0.7))
         for linea in lineas:

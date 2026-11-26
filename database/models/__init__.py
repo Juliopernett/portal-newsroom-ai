@@ -17,6 +17,7 @@ from database.models.chart import (
     ChartVideoModel,
 )
 from database.models.client import ClientModel
+from database.models.colores_marca import ColoresMarcaModel
 from database.models.destino_publicacion import DestinoPublicacionModel
 from database.models.gasto import GastoModel
 from database.models.identidad_comercial import IdentidadComercialModel
@@ -39,6 +40,7 @@ __all__ = [
     "ChartSnapshotModel",
     "ChartVideoModel",
     "ClientModel",
+    "ColoresMarcaModel",
     "DestinoPublicacionModel",
     "GastoModel",
     "IdentidadComercialModel",

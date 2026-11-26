@@ -17,6 +17,7 @@ from database.repositories.ai_configuracion_repository import (
 )
 from database.repositories.chart_repository import SqlAlchemyChartRepository
 from database.repositories.client_repository import SqlAlchemyClientRepository
+from database.repositories.colores_marca_repository import SqlAlchemyColoresMarcaRepository
 from database.repositories.destino_publicacion_repository import (
     SqlAlchemyDestinoPublicacionRepository,
 )
@@ -25,10 +26,10 @@ from database.repositories.identidad_comercial_repository import (
     SqlAlchemyIdentidadComercialRepository,
 )
 from database.repositories.informe_link_repository import SqlAlchemyInformeLinkRepository
+from database.repositories.media_asset_repository import SqlAlchemyMediaAssetRepository
 from database.repositories.metrica_publicacion_repository import (
     SqlAlchemyMetricaPublicacionRepository,
 )
-from database.repositories.media_asset_repository import SqlAlchemyMediaAssetRepository
 from database.repositories.news_candidate_repository import SqlAlchemyNewsCandidateRepository
 from database.repositories.otro_ingreso_repository import SqlAlchemyOtroIngresoRepository
 from database.repositories.pauta_repository import SqlAlchemyPautaRepository
@@ -62,6 +63,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.otros_ingresos = SqlAlchemyOtroIngresoRepository(self._session)
         self.identidad_comercial = SqlAlchemyIdentidadComercialRepository(self._session)
         self.ai_configuracion = SqlAlchemyAIConfiguracionRepository(self._session)
+        self.colores_marca = SqlAlchemyColoresMarcaRepository(self._session)
         self.informe_links = SqlAlchemyInformeLinkRepository(self._session)
         self.metricas_publicacion = SqlAlchemyMetricaPublicacionRepository(self._session)
         self.chart = SqlAlchemyChartRepository(self._session)

@@ -51,6 +51,7 @@ from app.api.schemas.chart import (
 )
 from config.settings import Settings
 from core.entities.chart import DEEZER_NINGUNA, CanalChart, EdicionChart, FilaEdicion, VideoChart
+from core.entities.colores_marca import ColoresMarca
 from core.ports.unit_of_work import UnitOfWork
 from core.ports.youtube_reader import YouTubeError, YouTubeReader
 from core.services.chart_alertas import evaluar_reacciones
@@ -230,6 +231,7 @@ def _png_tarjeta(
     lamina: Literal["portada", "lista"],
     formato: Literal["feed", "historia"],
     catalogo: CatalogoArtistas,
+    colores: ColoresMarca | None,
     marca_agua: str | None = None,
 ) -> bytes:
     """Draw a social card from ranking rows (edition or live), downloading only what it needs."""
@@ -248,7 +250,7 @@ def _png_tarjeta(
     if hd_primero:
         urls.append(hd_primero)
     imagenes = descargar_imagenes(urls)
-    return PillowChartRenderer().renderizar(
+    return PillowChartRenderer(colores).renderizar(
         semana_fin,
         [
             FilaImagen(
@@ -291,6 +293,7 @@ def imagen_en_vivo(
         lamina,
         formato,
         catalogo,
+        uow.colores_marca.get(),
         marca_agua="VISTA PREVIA EN VIVO",
     )
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})
@@ -312,7 +315,14 @@ def imagen_edicion(
     edicion = uow.chart.get_edicion(semana_fin)
     if edicion is None or not edicion.filas:
         raise HTTPException(status_code=404, detail="Edition not found")
-    png = _png_tarjeta(list(edicion.filas), edicion.semana_fin, lamina, formato, catalogo)
+    png = _png_tarjeta(
+        list(edicion.filas),
+        edicion.semana_fin,
+        lamina,
+        formato,
+        catalogo,
+        uow.colores_marca.get(),
+    )
     nombre = f"chart-vallenato-{edicion.semana_fin.isoformat()}-{lamina}-{formato}.png"
     return Response(
         content=png,

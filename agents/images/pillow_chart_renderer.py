@@ -20,17 +20,16 @@ from typing import Literal
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, UnidentifiedImageError
 
 from agents.images.pillow_portada_renderer import (
-    _AMARILLO_WEB,
     _ASSETS,
-    _AZUL,
-    _AZUL_NOCHE_WEB,
     _BLANCO,
     _NEGRO,
     _ancho,
     _dibujar,
     _fuente,
     _limpiar,
+    _rgb,
 )
+from core.entities.colores_marca import ColoresMarca
 
 Formato = Literal["feed", "historia"]
 Lamina = Literal["portada", "lista"]
@@ -41,13 +40,10 @@ _ALTOS: dict[str, int] = {"feed": 1350, "historia": 1920}
 _MARGEN_SUPERIOR = {"feed": 0, "historia": 150}
 _MARGEN_INFERIOR = {"feed": 0, "historia": 200}
 
-# Same identity as the news covers and portalvallenato.com: menu blue (`_AZUL`)
-# as the background, deepening towards the top, with the site's yellow as accent.
-_FONDO_ARRIBA = (24, 40, 78)
-_FONDO_ABAJO = _AZUL
+# Same identity as the news covers: `ColoresMarca.fondo` as the background,
+# deepening towards the top, and `destacado` as the accent.
 _CLARO = (214, 224, 245)
-_AZUL_BRILLO = (0x1E, 0x73, 0xBE)
-_VERDE, _ROJO, _AMBAR, _GRIS = (52, 211, 110), (255, 128, 118), _AMARILLO_WEB, (196, 208, 235)
+_VERDE, _ROJO, _GRIS = (52, 211, 110), (255, 128, 118), (196, 208, 235)
 
 _MESES = [
     "enero",
@@ -153,18 +149,18 @@ def _texto(
     draw.text((x, base), texto, font=fuente, fill=color, anchor="ls")
 
 
-def _fondo(ancho: int, alto: int) -> Image.Image:
+def _fondo(ancho: int, alto: int, paleta: _Paleta) -> Image.Image:
     mascara = Image.linear_gradient("L").resize((ancho, alto))
     lienzo = Image.composite(
-        Image.new("RGB", (ancho, alto), _FONDO_ABAJO),
-        Image.new("RGB", (ancho, alto), _FONDO_ARRIBA),
+        Image.new("RGB", (ancho, alto), paleta.fondo),
+        Image.new("RGB", (ancho, alto), paleta.oscuro),
         mascara,
     ).convert("RGBA")
     # Soft blue glow behind the headline, like the template's gradient.
     brillo = Image.new("RGBA", (ancho // 4, alto // 4), (0, 0, 0, 0))
     ImageDraw.Draw(brillo).ellipse(
         (ancho // 4 * 0.35, -alto // 14, ancho // 4 * 1.2, alto // 4 * 0.42),
-        fill=(*_AZUL_BRILLO, 120),
+        fill=(*paleta.brillo, 120),
     )
     brillo = brillo.filter(ImageFilter.GaussianBlur(28)).resize((ancho, alto), Image.LANCZOS)
     lienzo.alpha_composite(brillo)
@@ -183,7 +179,7 @@ def _imagen_circulo(f: FilaImagen) -> tuple[Image.Image | None, float]:
     return _abrir(f.miniatura), 0.5
 
 
-def _bloque_video(f: FilaImagen, w: int, h: int) -> Image.Image:
+def _bloque_video(f: FilaImagen, w: int, h: int, paleta: _Paleta) -> Image.Image:
     """The video's thumbnail as a rounded 16:9 block (artist photo, then initials, if missing)."""
     s = 4
     imagen = _abrir(f.miniatura) or _abrir(f.foto_artista)
@@ -192,7 +188,7 @@ def _bloque_video(f: FilaImagen, w: int, h: int) -> Image.Image:
             "RGBA"
         )
     else:
-        base = Image.new("RGBA", (w * s, h * s), (*_AZUL_NOCHE_WEB, 255))
+        base = Image.new("RGBA", (w * s, h * s), (*paleta.oscuro, 255))
         iniciales = "".join(p[0] for p in _limpiar(f.artista or "").split()[:2]) or "PV"
         ImageDraw.Draw(base).text(
             (w * s / 2, h * s / 2),
@@ -213,7 +209,12 @@ def _bloque_video(f: FilaImagen, w: int, h: int) -> Image.Image:
 
 
 def _circulo_foto(
-    foto: Image.Image | None, nombre: str, d: int, borde: int = 0, enfoque_y: float = 0.3
+    foto: Image.Image | None,
+    nombre: str,
+    d: int,
+    paleta: _Paleta,
+    borde: int = 0,
+    enfoque_y: float = 0.3,
 ) -> Image.Image:
     """Round picture (initials on brand blue when there is no picture at all)."""
     s = 4
@@ -221,7 +222,7 @@ def _circulo_foto(
         recorte = ImageOps.fit(foto, (d * s, d * s), Image.LANCZOS, centering=(0.5, enfoque_y))
         recorte = recorte.convert("RGBA")
     else:
-        recorte = Image.new("RGBA", (d * s, d * s), (*_AZUL_NOCHE_WEB, 255))
+        recorte = Image.new("RGBA", (d * s, d * s), (*paleta.oscuro, 255))
         iniciales = "".join(p[0] for p in _limpiar(nombre).split()[:2]) or "PV"
         fuente = _fuente("Anton-Regular.ttf", d * s * 0.42)
         ImageDraw.Draw(recorte).text(
@@ -240,7 +241,12 @@ def _circulo_foto(
 
 
 def _flecha(
-    draw: ImageDraw.ImageDraw, cx: float, cy: float, r: float, tendencia: str | None
+    draw: ImageDraw.ImageDraw,
+    cx: float,
+    cy: float,
+    r: float,
+    tendencia: str | None,
+    destacado: tuple[int, int, int],
 ) -> None:
     if tendencia == "sube":
         draw.polygon([(cx, cy - r), (cx + r, cy + r * 0.8), (cx - r, cy + r * 0.8)], fill=_VERDE)
@@ -248,13 +254,37 @@ def _flecha(
         draw.polygon([(cx, cy + r), (cx + r, cy - r * 0.8), (cx - r, cy - r * 0.8)], fill=_ROJO)
     elif tendencia == "nuevo":
         fuente = _fuente("Montserrat.ttf", r * 1.25, 800)
-        draw.text((cx, cy), "NEW", font=fuente, fill=_AMBAR, anchor="mm")
+        draw.text((cx, cy), "NEW", font=fuente, fill=destacado, anchor="mm")
     else:
         draw.rectangle((cx - r * 0.8, cy - r * 0.18, cx + r * 0.8, cy + r * 0.18), fill=_GRIS)
 
 
+@dataclass(frozen=True, slots=True)
+class _Paleta:
+    fondo: tuple[int, int, int]
+    destacado: tuple[int, int, int]
+    texto_destacado: tuple[int, int, int]
+
+    @property
+    def oscuro(self) -> tuple[int, int, int]:
+        """A deeper `fondo`: top of the background and placeholder blocks."""
+        r, g, b = self.fondo
+        return round(r * 0.45), round(g * 0.45), round(b * 0.45)
+
+    @property
+    def brillo(self) -> tuple[int, int, int]:
+        r, g, b = self.fondo
+        return min(round(r * 1.2), 255), min(round(g * 1.25), 255), min(round(b * 1.25), 255)
+
+
 class PillowChartRenderer:
     """Draws the cover and the Top 10 card of a weekly edition."""
+
+    def __init__(self, colores: ColoresMarca | None = None) -> None:
+        colores = colores or ColoresMarca()
+        self._paleta = _Paleta(
+            _rgb(colores.fondo), _rgb(colores.destacado), _rgb(colores.texto_destacado)
+        )
 
     def renderizar(
         self,
@@ -268,7 +298,7 @@ class PillowChartRenderer:
         if not filas:
             raise ChartImagenError("La edición no tiene filas")
         alto = _ALTOS[formato]
-        lienzo = _fondo(_ANCHO, alto)
+        lienzo = _fondo(_ANCHO, alto, self._paleta)
         draw = ImageDraw.Draw(lienzo)
         sup, inf = _MARGEN_SUPERIOR[formato], _MARGEN_INFERIOR[formato]
         self._cabecera(lienzo, draw, sup)
@@ -355,12 +385,19 @@ class PillowChartRenderer:
         texto = f"SEMANA DEL {_rango_semana(semana_fin).upper()}"
         ancho = fuente.getlength(texto) + 56
         x = (_ANCHO - ancho) / 2
-        draw.rounded_rectangle((x, y, x + ancho, y + pildora), radius=26, fill=_AMARILLO_WEB)
-        _texto(draw, _ANCHO / 2, y + pildora / 2 + 10, texto, fuente, _AZUL_NOCHE_WEB, "c")
+        draw.rounded_rectangle(
+            (x, y, x + ancho, y + pildora), radius=26, fill=self._paleta.destacado
+        )
+        _texto(
+            draw, _ANCHO / 2, y + pildora / 2 + 10, texto, fuente, self._paleta.texto_destacado, "c"
+        )
         y += pildora + 22 + hueco
 
         # Headline.
-        for linea, color in (("LO MÁS ESCUCHADO", _BLANCO), ("DE LA SEMANA", _AMARILLO_WEB)):
+        for linea, color in (
+            ("LO MÁS ESCUCHADO", _BLANCO),
+            ("DE LA SEMANA", self._paleta.destacado),
+        ):
             fuente = _fuente("Anton-Regular.ttf", 96)
             y += 104
             _texto(draw, _ANCHO / 2 + 5, y - 20 + 5, linea, fuente, _NEGRO, "c")
@@ -373,17 +410,17 @@ class PillowChartRenderer:
         if miniatura is not None:
             bloque_img = ImageOps.fit(miniatura, (tw, th), Image.LANCZOS)
         else:
-            bloque_img = Image.new("RGB", (tw, th), _AZUL_NOCHE_WEB)
+            bloque_img = Image.new("RGB", (tw, th), self._paleta.oscuro)
         marco = Image.new("RGBA", (tw + 16, th + 16), (*_BLANCO, 255))
         marco.paste(bloque_img, (8, 8))
         lienzo.alpha_composite(marco, (round(x_img) - 8, round(y) - 8))
-        draw.rectangle((x_img - 8, y - 8, x_img + 104, y + 132), fill=_AMARILLO_WEB)
+        draw.rectangle((x_img - 8, y - 8, x_img + 104, y + 132), fill=self._paleta.destacado)
         fuente = _fuente("Anton-Regular.ttf", 128)
-        _texto(draw, x_img + 48, y + 112, "1", fuente, _AZUL_NOCHE_WEB, "c")
+        _texto(draw, x_img + 48, y + 112, "1", fuente, self._paleta.texto_destacado, "c")
         d = 230
         foto, enfoque = _imagen_circulo(top)
         circulo = _circulo_foto(
-            foto, top.artista or "Portal Vallenato", d, borde=8, enfoque_y=enfoque
+            foto, top.artista or "Portal Vallenato", d, self._paleta, borde=8, enfoque_y=enfoque
         )
         sombra = Image.new("RGBA", lienzo.size, (0, 0, 0, 0))
         cx, cy = min(round(x_img + tw - d / 2 - 30), _ANCHO - d - 24), round(y + th - d / 2 + 24)
@@ -412,7 +449,7 @@ class PillowChartRenderer:
             y,
             f"{_vistas(top.vistas_semana)} vistas esta semana",
             _fuente("Montserrat.ttf", 25, 700),
-            _AMARILLO_WEB,
+            self._paleta.destacado,
         )
         y += 24 + hueco
 
@@ -436,7 +473,9 @@ class PillowChartRenderer:
         _texto(draw, 36, y, "TOP 10 DE LA SEMANA", fuente, _BLANCO)
         fuente = _fuente("Montserrat.ttf", 27, 700)
         y += 50
-        _texto(draw, 36, y, f"DEL {_rango_semana(semana_fin).upper()}", fuente, _AMARILLO_WEB)
+        _texto(
+            draw, 36, y, f"DEL {_rango_semana(semana_fin).upper()}", fuente, self._paleta.destacado
+        )
         y += 28
         fila_h = min((y1 - y) / max(len(filas), 1), 150)
         for i, fila in enumerate(filas):
@@ -461,20 +500,28 @@ class PillowChartRenderer:
         bw = h * 0.72
         x = x0 + 36
         draw.rectangle(
-            (x, centro - (h - 18) / 2, x + bw, centro + (h - 18) / 2), fill=_AMARILLO_WEB
+            (x, centro - (h - 18) / 2, x + bw, centro + (h - 18) / 2), fill=self._paleta.destacado
         )
         _texto(
             draw, x + bw / 2, centro + h * 0.2, str(f.posicion),
-            _fuente("Anton-Regular.ttf", h * 0.58), _AZUL_NOCHE_WEB, "c",
+            _fuente("Anton-Regular.ttf", h * 0.58), self._paleta.texto_destacado, "c",
         )  # fmt: skip
         th = round(h - 18)
         tw = round(th * 16 / 9)
         x += bw + 16
-        lienzo.alpha_composite(_bloque_video(f, tw, th), (round(x), round(centro - th / 2)))
+        lienzo.alpha_composite(
+            _bloque_video(f, tw, th, self._paleta), (round(x), round(centro - th / 2))
+        )
         if f.posicion <= 3:  # the top 3 also get the artist's photo, small, on the corner
             ds = round(h * 0.52)
             lienzo.alpha_composite(
-                _circulo_foto(_abrir(f.foto_artista), f.artista or "Portal Vallenato", ds, borde=3),
+                _circulo_foto(
+                    _abrir(f.foto_artista),
+                    f.artista or "Portal Vallenato",
+                    ds,
+                    self._paleta,
+                    borde=3,
+                ),
                 (round(x + tw - ds * 0.6), round(centro + th / 2 - ds * 0.9)),
             )
         x += tw + 26
@@ -503,4 +550,4 @@ class PillowChartRenderer:
             draw, x_der - 50, centro + h * 0.27, "vistas",
             _fuente("Montserrat.ttf", h * 0.17, 500), _GRIS, "r",
         )  # fmt: skip
-        _flecha(draw, x_der - 16, centro, h * 0.11, f.tendencia)
+        _flecha(draw, x_der - 16, centro, h * 0.11, f.tendencia, self._paleta.destacado)

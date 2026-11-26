@@ -19,13 +19,13 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, Response
 
-from config.settings import get_settings
 from app.api.errors import register_exception_handlers
 from app.api.routers import (
     ai_configuracion,
     auth,
     chart,
     clients,
+    colores_marca,
     dashboard,
     deudores,
     discovery,
@@ -41,6 +41,7 @@ from app.api.routers import (
     reportes,
     social,
 )
+from config.settings import get_settings
 
 FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
@@ -62,6 +63,7 @@ app.include_router(auth.router)
 app.include_router(chart.router)
 app.include_router(chart.router_publico)
 app.include_router(clients.router)
+app.include_router(colores_marca.router)
 app.include_router(dashboard.router)
 app.include_router(deudores.router)
 app.include_router(discovery.router)

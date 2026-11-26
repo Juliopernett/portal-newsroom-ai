@@ -224,9 +224,10 @@ def get_detector_feed() -> FeedDetector:
     return HttpFeedDetector()
 
 
-def get_portada_renderer() -> PortadaRenderer:
-    """Return the renderer that builds branded news covers (Sprint Portadas, 2026-10-29)."""
-    return PillowPortadaRenderer()
+def get_portada_renderer(uow: UnitOfWork = Depends(get_unit_of_work)) -> PortadaRenderer:
+    """Return the renderer that builds branded news covers (Sprint Portadas, 2026-10-29),
+    with the colours saved in Configuración."""
+    return PillowPortadaRenderer(uow.colores_marca.get())
 
 
 def get_media_storage() -> MediaStorage:

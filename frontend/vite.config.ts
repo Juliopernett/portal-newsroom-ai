@@ -53,6 +53,7 @@ export default defineConfig({
       // own top-level path.
       '/auth': backendProxy(),
       '/clients': backendProxy(),
+      '/colores-marca': backendProxy(),
       '/dashboard': backendProxy(),
       '/discovery': backendProxy(),
       '/gastos': backendProxy(),
