@@ -47,8 +47,8 @@ _TITULAR_ESCALA = 0.90
 _SOMBRA = (-6, 6)
 
 # Layout with a hook (`antetitulo`), approved 2026-11-26: the hook on one line
-# inside a yellow button, and a smaller white headline over a deep blue gradient.
-# Colours are the ones portalvallenato.com uses (its Brochure button).
+# inside a yellow button, and a smaller white headline over the site's menu blue.
+# Colours are the ones portalvallenato.com uses.
 # `_GANCHO_ALTO_MAX` keeps the whole block below the highlight circle.
 _AMARILLO_WEB = (0xE1, 0xCE, 0x26)
 _AZUL_NOCHE_WEB = (0x08, 0x3A, 0x7A)
@@ -65,7 +65,7 @@ _GANCHO_TITULAR_ANCHO = 1000
 _GANCHO_TITULAR_TAMANO_MAX = 54
 _GANCHO_TITULAR_TAMANO_COMODO = 40
 _GANCHO_TITULAR_INTERLINEA = 1.14
-_GANCHO_GRAD = (835, 470, _AZUL_NOCHE_WEB)
+_GANCHO_GRAD = (835, 470, _AZUL)  # el azul del menú de la web
 
 # A quoted name up to this long ("‘LINDA REMIX’") is never split across lines.
 _CITA_MAX_CARACTERES = 24
