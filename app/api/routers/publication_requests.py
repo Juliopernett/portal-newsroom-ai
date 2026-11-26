@@ -111,7 +111,12 @@ from core.entities.user import User
 from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.media_storage import MediaStorage
-from core.ports.portada_renderer import PortadaRenderer, VariantePortada
+from core.ports.portada_renderer import (
+    MAX_CARACTERES_ANTETITULO,
+    ZOOM_MAXIMO,
+    PortadaRenderer,
+    VariantePortada,
+)
 from core.ports.unit_of_work import UnitOfWork
 from core.services.candidate_draft_service import PortadaParaBorrador
 from core.services.destino_publicacion_service import (
@@ -391,9 +396,10 @@ def crear_borrador_wordpress(
     imagen_circulo: UploadFile | None = File(None),
     variante: VariantePortada = Form(VariantePortada.NOTICIAS),
     titular_portada: str | None = Form(None, max_length=200),
-    antetitulo: str | None = Form(None, max_length=60),
+    antetitulo: str | None = Form(None, max_length=MAX_CARACTERES_ANTETITULO),
     enfoque_x: float = Form(0.5, ge=0, le=1),
     enfoque_y: float = Form(0.3, ge=0, le=1),
+    zoom: float = Form(1.0, ge=1, le=ZOOM_MAXIMO),
     descripcion_foto: str | None = Form(None, max_length=300),
 ) -> CrearBorradorWordpressOut:
     """Prepare `request_id`'s content with AI, then create its WordPress draft.
@@ -437,6 +443,7 @@ def crear_borrador_wordpress(
             ),
             enfoque_x=enfoque_x,
             enfoque_y=enfoque_y,
+            zoom=zoom,
         )
     destino = uow.destinos_publicacion.get_by_id(destino_id)
     if destino is None or destino.publication_request_id != request_id:

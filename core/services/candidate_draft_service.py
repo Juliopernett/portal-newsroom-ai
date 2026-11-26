@@ -60,6 +60,7 @@ class PortadaParaBorrador:
     imagen_circulo: bytes | None = None
     enfoque_x: float = 0.5
     enfoque_y: float = 0.3
+    zoom: float = 1.0
 
 
 class BorradorDesdeCandidatoError(RuntimeError):
@@ -184,6 +185,7 @@ def crear_borrador_desde_candidato(
                 imagen_circulo=portada.imagen_circulo,
                 enfoque_x=portada.enfoque_x,
                 enfoque_y=portada.enfoque_y,
+                zoom=portada.zoom,
             ),
             formato="jpeg",
         )

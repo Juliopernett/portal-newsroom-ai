@@ -45,7 +45,22 @@ _TITULAR_TRACKING = 0.01
 # template's own sample line ("‘VAMOS PA’ AFUERA CON NUEVA") measures ~950px, as in Canva.
 _TITULAR_ESCALA = 0.90
 _SOMBRA = (-6, 6)
-_ANTETITULO_FACTOR = 1.38
+
+# Layout with a hook (`antetitulo`), approved 2026-11-26: the hook on one gold
+# line, a short gold rule, and a smaller white headline over a deeper gradient.
+# `_GANCHO_ALTO_MAX` keeps the whole block below the highlight circle.
+_ORO = (245, 190, 60)
+_GANCHO_ANCHO = 1000
+_GANCHO_BASE_Y = 1250
+_GANCHO_ALTO_MAX = 270
+_GANCHO_TAMANO_MAX = 100
+_GANCHO_INTERLINEA = 1.08
+_GANCHO_RAYA_ESPACIO = 38
+_GANCHO_RAYA = (120, 7)
+_GANCHO_TITULAR_TAMANO_MAX = 52
+_GANCHO_TITULAR_TAMANO_COMODO = 40
+_GANCHO_TITULAR_INTERLINEA = 1.14
+_GANCHO_GRAD = (835, 470, (24, 44, 96))
 
 # Highlight circle (template page 3/4).
 _CIRCULO_CENTRO = (814, 772)
@@ -91,9 +106,16 @@ def _dibujar(
         draw.text((cx, y), caracter, font=fuente, fill=color, anchor="ls")
 
 
-def _cubrir(imagen: Image.Image, ancho: int, alto: int, fx: float, fy: float) -> Image.Image:
+def _cubrir(
+    imagen: Image.Image, ancho: int, alto: int, fx: float, fy: float, zoom: float = 1.0
+) -> Image.Image:
     """Scale-and-crop `imagen` to fill `ancho`x`alto`, keeping the (fx, fy) focus."""
-    return ImageOps.fit(imagen, (ancho, alto), Image.LANCZOS, centering=(fx, fy))
+    w = min(imagen.width, imagen.height * ancho / alto) / max(zoom, 1.0)
+    h = w * alto / ancho
+    x = max(imagen.width - w, 0) * fx
+    y = max(imagen.height - h, 0) * fy
+    caja = (x, y, min(x + w, imagen.width), min(y + h, imagen.height))
+    return imagen.resize((ancho, alto), Image.LANCZOS, box=caja)
 
 
 def _abrir(datos: bytes, nombre: str) -> Image.Image:
@@ -105,15 +127,17 @@ def _abrir(datos: bytes, nombre: str) -> Image.Image:
         raise PortadaError(f"No se pudo leer la {nombre}: {exc}") from exc
 
 
-def _degradado() -> Image.Image:
-    capa = Image.new("RGBA", (_ANCHO, _ALTO), (*_AZUL, 0))
+def _degradado(
+    inicio: int = _GRAD_INICIO, largo: int = _GRAD_LARGO, color: tuple[int, int, int] = _AZUL
+) -> Image.Image:
+    capa = Image.new("RGBA", (_ANCHO, _ALTO), (*color, 0))
     px = capa.load()
     for y in range(_ALTO):
-        t = min(max((y - _GRAD_INICIO) / _GRAD_LARGO, 0.0), 1.0)
+        t = min(max((y - inicio) / largo, 0.0), 1.0)
         alfa = int(255 * (1 - (1 - t) ** _GRAD_CAPAS))
         if alfa:
             for x in range(_ANCHO):
-                px[x, y] = (*_AZUL, alfa)
+                px[x, y] = (*color, alfa)
     return capa
 
 
@@ -148,16 +172,21 @@ class PillowPortadaRenderer:
             raise PortadaError("El titular no puede estar vacío")
 
         base = _abrir(solicitud.imagen_base, "imagen base")
-        lienzo = _cubrir(base, _ANCHO, _ALTO, solicitud.enfoque_x, solicitud.enfoque_y)
+        lienzo = _cubrir(
+            base, _ANCHO, _ALTO, solicitud.enfoque_x, solicitud.enfoque_y, solicitud.zoom
+        )
         lienzo = lienzo.convert("RGBA")
-        lienzo.alpha_composite(_degradado())
+        lienzo.alpha_composite(_degradado(*_GANCHO_GRAD) if antetitulo else _degradado())
 
         if solicitud.imagen_circulo is not None:
             self._circulo(lienzo, _abrir(solicitud.imagen_circulo, "imagen del círculo"))
 
         draw = ImageDraw.Draw(lienzo)
         self._cabecera(lienzo, draw, solicitud.variante)
-        self._titular(draw, antetitulo, titular)
+        if antetitulo:
+            self._gancho_y_titular(draw, antetitulo, titular)
+        else:
+            self._titular(draw, titular)
         self._pie(lienzo, draw)
 
         salida = io.BytesIO()
@@ -203,41 +232,71 @@ class PillowPortadaRenderer:
         capa.paste(imagen, (x, y))
         lienzo.alpha_composite(capa)
 
-    def _titular(self, draw: ImageDraw.ImageDraw, antetitulo: str, titular: str) -> None:
+    def _titular(self, draw: ImageDraw.ImageDraw, titular: str) -> None:
         tamano = _TITULAR_TAMANO_MAX
         while True:
             cuerpo = _TITULAR_ESCALA * tamano
             fuente = _fuente("Anton-Regular.ttf", cuerpo)
             tracking = _TITULAR_TRACKING * cuerpo
-            lineas = [
-                (linea, 1.0) for linea in _envolver(titular, fuente, tracking, _TITULAR_ANCHO)
-            ]
-            if antetitulo:
-                lineas.insert(0, (antetitulo, _ANTETITULO_FACTOR))
-            alto = sum(cuerpo * factor * _TITULAR_INTERLINEA for _, factor in lineas)
-            cabe = alto <= _TITULAR_ALTO_MAX and (len(lineas) <= (4 if antetitulo else 3))
+            lineas = _envolver(titular, fuente, tracking, _TITULAR_ANCHO)
+            alto = len(lineas) * cuerpo * _TITULAR_INTERLINEA
+            cabe = alto <= _TITULAR_ALTO_MAX and len(lineas) <= 3
             if cabe or tamano <= _TITULAR_TAMANO_MIN:
                 break
             tamano -= 1
 
         y = _TITULAR_BASE_Y - alto
-        for texto, factor in lineas:
-            tam = cuerpo * factor
-            fuente_linea = _fuente("Anton-Regular.ttf", tam)
-            tracking_linea = _TITULAR_TRACKING * tam
-            y += tam * _TITULAR_INTERLINEA
-            x = (_ANCHO - _ancho(texto, fuente_linea, tracking_linea)) / 2
-            baseline = y - tam * 0.2
-            _dibujar(
-                draw,
-                x + _SOMBRA[0],
-                baseline + _SOMBRA[1],
-                texto,
-                fuente_linea,
-                _NEGRO,
-                tracking_linea,
-            )
-            _dibujar(draw, x, baseline, texto, fuente_linea, _BLANCO, tracking_linea)
+        for texto in lineas:
+            y += cuerpo * _TITULAR_INTERLINEA
+            self._linea_centrada(draw, texto, cuerpo, y - cuerpo * 0.2, _BLANCO, _SOMBRA)
+
+    def _gancho_y_titular(self, draw: ImageDraw.ImageDraw, gancho: str, titular: str) -> None:
+        # El gancho va siempre en una línea: se reduce hasta caber.
+        tam_gancho = _GANCHO_TAMANO_MAX
+        while tam_gancho > 1:
+            fuente = _fuente("Anton-Regular.ttf", tam_gancho)
+            if _ancho(gancho, fuente, _TITULAR_TRACKING * tam_gancho) <= _GANCHO_ANCHO:
+                break
+            tam_gancho -= 1
+        alto_gancho = tam_gancho * _GANCHO_INTERLINEA + _GANCHO_RAYA_ESPACIO
+
+        # El titular prefiere dos líneas; si es muy largo usa más, cada vez menores.
+        tam = _GANCHO_TITULAR_TAMANO_MAX
+        while True:
+            fuente = _fuente("Anton-Regular.ttf", tam)
+            lineas = _envolver(titular, fuente, _TITULAR_TRACKING * tam, _GANCHO_ANCHO)
+            alto = alto_gancho + len(lineas) * tam * _GANCHO_TITULAR_INTERLINEA
+            comodo = len(lineas) <= 2 or tam <= _GANCHO_TITULAR_TAMANO_COMODO
+            if (alto <= _GANCHO_ALTO_MAX and comodo) or tam <= 20:
+                break
+            tam -= 1
+
+        sombra = (round(_SOMBRA[0] * 0.7), round(_SOMBRA[1] * 0.7))
+        y = _GANCHO_BASE_Y - alto
+        self._linea_centrada(draw, gancho, tam_gancho, y + tam_gancho * 0.9, _ORO, sombra)
+        y += tam_gancho * _GANCHO_INTERLINEA
+        ancho_raya, grosor = _GANCHO_RAYA
+        x = (_ANCHO - ancho_raya) / 2
+        draw.rectangle((x, y + 14, x + ancho_raya, y + 14 + grosor), fill=_ORO)
+        y += _GANCHO_RAYA_ESPACIO
+        for texto in lineas:
+            self._linea_centrada(draw, texto, tam, y + tam * 0.9, _BLANCO, sombra)
+            y += tam * _GANCHO_TITULAR_INTERLINEA
+
+    @staticmethod
+    def _linea_centrada(
+        draw: ImageDraw.ImageDraw,
+        texto: str,
+        tamano: float,
+        baseline: float,
+        color: tuple[int, int, int],
+        sombra: tuple[int, int],
+    ) -> None:
+        fuente = _fuente("Anton-Regular.ttf", tamano)
+        tracking = _TITULAR_TRACKING * tamano
+        x = (_ANCHO - _ancho(texto, fuente, tracking)) / 2
+        _dibujar(draw, x + sombra[0], baseline + sombra[1], texto, fuente, _NEGRO, tracking)
+        _dibujar(draw, x, baseline, texto, fuente, color, tracking)
 
     def _pie(self, lienzo: Image.Image, draw: ImageDraw.ImageDraw) -> None:
         fuente = _fuente("Montserrat.ttf", 22.0, 700)

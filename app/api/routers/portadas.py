@@ -15,7 +15,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from app.api.dependencies import get_current_user, get_portada_renderer
 from app.api.uploads import ensure_image_matches_type
 from config.settings import get_settings
-from core.ports.portada_renderer import PortadaRenderer, SolicitudPortada, VariantePortada
+from core.ports.portada_renderer import (
+    MAX_CARACTERES_ANTETITULO,
+    ZOOM_MAXIMO,
+    PortadaRenderer,
+    SolicitudPortada,
+    VariantePortada,
+)
 from core.services.media_asset_service import TIPOS_IMAGEN_PERMITIDOS
 
 router = APIRouter(
@@ -41,10 +47,11 @@ def generar_portada(
     imagen_base: UploadFile = File(...),
     titular: str = Form(..., min_length=1, max_length=200),
     variante: VariantePortada = Form(VariantePortada.NOTICIAS),
-    antetitulo: str | None = Form(None, max_length=60),
+    antetitulo: str | None = Form(None, max_length=MAX_CARACTERES_ANTETITULO),
     imagen_circulo: UploadFile | None = File(None),
     enfoque_x: float = Form(0.5, ge=0, le=1),
     enfoque_y: float = Form(0.3, ge=0, le=1),
+    zoom: float = Form(1.0, ge=1, le=ZOOM_MAXIMO),
     formato: str = Form("png", pattern="^(png|jpeg)$"),
     renderer: PortadaRenderer = Depends(get_portada_renderer),
 ) -> Response:
@@ -66,6 +73,7 @@ def generar_portada(
         ),
         enfoque_x=enfoque_x,
         enfoque_y=enfoque_y,
+        zoom=zoom,
     )
     contenido = renderer.renderizar(solicitud, formato=formato)
     return Response(

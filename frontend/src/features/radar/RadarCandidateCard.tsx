@@ -37,6 +37,9 @@ import { formatHoras, horasEnEspera } from '@/features/solicitudes/utils'
 import { radarApi, type NewsCandidate, type OpcionesPortada } from './api'
 import { CampoDescripcionFoto } from './CampoDescripcionFoto'
 import { PanelPublicacion } from './PanelPublicacion'
+import { ENCUADRE_INICIAL } from '@/features/portadas/api'
+import { CampoGancho } from '@/features/portadas/CampoGancho'
+import { EncuadrePortada } from '@/features/portadas/EncuadrePortada'
 
 const ESTADO_LABELS: Record<NewsCandidate['estado'], string> = {
   nuevo: 'Nuevo',
@@ -82,6 +85,7 @@ export function RadarCandidateCard({
   const [titularPortada, setTitularPortada] = useState('')
   const [antetituloPortada, setAntetituloPortada] = useState('')
   const [descripcionFoto, setDescripcionFoto] = useState('')
+  const [encuadre, setEncuadre] = useState(ENCUADRE_INICIAL)
 
   function onExito(mensaje: string) {
     queryClient.invalidateQueries({ queryKey: RADAR_KEY })
@@ -110,6 +114,7 @@ export function RadarCandidateCard({
               titular: titularPortada,
               antetitulo: antetituloPortada,
               descripcionFoto,
+              ...encuadre,
             }
           : null,
       ),
@@ -337,7 +342,7 @@ export function RadarCandidateCard({
                   {crearNoticiaMutation.isPending ? 'Creando…' : 'Crear noticia'}
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
                 <AlertDialogHeader>
                   <AlertDialogTitle>¿Crear noticia a partir de este candidato?</AlertDialogTitle>
                   <AlertDialogDescription>
@@ -361,7 +366,10 @@ export function RadarCandidateCard({
                       id={`portada-foto-${candidato.id}`}
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
-                      onChange={(e) => setImagenPortada(e.target.files?.[0] ?? null)}
+                      onChange={(e) => {
+                        setImagenPortada(e.target.files?.[0] ?? null)
+                        setEncuadre(ENCUADRE_INICIAL)
+                      }}
                     />
                   </div>
                   {imagenPortada && (
@@ -395,17 +403,11 @@ export function RadarCandidateCard({
                           />
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor={`portada-antetitulo-${candidato.id}`}>
-                          Antetítulo (ej. ¡CONFIRMADO!)
-                        </Label>
-                        <Input
-                          id={`portada-antetitulo-${candidato.id}`}
-                          maxLength={60}
-                          value={antetituloPortada}
-                          onChange={(e) => setAntetituloPortada(e.target.value)}
-                        />
-                      </div>
+                      <CampoGancho
+                        id={`portada-antetitulo-${candidato.id}`}
+                        value={antetituloPortada}
+                        onChange={setAntetituloPortada}
+                      />
                       <div className="flex flex-col gap-1.5">
                         <Label htmlFor={`portada-titular-${candidato.id}`}>Titular de la portada</Label>
                         <Input
@@ -416,6 +418,19 @@ export function RadarCandidateCard({
                           onChange={(e) => setTitularPortada(e.target.value)}
                         />
                       </div>
+                      <EncuadrePortada
+                        key={`${imagenPortada.name}-${imagenPortada.lastModified}`}
+                        idBase={candidato.id}
+                        portada={{
+                          imagenBase: imagenPortada,
+                          imagenCirculo,
+                          variante: variantePortada,
+                          titular: titularPortada,
+                          antetitulo: antetituloPortada,
+                          ...encuadre,
+                        }}
+                        onChange={setEncuadre}
+                      />
                     </>
                   )}
                 </div>

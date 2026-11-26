@@ -236,6 +236,7 @@ def preparar_y_crear_borrador(
                 imagen_circulo=portada.imagen_circulo,
                 enfoque_x=portada.enfoque_x,
                 enfoque_y=portada.enfoque_y,
+                zoom=portada.zoom,
             ),
             formato="jpeg",
         )

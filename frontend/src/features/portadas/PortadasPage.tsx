@@ -9,7 +9,9 @@ import { guardarBlob } from '@/lib/descargar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SelectNative } from '@/components/ui/select-native'
-import { portadasApi, type VariantePortada } from './api'
+import { ENCUADRE_INICIAL, portadasApi, type VariantePortada } from './api'
+import { CampoGancho } from './CampoGancho'
+import { ControlesEncuadre } from './ControlesEncuadre'
 
 export function PortadasPage() {
   const [imagenBase, setImagenBase] = useState<File | null>(null)
@@ -17,8 +19,7 @@ export function PortadasPage() {
   const [titular, setTitular] = useState('')
   const [antetitulo, setAntetitulo] = useState('')
   const [variante, setVariante] = useState<VariantePortada>('noticias')
-  const [enfoqueY, setEnfoqueY] = useState(30)
-  const [enfoqueX, setEnfoqueX] = useState(50)
+  const [encuadre, setEncuadre] = useState(ENCUADRE_INICIAL)
   const [vistaPrevia, setVistaPrevia] = useState<string | null>(null)
 
   // Libera la URL del blob anterior al reemplazarla o al salir de la página.
@@ -36,14 +37,18 @@ export function PortadasPage() {
         titular,
         antetitulo,
         variante,
-        enfoqueX: enfoqueX / 100,
-        enfoqueY: enfoqueY / 100,
+        ...encuadre,
       }),
-    onSuccess: (blob) => setVistaPrevia(URL.createObjectURL(blob)),
-    onError: (err) => toast.error(errorMessage(err)),
   })
 
   const puedeGenerar = imagenBase !== null && titular.trim().length > 0
+
+  // Los callbacks de `mutate` solo corren para la petición más reciente.
+  const generar = () =>
+    generarMutation.mutate(undefined, {
+      onSuccess: (blob) => setVistaPrevia(URL.createObjectURL(blob)),
+      onError: (err) => toast.error(errorMessage(err)),
+    })
 
   return (
     <div className="flex flex-col gap-4">
@@ -75,7 +80,10 @@ export function PortadasPage() {
               id="portada-base"
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => setImagenBase(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                setImagenBase(e.target.files?.[0] ?? null)
+                setEncuadre(ENCUADRE_INICIAL)
+              }}
             />
           </div>
 
@@ -92,16 +100,11 @@ export function PortadasPage() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="portada-antetitulo">Antetítulo (opcional)</Label>
-            <Input
-              id="portada-antetitulo"
-              placeholder="¡CONFIRMADO!"
-              maxLength={60}
-              value={antetitulo}
-              onChange={(e) => setAntetitulo(e.target.value)}
-            />
-          </div>
+          <CampoGancho
+            id="portada-antetitulo"
+            value={antetitulo}
+            onChange={setAntetitulo}
+          />
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="portada-titular">Titular</Label>
@@ -117,36 +120,18 @@ export function PortadasPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="portada-enfoque-y">Encuadre vertical</Label>
-              <input
-                id="portada-enfoque-y"
-                type="range"
-                min={0}
-                max={100}
-                value={enfoqueY}
-                onChange={(e) => setEnfoqueY(Number(e.target.value))}
-              />
-              <span className="text-xs text-muted-foreground">Arriba ↔ abajo</span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="portada-enfoque-x">Encuadre horizontal</Label>
-              <input
-                id="portada-enfoque-x"
-                type="range"
-                min={0}
-                max={100}
-                value={enfoqueX}
-                onChange={(e) => setEnfoqueX(Number(e.target.value))}
-              />
-              <span className="text-xs text-muted-foreground">Izquierda ↔ derecha</span>
-            </div>
-          </div>
+          <ControlesEncuadre
+            idBase="portadas"
+            imagen={imagenBase}
+            value={encuadre}
+            onChange={setEncuadre}
+            // Con una vista previa a la vista, se actualiza sola al soltar un control.
+            onSoltar={vistaPrevia && puedeGenerar ? generar : undefined}
+          />
 
           <Button
             disabled={!puedeGenerar || generarMutation.isPending}
-            onClick={() => generarMutation.mutate()}
+            onClick={generar}
           >
             {generarMutation.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
             Generar portada

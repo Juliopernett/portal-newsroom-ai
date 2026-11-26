@@ -300,3 +300,18 @@ def test_rejects_an_already_procesado_candidate() -> None:
         crear_borrador_desde_candidato(
             _candidato(estado=EstadoNewsCandidate.PROCESADO), FakeAIProvider(), _FakeCMS()
         )
+
+
+def test_the_framing_reaches_the_renderer() -> None:
+    renderer = _FakeRenderer()
+
+    crear_borrador_desde_candidato(
+        _candidato(),
+        FakeAIProvider(respuesta_json=_RESPUESTA),
+        _FakeCMS(),
+        portada=PortadaParaBorrador(imagen_base=b"foto", enfoque_x=0.2, zoom=1.5),
+        portada_renderer=renderer,
+    )
+
+    assert renderer.solicitud is not None
+    assert (renderer.solicitud.enfoque_x, renderer.solicitud.zoom) == (0.2, 1.5)

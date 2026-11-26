@@ -68,3 +68,13 @@ def test_generar_portada_requires_login(unauthenticated_client: TestClient) -> N
     )
 
     assert response.status_code == 401
+
+
+def test_rejects_a_hook_that_does_not_fit_one_line(client: TestClient) -> None:
+    response = client.post(
+        "/portadas",
+        files={"imagen_base": ("foto.jpg", b"x", "image/jpeg")},
+        data={"titular": "Titular", "antetitulo": "a" * 36},
+    )
+
+    assert response.status_code == 422

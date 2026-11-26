@@ -1,3 +1,4 @@
+import type { Encuadre } from '@/features/portadas/api'
 import { api } from '@/api/client'
 
 export type EstadoNewsCandidate = 'nuevo' | 'guardado' | 'descartado' | 'procesado'
@@ -44,7 +45,7 @@ export interface NewsCandidate {
 
 // Opciones de portada de "Crear noticia" — todas opcionales: sin
 // `imagenBase` el borrador se crea sin imagen destacada.
-export interface OpcionesPortada {
+export interface OpcionesPortada extends Encuadre {
   imagenBase: File
   imagenCirculo: File | null
   variante: 'noticias' | 'lo_ultimo'
@@ -77,6 +78,9 @@ export const radarApi = {
     form.append('imagen_base', portada.imagenBase)
     if (portada.imagenCirculo) form.append('imagen_circulo', portada.imagenCirculo)
     form.append('variante', portada.variante)
+    form.append('enfoque_x', String(portada.enfoqueX))
+    form.append('enfoque_y', String(portada.enfoqueY))
+    form.append('zoom', String(portada.zoom))
     if (portada.titular.trim()) form.append('titular_portada', portada.titular.trim())
     if (portada.antetitulo.trim()) form.append('antetitulo', portada.antetitulo.trim())
     if (portada.descripcionFoto.trim())

@@ -51,7 +51,12 @@ from core.ports.ai_provider import AIProvider
 from core.ports.cms_publisher import CMSPublisher
 from core.ports.content_extractor import ContentExtractor
 from core.ports.media_storage import MediaStorage
-from core.ports.portada_renderer import PortadaRenderer, VariantePortada
+from core.ports.portada_renderer import (
+    MAX_CARACTERES_ANTETITULO,
+    ZOOM_MAXIMO,
+    PortadaRenderer,
+    VariantePortada,
+)
 from core.ports.source_resolver import SourceResolver
 from core.ports.unit_of_work import UnitOfWork
 from core.services.candidate_draft_service import (
@@ -238,9 +243,10 @@ def crear_noticia_desde_candidato(
     imagen_circulo: UploadFile | None = File(None),
     variante: VariantePortada = Form(VariantePortada.NOTICIAS),
     titular_portada: str | None = Form(None, max_length=200),
-    antetitulo: str | None = Form(None, max_length=60),
+    antetitulo: str | None = Form(None, max_length=MAX_CARACTERES_ANTETITULO),
     enfoque_x: float = Form(0.5, ge=0, le=1),
     enfoque_y: float = Form(0.3, ge=0, le=1),
+    zoom: float = Form(1.0, ge=1, le=ZOOM_MAXIMO),
     descripcion_foto: str | None = Form(None, max_length=300),
 ) -> NewsCandidate:
     """Rewrite the candidate with the editorial AI and create a WordPress draft.
@@ -271,6 +277,7 @@ def crear_noticia_desde_candidato(
             ),
             enfoque_x=enfoque_x,
             enfoque_y=enfoque_y,
+            zoom=zoom,
         )
     try:
         actualizado = crear_borrador_desde_candidato(

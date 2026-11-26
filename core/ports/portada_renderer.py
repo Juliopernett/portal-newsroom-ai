@@ -14,6 +14,13 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
+# Longest kicker the cover takes: it is always drawn on a single line, and past
+# this length the letters would get too small to read on a phone.
+MAX_CARACTERES_ANTETITULO = 35
+
+
+ZOOM_MAXIMO = 2.5
+
 
 class VariantePortada(StrEnum):
     """Which label the cover carries — the two template families."""
@@ -32,10 +39,12 @@ class SolicitudPortada:
 
     `imagen_circulo`, when given, selects the "two photos" template: it
     is shown inside a highlight circle with an arrow pointing at it.
-    `antetitulo` is an optional bigger first line (e.g. "¡CONFIRMADO!").
+    `antetitulo` is the optional hook (e.g. "¡CONFIRMADO!"): one highlighted
+    line above a smaller headline.
     `enfoque_x`/`enfoque_y` (0..1) pick which part of the base photo
     survives the crop to 4:5 — 0.5/0.3 keeps faces, which sit high in
-    most photos.
+    most photos. At `zoom=1` the photo can only move along the side that
+    overflows 4:5; zooming in (up to `ZOOM_MAXIMO`) leaves room on both.
     """
 
     imagen_base: bytes
@@ -45,6 +54,7 @@ class SolicitudPortada:
     imagen_circulo: bytes | None = None
     enfoque_x: float = 0.5
     enfoque_y: float = 0.3
+    zoom: float = 1.0
 
 
 class PortadaRenderer(Protocol):

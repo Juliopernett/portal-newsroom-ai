@@ -17,6 +17,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SelectNative } from '@/components/ui/select-native'
+import { ENCUADRE_INICIAL } from '@/features/portadas/api'
+import { CampoGancho } from '@/features/portadas/CampoGancho'
+import { EncuadrePortada } from '@/features/portadas/EncuadrePortada'
 import type { OpcionesPortada } from '@/features/radar/api'
 import { CampoDescripcionFoto } from '@/features/radar/CampoDescripcionFoto'
 
@@ -41,6 +44,7 @@ export function CrearBorradorDialog({
   const [titular, setTitular] = useState('')
   const [antetitulo, setAntetitulo] = useState('')
   const [descripcionFoto, setDescripcionFoto] = useState('')
+  const [encuadre, setEncuadre] = useState(ENCUADRE_INICIAL)
 
   async function confirmar() {
     setPendiente(true)
@@ -48,7 +52,15 @@ export function CrearBorradorDialog({
     try {
       await crear(
         imagenBase
-          ? { imagenBase, imagenCirculo, variante, titular, antetitulo, descripcionFoto }
+          ? {
+              imagenBase,
+              imagenCirculo,
+              variante,
+              titular,
+              antetitulo,
+              descripcionFoto,
+              ...encuadre,
+            }
           : null,
         descripcionFoto,
       )
@@ -74,7 +86,7 @@ export function CrearBorradorDialog({
           Crear borrador
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle>Crear borrador en WordPress</AlertDialogTitle>
           <AlertDialogDescription>
@@ -96,7 +108,10 @@ export function CrearBorradorDialog({
               id={`portada-foto-${idBase}`}
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => setImagenBase(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                setImagenBase(e.target.files?.[0] ?? null)
+                setEncuadre(ENCUADRE_INICIAL)
+              }}
             />
           </div>
           <CampoDescripcionFoto
@@ -128,17 +143,11 @@ export function CrearBorradorDialog({
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={`portada-antetitulo-${idBase}`}>
-                  Antetítulo (ej. ¡CONFIRMADO!)
-                </Label>
-                <Input
-                  id={`portada-antetitulo-${idBase}`}
-                  maxLength={60}
-                  value={antetitulo}
-                  onChange={(e) => setAntetitulo(e.target.value)}
-                />
-              </div>
+              <CampoGancho
+                id={`portada-antetitulo-${idBase}`}
+                value={antetitulo}
+                onChange={setAntetitulo}
+              />
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor={`portada-titular-${idBase}`}>Titular de la portada</Label>
                 <Input
@@ -149,6 +158,12 @@ export function CrearBorradorDialog({
                   onChange={(e) => setTitular(e.target.value)}
                 />
               </div>
+              <EncuadrePortada
+                key={`${imagenBase.name}-${imagenBase.lastModified}`}
+                idBase={idBase}
+                portada={{ imagenBase, imagenCirculo, variante, titular, antetitulo, ...encuadre }}
+                onChange={setEncuadre}
+              />
             </>
           )}
         </div>

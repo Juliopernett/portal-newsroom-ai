@@ -8,7 +8,12 @@ import pytest
 from PIL import Image
 
 from agents.images.pillow_portada_renderer import PillowPortadaRenderer
-from core.ports.portada_renderer import PortadaError, SolicitudPortada, VariantePortada
+from core.ports.portada_renderer import (
+    MAX_CARACTERES_ANTETITULO,
+    PortadaError,
+    SolicitudPortada,
+    VariantePortada,
+)
 
 
 def _foto(
@@ -77,6 +82,96 @@ def test_long_headline_and_emoji_do_not_break_the_render() -> None:
     )
 
     assert _abrir(resultado).size == (1080, 1350)
+
+
+@pytest.mark.parametrize(
+    "antetitulo",
+    [
+        "¡Se unieron vallenato y carranga!",
+        "¡Se unieron el vallenato, la carranga y la música popular en una sola canción!",
+        "SUPERCALIFRAGILISTICOEXPIALIDOSOVALLENATODELMAGDALENAGRANDE",
+    ],
+)
+def test_a_long_kicker_stays_inside_the_cover(antetitulo: str) -> None:
+    resultado = PillowPortadaRenderer().renderizar(
+        SolicitudPortada(
+            imagen_base=_foto((40, 40, 40)),
+            antetitulo=antetitulo,
+            titular="Heredero y Rafa Pérez estrenan Linda Remix, un tema que sabe a Colombia",
+        )
+    )
+
+    imagen = _abrir(resultado).convert("RGB")
+    # No white lettering may reach the side margins of the headline area.
+    for x in (*range(0, 24), *range(1056, 1080)):
+        for y in range(880, 1250):
+            assert min(imagen.getpixel((x, y))) < 230, (x, y)
+
+
+def _es_oro(pixel: tuple[int, ...]) -> bool:
+    r, g, b = pixel[:3]
+    return r > 225 and 170 < g < 210 and b < 90
+
+
+def test_the_hook_is_one_gold_line_below_the_circle() -> None:
+    resultado = PillowPortadaRenderer().renderizar(
+        SolicitudPortada(
+            imagen_base=_foto((40, 40, 40)),
+            imagen_circulo=_foto((40, 40, 40)),
+            antetitulo="W" * MAX_CARACTERES_ANTETITULO,
+            titular="Un titular muy largo que obliga a usar varias líneas debajo del gancho " * 2,
+        )
+    )
+
+    imagen = _abrir(resultado).convert("RGB")
+    filas = [
+        y for y in range(700, 1270) if any(_es_oro(imagen.getpixel((x, y))) for x in range(1080))
+    ]
+    # Gold appears (hook and rule), all of it under the circle, which ends at y=967.
+    assert filas and filas[0] > 975
+
+
+def test_without_a_hook_nothing_is_gold() -> None:
+    resultado = PillowPortadaRenderer().renderizar(
+        SolicitudPortada(imagen_base=_foto((40, 40, 40)), titular="Titular sin gancho")
+    )
+
+    imagen = _abrir(resultado).convert("RGB")
+    assert not any(
+        _es_oro(imagen.getpixel((x, y))) for x in range(0, 1080, 2) for y in range(850, 1270, 2)
+    )
+
+
+def _foto_cuadrantes() -> bytes:
+    """A 4:5 photo with a different colour in each quarter: nothing overflows."""
+    imagen = Image.new("RGB", (800, 1000), (200, 0, 0))
+    imagen.paste((0, 200, 0), (400, 0, 800, 500))
+    imagen.paste((0, 0, 200), (0, 500, 400, 1000))
+    imagen.paste((200, 200, 0), (400, 500, 800, 1000))
+    buffer = io.BytesIO()
+    imagen.save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("enfoque_x", "enfoque_y", "esperado"),
+    [(0.0, 0.0, (200, 0, 0)), (1.0, 0.0, (0, 200, 0)), (0.0, 1.0, (0, 0, 200))],
+)
+def test_zoom_lets_a_4_5_photo_move_both_ways(
+    enfoque_x: float, enfoque_y: float, esperado: tuple[int, int, int]
+) -> None:
+    resultado = PillowPortadaRenderer().renderizar(
+        SolicitudPortada(
+            imagen_base=_foto_cuadrantes(),
+            titular="T",
+            enfoque_x=enfoque_x,
+            enfoque_y=enfoque_y,
+            zoom=2.0,
+        )
+    )
+
+    # The centre of the photo area shows the quarter the focus points at.
+    assert _abrir(resultado).convert("RGB").getpixel((540, 500)) == esperado
 
 
 def test_rejects_an_empty_headline() -> None:

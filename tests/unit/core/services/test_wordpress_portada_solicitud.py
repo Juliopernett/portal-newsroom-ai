@@ -107,3 +107,13 @@ def test_without_description_the_alt_text_is_the_draft_title() -> None:
     cms, _, _ = _crear(PortadaParaBorrador(imagen_base=b"foto"), descripcion="   ")
 
     assert cms.textos_alternativos == ["Titular generado"]
+
+
+def test_the_framing_reaches_the_renderer() -> None:
+    _, renderer, _ = _crear(
+        PortadaParaBorrador(imagen_base=b"foto", enfoque_x=0.2, enfoque_y=0.8, zoom=1.5)
+    )
+
+    pedida = renderer.pedida
+    assert pedida is not None
+    assert (pedida.enfoque_x, pedida.enfoque_y, pedida.zoom) == (0.2, 0.8, 1.5)
