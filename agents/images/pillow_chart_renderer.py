@@ -20,8 +20,10 @@ from typing import Literal
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps, UnidentifiedImageError
 
 from agents.images.pillow_portada_renderer import (
+    _AMARILLO_WEB,
     _ASSETS,
     _AZUL,
+    _AZUL_NOCHE_WEB,
     _BLANCO,
     _NEGRO,
     _ancho,
@@ -39,10 +41,13 @@ _ALTOS: dict[str, int] = {"feed": 1350, "historia": 1920}
 _MARGEN_SUPERIOR = {"feed": 0, "historia": 150}
 _MARGEN_INFERIOR = {"feed": 0, "historia": 200}
 
-_FONDO_ARRIBA = (9, 18, 44)
-_FONDO_ABAJO = (30, 50, 105)
-_CLARO = (176, 196, 235)
-_VERDE, _ROJO, _AMBAR, _GRIS = (52, 211, 110), (255, 99, 88), (240, 180, 20), (140, 155, 185)
+# Same identity as the news covers and portalvallenato.com: menu blue (`_AZUL`)
+# as the background, deepening towards the top, with the site's yellow as accent.
+_FONDO_ARRIBA = (24, 40, 78)
+_FONDO_ABAJO = _AZUL
+_CLARO = (214, 224, 245)
+_AZUL_BRILLO = (0x1E, 0x73, 0xBE)
+_VERDE, _ROJO, _AMBAR, _GRIS = (52, 211, 110), (255, 128, 118), _AMARILLO_WEB, (196, 208, 235)
 
 _MESES = [
     "enero",
@@ -158,7 +163,8 @@ def _fondo(ancho: int, alto: int) -> Image.Image:
     # Soft blue glow behind the headline, like the template's gradient.
     brillo = Image.new("RGBA", (ancho // 4, alto // 4), (0, 0, 0, 0))
     ImageDraw.Draw(brillo).ellipse(
-        (ancho // 4 * 0.35, -alto // 14, ancho // 4 * 1.2, alto // 4 * 0.42), fill=(*_AZUL, 140)
+        (ancho // 4 * 0.35, -alto // 14, ancho // 4 * 1.2, alto // 4 * 0.42),
+        fill=(*_AZUL_BRILLO, 120),
     )
     brillo = brillo.filter(ImageFilter.GaussianBlur(28)).resize((ancho, alto), Image.LANCZOS)
     lienzo.alpha_composite(brillo)
@@ -186,7 +192,7 @@ def _bloque_video(f: FilaImagen, w: int, h: int) -> Image.Image:
             "RGBA"
         )
     else:
-        base = Image.new("RGBA", (w * s, h * s), (*_AZUL, 255))
+        base = Image.new("RGBA", (w * s, h * s), (*_AZUL_NOCHE_WEB, 255))
         iniciales = "".join(p[0] for p in _limpiar(f.artista or "").split()[:2]) or "PV"
         ImageDraw.Draw(base).text(
             (w * s / 2, h * s / 2),
@@ -215,7 +221,7 @@ def _circulo_foto(
         recorte = ImageOps.fit(foto, (d * s, d * s), Image.LANCZOS, centering=(0.5, enfoque_y))
         recorte = recorte.convert("RGBA")
     else:
-        recorte = Image.new("RGBA", (d * s, d * s), (*_AZUL, 255))
+        recorte = Image.new("RGBA", (d * s, d * s), (*_AZUL_NOCHE_WEB, 255))
         iniciales = "".join(p[0] for p in _limpiar(nombre).split()[:2]) or "PV"
         fuente = _fuente("Anton-Regular.ttf", d * s * 0.42)
         ImageDraw.Draw(recorte).text(
@@ -349,12 +355,12 @@ class PillowChartRenderer:
         texto = f"SEMANA DEL {_rango_semana(semana_fin).upper()}"
         ancho = fuente.getlength(texto) + 56
         x = (_ANCHO - ancho) / 2
-        draw.rounded_rectangle((x, y, x + ancho, y + pildora), radius=26, fill=_AZUL)
-        _texto(draw, _ANCHO / 2, y + pildora / 2 + 10, texto, fuente, _BLANCO, "c")
+        draw.rounded_rectangle((x, y, x + ancho, y + pildora), radius=26, fill=_AMARILLO_WEB)
+        _texto(draw, _ANCHO / 2, y + pildora / 2 + 10, texto, fuente, _AZUL_NOCHE_WEB, "c")
         y += pildora + 22 + hueco
 
         # Headline.
-        for linea, color in (("LO MÁS ESCUCHADO", _BLANCO), ("DE LA SEMANA", (120, 160, 235))):
+        for linea, color in (("LO MÁS ESCUCHADO", _BLANCO), ("DE LA SEMANA", _AMARILLO_WEB)):
             fuente = _fuente("Anton-Regular.ttf", 96)
             y += 104
             _texto(draw, _ANCHO / 2 + 5, y - 20 + 5, linea, fuente, _NEGRO, "c")
@@ -367,12 +373,13 @@ class PillowChartRenderer:
         if miniatura is not None:
             bloque_img = ImageOps.fit(miniatura, (tw, th), Image.LANCZOS)
         else:
-            bloque_img = Image.new("RGB", (tw, th), _AZUL)
+            bloque_img = Image.new("RGB", (tw, th), _AZUL_NOCHE_WEB)
         marco = Image.new("RGBA", (tw + 16, th + 16), (*_BLANCO, 255))
         marco.paste(bloque_img, (8, 8))
         lienzo.alpha_composite(marco, (round(x_img) - 8, round(y) - 8))
-        draw.rectangle((x_img - 8, y - 8, x_img + 104, y + 132), fill=_NEGRO)
-        _texto(draw, x_img + 48, y + 112, "1", _fuente("Anton-Regular.ttf", 128), _BLANCO, "c")
+        draw.rectangle((x_img - 8, y - 8, x_img + 104, y + 132), fill=_AMARILLO_WEB)
+        fuente = _fuente("Anton-Regular.ttf", 128)
+        _texto(draw, x_img + 48, y + 112, "1", fuente, _AZUL_NOCHE_WEB, "c")
         d = 230
         foto, enfoque = _imagen_circulo(top)
         circulo = _circulo_foto(
@@ -405,7 +412,7 @@ class PillowChartRenderer:
             y,
             f"{_vistas(top.vistas_semana)} vistas esta semana",
             _fuente("Montserrat.ttf", 25, 700),
-            (120, 160, 235),
+            _AMARILLO_WEB,
         )
         y += 24 + hueco
 
@@ -429,7 +436,7 @@ class PillowChartRenderer:
         _texto(draw, 36, y, "TOP 10 DE LA SEMANA", fuente, _BLANCO)
         fuente = _fuente("Montserrat.ttf", 27, 700)
         y += 50
-        _texto(draw, 36, y, f"DEL {_rango_semana(semana_fin).upper()}", fuente, (120, 160, 235))
+        _texto(draw, 36, y, f"DEL {_rango_semana(semana_fin).upper()}", fuente, _AMARILLO_WEB)
         y += 28
         fila_h = min((y1 - y) / max(len(filas), 1), 150)
         for i, fila in enumerate(filas):
@@ -453,10 +460,12 @@ class PillowChartRenderer:
         centro = y + h / 2
         bw = h * 0.72
         x = x0 + 36
-        draw.rectangle((x, centro - (h - 18) / 2, x + bw, centro + (h - 18) / 2), fill=_AZUL)
+        draw.rectangle(
+            (x, centro - (h - 18) / 2, x + bw, centro + (h - 18) / 2), fill=_AMARILLO_WEB
+        )
         _texto(
             draw, x + bw / 2, centro + h * 0.2, str(f.posicion),
-            _fuente("Anton-Regular.ttf", h * 0.58), _BLANCO, "c",
+            _fuente("Anton-Regular.ttf", h * 0.58), _AZUL_NOCHE_WEB, "c",
         )  # fmt: skip
         th = round(h - 18)
         tw = round(th * 16 / 9)
