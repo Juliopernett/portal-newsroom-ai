@@ -16,27 +16,34 @@ interface ReportOption {
 
 const REPORTS: ReportOption[] = [
   {
+    value: 'completo',
+    label: 'Reporte completo',
+    baseUrl: '/reportes/completo.xlsx',
+    helpText:
+      'Un solo archivo con cuatro pestañas: rentabilidad, pautas, gastos y otros ingresos. Vacío = histórico completo. Las pautas se filtran por fecha de inicio y la rentabilidad cuenta cada pauta por su fecha de pago.',
+  },
+  {
     value: 'rentabilidad',
     label: 'Rentabilidad mensual',
-    baseUrl: '/reportes/rentabilidad.csv',
+    baseUrl: '/reportes/rentabilidad.xlsx',
     helpText: 'Vacío = últimos 12 meses. Ingresos cobrados menos gastos registrados, por mes.',
   },
   {
     value: 'pautas',
     label: 'Pautas',
-    baseUrl: '/reportes/pautas.csv',
+    baseUrl: '/reportes/pautas.xlsx',
     helpText: 'Vacío = histórico completo. Filtra por la fecha de inicio de cada pauta.',
   },
   {
     value: 'gastos',
     label: 'Gastos',
-    baseUrl: '/reportes/gastos.csv',
+    baseUrl: '/reportes/gastos.xlsx',
     helpText: 'Vacío = histórico completo. Ordenado por fecha.',
   },
   {
     value: 'otros-ingresos',
     label: 'Otros ingresos',
-    baseUrl: '/reportes/otros-ingresos.csv',
+    baseUrl: '/reportes/otros-ingresos.xlsx',
     helpText: 'Vacío = histórico completo. Ingresos recibidos fuera de una pauta (Facebook, AdSense…), ordenados por fecha de cobro.',
   },
 ]
@@ -61,7 +68,7 @@ export function ReportesPage() {
       <div>
         <h1 className="text-lg font-semibold">Reportes</h1>
         <p className="text-sm text-muted-foreground">
-          Exporta CSV para abrir en Excel — deja las fechas vacías para el histórico completo
+          Descarga tus datos en Excel, con totales y filtros
         </p>
       </div>
 
@@ -112,9 +119,9 @@ export function ReportesPage() {
           <Button
             variant="secondary"
             className="w-full sm:w-auto"
-            onClick={() => void descargarArchivo(href, `${report.value}.csv`)}
+            onClick={() => void descargarArchivo(href, `${report.value}.xlsx`)}
           >
-            <Download /> Descargar CSV
+            <Download /> Descargar Excel
           </Button>
         </div>
 

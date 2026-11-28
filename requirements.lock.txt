@@ -49,6 +49,8 @@ distro==1.9.0
     # via anthropic
 docstring-parser==0.18.0
     # via anthropic
+et-xmlfile==2.0.0
+    # via openpyxl
 fastapi==0.141.1
     # via -r requirements.txt
 feedparser==6.0.14
@@ -86,6 +88,8 @@ mako==1.4.1
     # via alembic
 markupsafe==3.0.3
     # via mako
+openpyxl==3.1.5
+    # via -r requirements.txt
 pillow==13.0.0
     # via
     #   -r requirements.txt
