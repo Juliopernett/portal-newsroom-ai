@@ -94,7 +94,7 @@ pillow==13.0.0
     # via
     #   -r requirements.txt
     #   reportlab
-playwright==1.62.0
+playwright==1.65.2
     # via -r requirements.txt
 psycopg[binary]==3.3.4
     # via -r requirements.txt
